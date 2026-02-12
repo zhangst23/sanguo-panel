@@ -1,0 +1,43 @@
+// Arco Design Variable Overrides
+:root {
+  // Brand Colors
+  --arco-blue-6: #165DFF;
+  --arco-blue-5: #3491FA;
+  --arco-blue-1: #E8F3FF;
+
+  // Functional Colors
+  --arco-green-6: #00B42A;
+  --arco-orange-6: #FF7D00;
+  --arco-red-6: #F53F3F;
+
+  // Neutral Colors
+  --arco-gray-1: #FFFFFF;
+  --arco-gray-2: #F7F8FA;
+  --arco-gray-3: #F2F3F5;
+  --arco-gray-4: #E5E6EB;
+  --arco-gray-5: #C9CDD4;
+  --arco-gray-6: #86909C;
+  --arco-gray-7: #4E5969;
+  --arco-gray-8: #1D2129;
+
+  // Border Radius
+  --border-radius-small: 4px;
+  --border-radius-medium: 6px;
+  --border-radius-large: 8px;
+
+  // Typography
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+}
+
+body {
+  background-color: var(--arco-gray-2);
+  color: var(--arco-gray-8);
+  font-family: var(--font-family);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+}
+
+#app {
+  height: 100vh;
+}
