@@ -40,4 +40,11 @@ class Site(Base):
     status = Column(Enum(StatusEnum), default=StatusEnum.active)
     notes = Column(String)
     
+    # Performance & Cache
+    performance_preset = Column(String(20), default="balanced") # basic, balanced, ultimate
+    lscache_enabled = Column(Boolean, default=True)
+    redis_enabled = Column(Boolean, default=True)
+    opcache_enabled = Column(Boolean, default=True)
+    browser_cache_enabled = Column(Boolean, default=True)
+    
     shared_db = relationship("SharedDatabase", back_populates="sites")

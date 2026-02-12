@@ -19,10 +19,20 @@ class SiteUpdate(BaseModel):
     php_version: Optional[str] = None
     notes: Optional[str] = None
     status: Optional[str] = None
+    performance_preset: Optional[str] = None
+    lscache_enabled: Optional[bool] = None
+    redis_enabled: Optional[bool] = None
+    opcache_enabled: Optional[bool] = None
+    browser_cache_enabled: Optional[bool] = None
 
 class Site(SiteBase):
     id: int
     status: str
+    performance_preset: str
+    lscache_enabled: bool
+    redis_enabled: bool
+    opcache_enabled: bool
+    browser_cache_enabled: bool
     created_at: datetime
     updated_at: datetime
 
