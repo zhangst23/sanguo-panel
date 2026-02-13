@@ -24,11 +24,14 @@
           <template #icon><icon-common /></template>
           Websites
         </a-menu-item>
+        <a-menu-item key="MariaDB">
+          <template #icon><icon-storage /></template>
+          MariaDB
+        </a-menu-item>
         <a-sub-menu key="System">
           <template #icon><icon-settings /></template>
           <template #title>System</template>
           <a-menu-item key="PHP">PHP</a-menu-item>
-          <a-menu-item key="MariaDB">MariaDB</a-menu-item>
           <a-menu-item key="LiteSpeed">LiteSpeed</a-menu-item>
         </a-sub-menu>
       </a-menu>
