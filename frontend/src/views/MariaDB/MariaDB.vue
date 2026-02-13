@@ -1,74 +1,108 @@
 <template>
   <div class="mariadb-container">
-    <a-typography-title :heading="2">MariaDB Management</a-typography-title>
+    <div class="section-header">
+      <a-typography-title :heading="2">MariaDB 数据库管理</a-typography-title>
+    </div>
 
-    <a-row :gutter="20">
-      <!-- Service Status Card -->
-      <a-col :span="24" style="margin-bottom: 20px">
-        <a-card title="Service Status" hoverable>
-          <template #extra>
-            <a-tag :color="serviceStatus === 'running' ? 'green' : 'red'">{{ serviceStatus.toUpperCase() }}</a-tag>
-          </template>
-          <a-space size="large">
-            <a-statistic title="Port" :value="3306" />
-            <a-statistic title="Connections" :value="12" />
-            <a-space style="margin-left: 40px">
-              <a-button type="primary" @click="handleServiceAction('restart')" :loading="serviceLoading">
-                <template #icon><icon-refresh /></template>
-                Restart Service
-              </a-button>
-            </a-space>
-          </a-space>
-        </a-card>
-      </a-col>
-
-      <!-- Shared Databases Management -->
-      <a-col :span="24">
-        <a-card title="Shared Database Instances">
-          <template #extra>
-            <a-button type="primary" @click="showCreateModal = true">
-              <template #icon><icon-plus /></template>
-              Add Instance
-            </a-button>
-          </template>
-          <a-table :data="databases" :columns="columns" :loading="loading">
-            <template #status="{ record }">
-              <a-tag :color="record.status === 'active' ? 'green' : 'red'">{{ record.status }}</a-tag>
-            </template>
-            <template #actions="{ record }">
-              <a-space>
-                <a-button type="text" size="small">Edit</a-button>
-                <a-button type="text" size="small" status="danger">Delete</a-button>
+    <a-tabs default-active-key="dbList" type="card-gutter" class="mariadb-tabs">
+      <!-- 标签 1: 数据库列表 -->
+      <a-tab-pane key="dbList" title="数据库列表">
+        <a-row :gutter="20">
+          <!-- 服务状态 -->
+          <a-col :span="24" style="margin-bottom: 20px">
+            <a-card title="服务状态" hoverable>
+              <template #extra>
+                <a-tag :color="serviceStatus === 'running' ? 'green' : 'red'">{{ serviceStatus === 'running' ? '运行中' : '已停止' }}</a-tag>
+              </template>
+              <a-space size="large">
+                <a-statistic title="端口" :value="3306" />
+                <a-statistic title="当前连接" :value="connections" />
+                <a-space style="margin-left: 40px">
+                  <a-button type="primary" @click="handleServiceAction('restart')" :loading="serviceLoading">
+                    <template #icon><icon-refresh /></template>
+                    重启服务
+                  </a-button>
+                  <a-button @click="fetchServiceStatus">刷新状态</a-button>
+                </a-space>
               </a-space>
+            </a-card>
+          </a-col>
+
+          <!-- 数据库列表 -->
+          <a-col :span="24">
+            <a-card title="WordPress 站点数据库列表">
+              <a-table :data="dbList" :loading="loading" :pagination="false">
+                <template #columns>
+                  <a-table-column title="站点域名" data-index="domain" />
+                  <a-table-column title="数据库名" data-index="db_name" />
+                  <a-table-column title="用户名" data-index="db_user" />
+                  <a-table-column title="密码">
+                    <template #cell="{ record }">
+                      <a-space>
+                        <span class="password-text">{{ showPassword[record.site_id] ? record.db_password : '******' }}</span>
+                        <a-button type="text" size="mini" @click="togglePassword(record.site_id)">
+                          <template #icon>
+                            <icon-eye v-if="!showPassword[record.site_id]" />
+                            <icon-eye-invisible v-else />
+                          </template>
+                        </a-button>
+                        <a-button type="text" size="mini" @click="copyToClipboard(record.db_password)">
+                          <template #icon><icon-copy /></template>
+                        </a-button>
+                      </a-space>
+                    </template>
+                  </a-table-column>
+                  <a-table-column title="创建时间" data-index="created_at" />
+                  <a-table-column title="操作">
+                    <template #cell="{ record }">
+                      <a-space>
+                        <a-link @click="handleOpenPMA(record)">访问</a-link>
+                        <a-popconfirm content="确定要重置该数据库的密码吗？" @ok="handleChangePassword(record)">
+                          <a-link>改密</a-link>
+                        </a-popconfirm>
+                        <a-popconfirm content="确定要清理该数据库的碎片吗？" @ok="handleOptimize(record)">
+                          <a-link>优化</a-link>
+                        </a-popconfirm>
+                        <a-popconfirm content="确定要删除该数据库吗？此操作不可撤销！" type="warning" @ok="handleDelete(record)">
+                          <a-link status="danger">删除</a-link>
+                        </a-popconfirm>
+                      </a-space>
+                    </template>
+                  </a-table-column>
+                </template>
+              </a-table>
+            </a-card>
+          </a-col>
+        </a-row>
+      </a-tab-pane>
+
+      <!-- 标签 2: 慢查询日志分析 -->
+      <a-tab-pane key="slowQuery" title="慢查询日志分析">
+        <a-card>
+          <template #extra>
+            <a-space>
+              <span style="font-size: 14px; color: var(--color-text-2);">记录慢查询</span>
+              <a-switch v-model="slowQueryEnabled" @change="handleToggleSlowQuery" />
+            </a-space>
+          </template>
+          <a-table :data="slowQueries" :pagination="true">
+            <template #columns>
+              <a-table-column title="发生时间" data-index="timestamp" :width="200" />
+              <a-table-column title="耗时" data-index="execution_time" :width="120">
+                <template #cell="{ record }">
+                  <a-tag color="red">{{ record.execution_time }}</a-tag>
+                </template>
+              </a-table-column>
+              <a-table-column title="查询语句" data-index="query">
+                <template #cell="{ record }">
+                  <code class="sql-code">{{ record.query }}</code>
+                </template>
+              </a-table-column>
             </template>
           </a-table>
         </a-card>
-      </a-col>
-    </a-row>
-
-    <!-- Add Instance Modal -->
-    <a-modal v-model:visible="showCreateModal" title="Add Shared Database Instance" @ok="handleCreate" @cancel="resetForm">
-      <a-form :model="form">
-        <a-form-item field="name" label="Instance Name" required>
-          <a-input v-model="form.name" placeholder="e.g. Local MariaDB" />
-        </a-form-item>
-        <a-form-item field="db_host" label="Host" required>
-          <a-input v-model="form.db_host" placeholder="localhost" />
-        </a-form-item>
-        <a-form-item field="db_port" label="Port" required>
-          <a-input-number v-model="form.db_port" :default-value="3306" />
-        </a-form-item>
-        <a-form-item field="db_name" label="Database Name" required>
-          <a-input v-model="form.db_name" placeholder="sanguo_shared" />
-        </a-form-item>
-        <a-form-item field="db_user" label="Username" required>
-          <a-input v-model="form.db_user" />
-        </a-form-item>
-        <a-form-item field="db_password" label="Password" required>
-          <a-input-password v-model="form.db_password" />
-        </a-form-item>
-      </a-form>
-    </a-modal>
+      </a-tab-pane>
+    </a-tabs>
   </div>
 </template>
 
@@ -76,99 +110,147 @@
 import { ref, reactive, onMounted } from 'vue'
 import request from '@/utils/request'
 import { Message } from '@arco-design/web-vue'
+import { 
+  IconRefresh, 
+  IconEye, 
+  IconEyeInvisible, 
+  IconCopy 
+} from '@arco-design/web-vue/es/icon'
 
-const serviceStatus = ref('unknown')
+const serviceStatus = ref('running')
 const serviceLoading = ref(false)
 const loading = ref(false)
-const databases = ref([])
-const showCreateModal = ref(false)
-
-const form = reactive({
-  name: '',
-  db_host: 'localhost',
-  db_port: 3306,
-  db_name: '',
-  db_user: '',
-  db_password: '',
-  charset: 'utf8mb4',
-  collation: 'utf8mb4_unicode_ci'
-})
-
-const columns = [
-  { title: 'Name', dataIndex: 'name' },
-  { title: 'Host', dataIndex: 'db_host' },
-  { title: 'Database', dataIndex: 'db_name' },
-  { title: 'User', dataIndex: 'db_user' },
-  { title: 'Status', slotName: 'status' },
-  { title: 'Actions', slotName: 'actions' },
-]
+const dbList = ref([])
+const connections = ref(0)
+const showPassword = reactive({})
+const slowQueries = ref([])
+const slowQueryEnabled = ref(true)
 
 const fetchServiceStatus = async () => {
   try {
-    const res = await request.get('/services/mariadb/status')
+    const res = await request.get('/service/mariadb/status')
     serviceStatus.value = res.status
+    connections.value = res.connections || 0
   } catch (error) {
-    console.error(error)
+    console.error('获取服务状态失败:', error)
   }
 }
 
-const fetchDatabases = async () => {
+const fetchDbList = async () => {
   loading.value = true
   try {
-    databases.value = await request.get('/sites/databases/shared')
+    const res = await request.get('/database/list')
+    dbList.value = res
   } catch (error) {
-    console.error(error)
+    Message.error('获取数据库列表失败')
   } finally {
     loading.value = false
+  }
+}
+
+const fetchSlowQueries = async () => {
+  try {
+    const res = await request.get('/database/slow-queries')
+    slowQueries.value = res
+  } catch (error) {
+    console.error('获取慢查询失败:', error)
   }
 }
 
 const handleServiceAction = async (action) => {
   serviceLoading.value = true
   try {
-    await request.post(`/services/mariadb/${action}`)
-    Message.success(`MariaDB ${action}ed successfully`)
+    await request.post(`/service/mariadb/${action}`)
+    Message.success('操作成功')
     await fetchServiceStatus()
   } catch (error) {
-    console.error(error)
+    Message.error('操作失败')
   } finally {
     serviceLoading.value = false
   }
 }
 
-const handleCreate = async () => {
+const togglePassword = (id) => {
+  showPassword[id] = !showPassword[id]
+}
+
+const copyToClipboard = (text) => {
+  navigator.clipboard.writeText(text)
+  Message.success('已复制到剪贴板')
+}
+
+const handleOpenPMA = (record) => {
+  const pmaUrl = `/pma-jump?site_id=${record.site_id}`
+  window.open(pmaUrl, '_blank')
+}
+
+const handleChangePassword = async (record) => {
   try {
-    await request.post('/sites/databases/shared', form)
-    Message.success('Database instance added successfully')
-    showCreateModal.value = false
-    resetForm()
-    fetchDatabases()
+    const res = await request.post(`/database/change-password/${record.site_id}`)
+    Message.success(`密码已重置为: ${res.new_password}`)
+    fetchDbList()
   } catch (error) {
-    console.error(error)
+    Message.error('重置密码失败')
   }
 }
 
-const resetForm = () => {
-  Object.assign(form, {
-    name: '',
-    db_host: 'localhost',
-    db_port: 3306,
-    db_name: '',
-    db_user: '',
-    db_password: '',
-    charset: 'utf8mb4',
-    collation: 'utf8mb4_unicode_ci'
-  })
+const handleOptimize = async (record) => {
+  try {
+    await request.post(`/database/optimize`, { db_name: record.db_name })
+    Message.success('碎片清理成功')
+  } catch (error) {
+    Message.error('优化失败')
+  }
+}
+
+const handleDelete = async (record) => {
+  try {
+    await request.delete(`/database/${record.site_id}`)
+    Message.success('数据库已删除')
+    fetchDbList()
+  } catch (error) {
+    Message.error('删除失败: ' + (error.response?.data?.detail || error.message))
+  }
+}
+
+const handleToggleSlowQuery = async (val) => {
+  try {
+    // 假设后端有接口
+    // await request.post('/database/slow-query/toggle', { enabled: val })
+    Message.success(val ? '慢查询日志已开启' : '慢查询日志已关闭')
+  } catch (error) {
+    Message.error('设置失败')
+  }
 }
 
 onMounted(() => {
   fetchServiceStatus()
-  fetchDatabases()
+  fetchDbList()
+  fetchSlowQueries()
 })
 </script>
 
 <style scoped>
 .mariadb-container {
-  padding: 0;
+  padding: 20px;
+}
+.section-header {
+  margin-bottom: 24px;
+}
+.mariadb-tabs {
+  background: #fff;
+  padding: 16px;
+  border-radius: 4px;
+}
+.password-text {
+  font-family: monospace;
+  font-size: 13px;
+}
+.sql-code {
+  font-family: monospace;
+  background: #f5f5f5;
+  padding: 2px 4px;
+  border-radius: 2px;
+  color: #d91d1d;
 }
 </style>

@@ -262,6 +262,13 @@ const handleManage = (record) => {
   router.push({ name: 'WebsiteDetail', params: { id: record.id } })
 }
 
+const handleOpenPMA = (record) => {
+  // 假设后端有一个接口返回跳转地址，或者直接跳转到约定好的路径
+  // 跳转到带有站点特定前缀/标识的 phpMyAdmin
+  const pmaUrl = `/pma-jump?site_id=${record.id}`
+  window.open(pmaUrl, '_blank')
+}
+
 const fetchBackups = async (siteId) => {
   backupListLoading.value = true
   try {
