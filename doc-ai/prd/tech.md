@@ -2,6 +2,7 @@
 
 ## 技术组合栈（WordPress极致速度面板）
 OpenLiteSpeed + LSAPI + MariaDB + Redis Object Cache + LSCache + 自动图片优化 + OPcache + 数据库清理 + CDN + 静态化全站缓存
+面板使用sqlite，WordPress站点使用MariaDB数据库。
 面板下安装的多个 WordPress 站点的数据表使用不同前缀进行隔离。通过配置文件 wp-config.php 中的 $table_prefix 变量支持在同一数据库中安装多个独立站点。
 
 首选 OpenLiteSpeed：免费、性能强、适配 WordPress 缓存、无授权风险

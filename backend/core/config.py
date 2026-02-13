@@ -23,7 +23,7 @@ class Settings(BaseSettings):
         raise ValueError(v)
 
     # Database
-    DATABASE_URL: str = "sqlite:///./panel.db"
+    DATABASE_URL: str = "sqlite:///./backend/panel.db"
     
     model_config = SettingsConfigDict(case_sensitive=True, env_file=".env")
 

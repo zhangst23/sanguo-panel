@@ -81,7 +81,27 @@
 - **前端布局**: 使用 Arco Design 的 `a-layout` 组合，支持侧边栏折叠。
 - **实时性**: Dashboard 采用 `setInterval` 定期拉取监控数据。
 
+## 2026-02-13: 后端启动修复与站点创建功能完善
+
+### 已完成功能
+1.  **后端启动环境优化**:
+    - 修复了 `PYTHONPATH` 导致的 `ModuleNotFoundError` 问题。
+    - 统一了数据库文件路径为 `backend/panel.db`，避免在根目录产生多余文件。
+    - 优化了 `uvicorn` 启动参数，增加了 `--reload-exclude "*.db"`，解决了数据库写入触发服务无限重启导致的“一直转圈圈”问题。
+2.  **数据库架构一致性**:
+    - 修复了 `sites` 表缺少性能优化相关字段（如 `performance_preset`, `lscache_enabled` 等）的问题。
+    - 重新初始化了数据库，确保所有 P0/P1 功能所需的字段均已正确创建。
+    - 实现完整数据库模型（Task, Backup, Firewall, Options），支持后续真实功能开发。
+3.  **任务系统基础**:
+    - 建立后台异步任务系统基础（Task 追踪与进度上报），并集成到“一键全站极速优化”功能中。
+4.  **前端站点管理优化**:
+    - 优化了 `WebsiteList.vue` 的创建流程，增加了表单校验和提交时的 `loading` 状态。
+    - 修复了 `shared_db_id` 在初始加载时可能为 `null` 导致提交失败的问题。
+
+### 技术要点
+- **Uvicorn 配置**: 在开发模式下使用 `--reload` 时，必须排除数据库文件，否则 SQLite 写入操作会导致服务重启。
+- **FastAPI 启动钩子**: 在 `main.py` 中增加了 `startup` 事件日志，方便确认服务是否正常启动。
+
 ### 注意事项
-- 当前 Node.js 版本 (20.12.0) 低于 Vite 推荐版本，但在开发环境下运行正常。
-- 数据库目前使用本地 SQLite (`panel.db`)，便于开发调试。
-- 后端需要 `PYTHONPATH` 环境变量才能正确识别 `backend` 模块。
+- 后端启动命令已更新，建议使用 `README.md` 中提供的最新启动方式。
+- 如果之前已创建数据库，建议删除 `panel.db` 并运行 `python backend/init_db.py` 重新初始化以应用最新的 Schema。

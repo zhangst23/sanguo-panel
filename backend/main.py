@@ -9,6 +9,10 @@ app = FastAPI(
     version=settings.VERSION,
 )
 
+@app.on_event("startup")
+async def startup_event():
+    print(f"--- {settings.PROJECT_NAME} is starting up ---")
+
 # Set all CORS enabled origins
 if settings.BACKEND_CORS_ORIGINS:
     app.add_middleware(
@@ -19,7 +23,7 @@ if settings.BACKEND_CORS_ORIGINS:
         allow_headers=["*"],
     )
 
-app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
+app.include_router(auth.router, prefix=f"{settings.API_V1_STR}", tags=["auth"])
 app.include_router(system.router, prefix=f"{settings.API_V1_STR}/system", tags=["system"])
 app.include_router(site.router, prefix=f"{settings.API_V1_STR}/sites", tags=["sites"])
 app.include_router(service.router, prefix=f"{settings.API_V1_STR}/services", tags=["services"])

@@ -26,7 +26,13 @@
     </a-card>
 
     <!-- Create Site Modal -->
-    <a-modal v-model:visible="showCreateModal" title="Create New Site" @ok="handleCreate" @cancel="resetForm">
+    <a-modal 
+      v-model:visible="showCreateModal" 
+      title="Create New Site" 
+      :confirm-loading="confirmLoading"
+      @ok="handleCreate" 
+      @cancel="resetForm"
+    >
       <a-form :model="form" ref="formRef">
         <a-form-item field="domain" label="Domain" required>
           <a-input v-model="form.domain" placeholder="e.g. example.com" />
@@ -104,7 +110,15 @@ const fetchSharedDbs = async () => {
   }
 }
 
+const confirmLoading = ref(false)
+
 const handleCreate = async () => {
+  if (!form.domain || !form.root_path || !form.shared_db_id) {
+    Message.error('Please fill in all required fields')
+    return
+  }
+  
+  confirmLoading.value = true
   try {
     await request.post('/sites/', form)
     Message.success('Site created successfully')
@@ -113,6 +127,9 @@ const handleCreate = async () => {
     fetchSites()
   } catch (error) {
     console.error(error)
+    // Error message is already handled by request interceptor
+  } finally {
+    confirmLoading.value = false
   }
 }
 
