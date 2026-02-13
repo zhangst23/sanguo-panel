@@ -2,6 +2,13 @@ import os
 import subprocess
 import glob
 
+def get_php_path():
+    """
+    Find the PHP executable in PATH or common installation directories.
+    Returns the full path to the executable or None if not found.
+    """
+    return find_php_executable()
+
 def find_php_executable():
     """
     Find the PHP executable in PATH or common installation directories.

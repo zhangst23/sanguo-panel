@@ -31,8 +31,8 @@ def init_db():
             db_host="localhost",
             db_port=3306,
             db_name="sanguo_shared",
-            db_user="sanguo_user",
-            db_password="password123",
+            db_user="root",
+            db_password="",
             max_table_count=1000,
             status="active"
         )
@@ -40,6 +40,13 @@ def init_db():
         db.commit()
         print("Default shared database created.")
     else:
+        # Update existing default if it matches the old placeholder
+        if shared_db.db_user == "sanguo_user":
+            shared_db.db_user = "root"
+            shared_db.db_password = ""
+            db.add(shared_db)
+            db.commit()
+            print("Default shared database updated to root (XAMPP default).")
         print("Default shared database already exists.")
     
     db.close()

@@ -55,8 +55,8 @@ def create_site(
                 db_host="localhost",
                 db_port=3306,
                 db_name="sanguo_shared",
-                db_user="sanguo_user",
-                db_password="sanguo_password",
+                db_user="root",
+                db_password="",
                 status="active"
             )
             db.add(shared_db)
@@ -95,91 +95,128 @@ def create_site(
     # --- MariaDB/MySQL Database & WordPress Installation Logic ---
     try:
         shared_db = db.query(SharedDatabaseModel).filter(SharedDatabaseModel.id == site.shared_db_id).first()
+        
+        # Initialize DB variables to None
+        db_name = None
+        db_user = None
+        db_pass = None
+
         if shared_db:
             import mysql.connector
             import string
             import random
-            import requests
-            import zipfile
-            import shutil
             
             # 1. Database Creation
-            conn = mysql.connector.connect(
-                host=shared_db.db_host,
-                port=shared_db.db_port,
-                user=shared_db.db_user,
-                password=shared_db.db_password
-            )
-            cursor = conn.cursor()
-            
-            # Generate DB name, user, password
-            safe_domain = site.domain.replace('.', '_').replace('-', '_')
-            db_name = f"db_{safe_domain}"
-            db_user = f"u_{safe_domain}"[:16] # MySQL user max 16 chars in older versions
-            db_pass = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
-            
-            # Create DB
-            cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{db_name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
-            
-            # Create User and Grant Permissions
             try:
-                cursor.execute(f"CREATE USER '{db_user}'@'localhost' IDENTIFIED BY '{db_pass}'")
-            except:
-                cursor.execute(f"ALTER USER '{db_user}'@'localhost' IDENTIFIED BY '{db_pass}'")
+                conn = mysql.connector.connect(
+                    host=shared_db.db_host,
+                    port=shared_db.db_port,
+                    user=shared_db.db_user,
+                    password=shared_db.db_password,
+                    connect_timeout=5
+                )
+                cursor = conn.cursor()
+                
+                # Generate DB name, user, password
+                safe_domain = site.domain.replace('.', '_').replace('-', '_')
+                db_name = f"db_{safe_domain}"
+                db_user = f"u_{safe_domain}"[:16] 
+                db_pass = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
+                
+                # Create DB
+                cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{db_name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
+                
+                # Create User and Grant Permissions
+                try:
+                    cursor.execute(f"CREATE USER '{db_user}'@'localhost' IDENTIFIED BY '{db_pass}'")
+                except:
+                    cursor.execute(f"ALTER USER '{db_user}'@'localhost' IDENTIFIED BY '{db_pass}'")
+                
+                cursor.execute(f"GRANT ALL PRIVILEGES ON `{db_name}`.* TO '{db_user}'@'localhost'")
+                cursor.execute("FLUSH PRIVILEGES")
+                
+                # Update site record
+                site.db_name = db_name
+                site.db_user = db_user
+                site.db_password = db_pass
+                site.db_permission = "site_only"
+                site.notes = "step2: MariaDB 数据库安装完成"
+                db.add(site)
+                db.commit()
+                
+                cursor.close()
+                conn.close()
+            except Exception as db_err:
+                print(f"Database creation failed: {db_err}")
+                site.notes = f"warning: 数据库创建失败({str(db_err)})，将继续安装文件"
+                db.add(site)
+                db.commit()
+
+        # 2. WordPress Files Installation using WP-CLI
+        import subprocess
+        import shutil
+        from backend.utils.php_utils import get_php_path
+
+        if not os.path.exists(site.root_path):
+            os.makedirs(site.root_path, exist_ok=True)
+        
+        php_path = get_php_path()
+        bin_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "backend", "bin")
+        os.makedirs(bin_dir, exist_ok=True)
+        wp_cli_path = os.path.join(bin_dir, "wp-cli.phar")
+        
+        if not os.path.exists(wp_cli_path):
+            import requests
+            print("Downloading WP-CLI...")
+            r = requests.get("https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar")
+            with open(wp_cli_path, "wb") as f:
+                f.write(r.content)
+
+        # Step 1: Download core
+        site.notes = "step1: WordPress 文件下载中..."
+        db.add(site)
+        db.commit()
+
+        try:
+            # Download Core
+            cmd = [php_path, wp_cli_path, "core", "download", f"--path={site.root_path}", "--locale=zh_CN", "--allow-root", "--skip-content"]
+            subprocess.run(cmd, check=True, capture_output=True)
             
-            # Default to site_only permission
-            cursor.execute(f"GRANT ALL PRIVILEGES ON `{db_name}`.* TO '{db_user}'@'localhost'")
-            cursor.execute("FLUSH PRIVILEGES")
+            # Step 3: Config Create (only if DB was created successfully)
+            if db_name and db_user and db_pass:
+                site.notes = "step3: 配置优化中..."
+                db.add(site)
+                db.commit()
+
+                cmd_config = [
+                    php_path, wp_cli_path, "config", "create", 
+                    f"--path={site.root_path}", 
+                    f"--dbname={db_name}", 
+                    f"--dbuser={db_user}", 
+                    f"--dbpass={db_pass}", 
+                    f"--dbhost={shared_db.db_host}",
+                    f"--dbprefix={site.table_prefix}",
+                    "--locale=zh_CN",
+                    "--allow-root"
+                ]
+                subprocess.run(cmd_config, check=True, capture_output=True)
+                site.notes = "completed: WordPress 站点创建完成"
+            else:
+                site.notes = "completed: 文件已安装(数据库配置需手动)"
             
-            # Update site record
-            site.db_name = db_name
-            site.db_user = db_user
-            site.db_password = db_pass
-            site.db_permission = "site_only"
-            site.notes = f"WordPress installed. DB: {db_name}"
             db.add(site)
             db.commit()
-            
-            cursor.close()
-            conn.close()
 
-            # 2. WordPress Files Installation
-            # Ensure root path exists
-            if not os.path.exists(site.root_path):
-                os.makedirs(site.root_path, exist_ok=True)
-            
-            # Download WordPress if not already present in a cache directory
-            wp_zip_path = os.path.join(os.path.dirname(site.root_path), "wordpress-latest.zip")
-            if not os.path.exists(wp_zip_path):
-                print(f"Downloading WordPress...")
-                response = requests.get("https://wordpress.org/latest.zip", timeout=60)
-                with open(wp_zip_path, "wb") as f:
-                    f.write(response.content)
-            
-            # Extract to root path
-            print(f"Extracting WordPress to {site.root_path}...")
-            with zipfile.ZipFile(wp_zip_path, 'r') as zip_ref:
-                # WordPress zip contains a 'wordpress' folder, we want its contents
-                extract_tmp = os.path.join(os.path.dirname(site.root_path), f"wp_tmp_{site.id}")
-                zip_ref.extractall(extract_tmp)
-                
-                # Move contents from extract_tmp/wordpress to site.root_path
-                wp_src = os.path.join(extract_tmp, "wordpress")
-                for item in os.listdir(wp_src):
-                    s = os.path.join(wp_src, item)
-                    d = os.path.join(site.root_path, item)
-                    if os.path.isdir(s):
-                        if os.path.exists(d): shutil.rmtree(d)
-                        shutil.copytree(s, d)
-                    else:
-                        shutil.copy2(s, d)
-                
-                # Cleanup tmp
-                shutil.rmtree(extract_tmp)
+        except subprocess.CalledProcessError as e:
+            err_msg = e.stderr.decode(errors='ignore') if e.stderr else str(e)
+            print(f"WP-CLI Error: {err_msg}")
+            site.notes = f"failed: WP-CLI 执行失败 - {err_msg}"
+            db.add(site)
+            db.commit()
 
     except Exception as e:
         print(f"Error during WordPress installation: {e}")
-        site.notes = f"Installation failed: {e}. Please check logs."
+        site.notes = f"failed: 安装失败 - {str(e)}"
         db.add(site)
         db.commit()
 
