@@ -34,3 +34,21 @@ def read_task(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
+
+@router.delete("/{task_uuid}")
+def delete_task(
+    *,
+    db: Session = Depends(deps.get_db),
+    task_uuid: str,
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    """
+    Delete task record.
+    """
+    task = db.query(TaskModel).filter(TaskModel.task_uuid == task_uuid).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    db.delete(task)
+    db.commit()
+    return {"success": True}

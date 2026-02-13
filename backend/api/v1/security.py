@@ -1,14 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from backend.core.database import get_db
 from backend.api.deps import get_current_user
 from backend.utils.site_utils import update_wp_config_redis, update_wp_hide_login, fix_site_permissions, update_wp_xmlrpc
 from backend.models.site import Site
+from backend.models.backup import Backup as BackupModel, BackupSchedule as BackupScheduleModel
+from backend.models.task import Task as TaskModel, TaskStatus
+from backend.schemas.backup import Backup, BackupCreate, BackupSchedule, BackupScheduleCreate
+from backend.utils.backup_utils import create_site_backup
 from backend.core import security as security_utils
 from backend.models.user import User
 from typing import List, Optional
 import subprocess
 import os
+import uuid
 
 router = APIRouter()
 
@@ -229,48 +235,142 @@ def update_fail2ban_config(config: dict, current_user=Depends(get_current_user))
 
 # --- Backup Endpoints ---
 
-@router.get("/backups")
-def list_backups(current_user=Depends(get_current_user)):
-    backup_dir = "/www/backup"
-    if os.name == 'nt':
-        return [{"filename": "site1_backup_20231027.zip", "size": "15MB", "created_at": "2023-10-27 10:00"}]
-    
-    if not os.path.exists(backup_dir):
-        return []
-    
-    backups = []
-    for f in os.listdir(backup_dir):
-        if f.endswith(".zip") or f.endswith(".tar.gz"):
-            path = os.path.join(backup_dir, f)
-            stat = os.stat(path)
-            backups.append({
-                "filename": f,
-                "size": f"{stat.st_size // (1024*1024)}MB",
-                "created_at": str(stat.st_ctime)
-            })
-    return backups
+@router.get("/backups", response_model=List[Backup])
+def list_backups(
+    site_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    query = db.query(BackupModel)
+    if site_id:
+        query = query.filter(BackupModel.site_id == site_id)
+    return query.order_by(BackupModel.created_at.desc()).all()
 
 @router.post("/backups/create")
-def create_backup(target: str, item_id: Optional[int] = None, current_user=Depends(get_current_user)):
-    # In a real app, this would be a background task
-    if os.name == 'nt': return {"success": True, "message": f"Backup of {target} (ID: {item_id}) created (Mocked)"}
-    # Mock backup logic
-    return {"success": True, "message": f"Backup task for {target} started"}
+def create_backup(
+    background_tasks: BackgroundTasks,
+    target: str = "site",
+    item_id: Optional[int] = None,
+    include_db: bool = True,
+    include_files: bool = True,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    if target == 'site' and item_id:
+        site = db.query(Site).filter(Site.id == item_id).first()
+        if not site:
+            raise HTTPException(status_code=404, detail="Site not found")
+        
+        task_uuid = str(uuid.uuid4())
+        new_task = TaskModel(
+            task_uuid=task_uuid,
+            type="backup",
+            site_id=item_id,
+            status=TaskStatus.pending,
+            progress=0,
+            message=f"Scheduled backup for {site.domain}",
+            created_by=current_user.id
+        )
+        db.add(new_task)
+        db.commit()
 
-@router.get("/backups/schedule")
-def get_backup_schedule(current_user=Depends(get_current_user)):
-    return {
-        "enabled": True,
-        "frequency": "daily",
-        "retention": 7,
-        "storage": "local"
-    }
+        background_tasks.add_task(create_site_backup, db, item_id, task_uuid, include_db, include_files)
+        return {"success": True, "message": "Backup task started", "task_uuid": task_uuid}
+    
+    elif target == 'all':
+        sites = db.query(Site).all()
+        if not sites:
+            return {"success": True, "message": "No sites to backup"}
+        
+        task_uuids = []
+        for site in sites:
+            task_uuid = str(uuid.uuid4())
+            new_task = TaskModel(
+                task_uuid=task_uuid,
+                type="backup",
+                site_id=site.id,
+                status=TaskStatus.pending,
+                progress=0,
+                message=f"Scheduled full backup for {site.domain}",
+                created_by=current_user.id
+            )
+            db.add(new_task)
+            task_uuids.append(task_uuid)
+            background_tasks.add_task(create_site_backup, db, site.id, task_uuid, include_db, include_files)
+        
+        db.commit()
+        return {"success": True, "message": f"Backup tasks started for {len(sites)} sites", "task_uuids": task_uuids}
+    
+    return {"success": False, "message": "Unsupported backup target"}
+
+@router.get("/backups/schedule", response_model=List[BackupSchedule])
+def get_backup_schedules(
+    site_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    query = db.query(BackupScheduleModel)
+    if site_id:
+        query = query.filter(BackupScheduleModel.site_id == site_id)
+    return query.all()
 
 @router.post("/backups/schedule")
-def update_backup_schedule(schedule: dict, current_user=Depends(get_current_user)):
+def update_backup_schedule(
+    schedule_in: BackupScheduleCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    # Check if schedule exists for this site
+    schedule = db.query(BackupScheduleModel).filter(
+        BackupScheduleModel.site_id == schedule_in.site_id
+    ).first()
+    
+    if schedule:
+        for key, value in schedule_in.dict().items():
+            setattr(schedule, key, value)
+    else:
+        schedule = BackupScheduleModel(**schedule_in.dict())
+        db.add(schedule)
+    
+    db.commit()
     return {"success": True}
 
-# --- Migration Endpoints ---
+@router.get("/backups/{backup_id}/download")
+def download_backup(
+    backup_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    backup = db.query(BackupModel).filter(BackupModel.id == backup_id).first()
+    if not backup:
+        raise HTTPException(status_code=404, detail="Backup not found")
+    
+    if backup.file_path and os.path.exists(backup.file_path):
+        return FileResponse(
+            backup.file_path, 
+            filename=backup.name,
+            media_type='application/zip'
+        )
+    raise HTTPException(status_code=404, detail="Backup file not found on disk")
+def delete_backup(
+    backup_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    backup = db.query(BackupModel).filter(BackupModel.id == backup_id).first()
+    if not backup:
+        raise HTTPException(status_code=404, detail="Backup not found")
+    
+    # Delete physical file
+    if backup.file_path and os.path.exists(backup.file_path):
+        try:
+            os.remove(backup.file_path)
+        except Exception as e:
+            print(f"Failed to delete file: {e}")
+            
+    db.delete(backup)
+    db.commit()
+    return {"success": True}
 
 @router.post("/migration/import")
 def import_site(panel_type: str, file_path: str, current_user=Depends(get_current_user)):

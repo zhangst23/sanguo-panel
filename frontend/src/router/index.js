@@ -124,6 +124,12 @@ const routes = [
         meta: { requiresAuth: true },
       },
       {
+        path: 'tasks',
+        name: 'TaskList',
+        component: () => import('@/views/Task/TaskList.vue'),
+        meta: { requiresAuth: true },
+      },
+      {
         path: 'redis',
         name: 'Redis',
         component: () => import('@/views/Redis/Redis.vue'),

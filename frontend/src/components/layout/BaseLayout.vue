@@ -40,6 +40,10 @@
           <template #icon><icon-cloud-download /></template>
           备份迁移
         </a-menu-item>
+        <a-menu-item key="TaskList">
+          <template #icon><icon-list /></template>
+          任务列表
+        </a-menu-item>
         <a-sub-menu key="System">
           <template #icon><icon-settings /></template>
           <template #title>系统管理</template>
@@ -98,7 +102,8 @@ import {
   IconSettings,
   IconMenuFold,
   IconMenuUnfold,
-  IconNotification
+  IconNotification,
+  IconList
 } from '@arco-design/web-vue/es/icon'
 
 const router = useRouter()
