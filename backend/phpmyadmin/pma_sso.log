@@ -82,3 +82,14 @@
 [2026-02-13 08:15:15] Verification successful for user: sanguo_user
 [2026-02-13 08:15:15] Setting target database to: sanguo_shared
 [2026-02-13 08:15:15] Token verified during inclusion. Continuing without redirect.
+[2026-02-13 08:47:09] --- SSO SCRIPT START ---
+[2026-02-13 08:47:09] Request URI: /index.php?pma_token=4983be1e-6274-4f2d-bf96-6239e32932fd&db=db_y1unyingx_com
+[2026-02-13 08:47:09] PHP Self: /index.php
+[2026-02-13 08:47:09] Included files: 278
+[2026-02-13 08:47:09] Included by phpMyAdmin. PHPMYADMIN constant is defined.
+[2026-02-13 08:47:09] Session ID: p16c3velo6e3opbs3ia0o33ehk
+[2026-02-13 08:47:09] Cookies: {"pma_lang":"en","__next_hmr_refresh_hash__":"987","PMA_SSO":"r2omfvu8386bj55cbpdhl7dbqi","phpMyAdmin":"p16c3velo6e3opbs3ia0o33ehk"}
+[2026-02-13 08:47:09] Received token: 4983be1e-6274-4f2d-bf96-6239e32932fd
+[2026-02-13 08:47:09] Verification successful for user: root
+[2026-02-13 08:47:09] Setting target database to: db_y1unyingx_com
+[2026-02-13 08:47:09] Token verified during inclusion. Continuing without redirect.
