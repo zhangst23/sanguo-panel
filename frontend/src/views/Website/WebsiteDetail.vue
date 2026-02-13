@@ -220,41 +220,25 @@
 
       <!-- 高级设置 -->
       <a-tab-pane key="advanced" title="高级设置">
-        <a-collapse :bordered="false">
-          <a-collapse-item header="PHP 设置 (php.ini)" key="php">
-            <a-typography-text type="secondary">在此预览或快速修改常用 PHP 参数</a-typography-text>
-            <a-form layout="vertical" style="margin-top: 16px">
-              <a-row :gutter="16">
-                <a-col :span="8">
-                  <a-form-item label="memory_limit">
-                    <a-input v-model="phpConfig.memory_limit" />
-                  </a-form-item>
-                </a-col>
-                <a-col :span="8">
-                  <a-form-item label="post_max_size">
-                    <a-input v-model="phpConfig.post_max_size" />
-                  </a-form-item>
-                </a-col>
-                <a-col :span="8">
-                  <a-form-item label="max_execution_time">
-                    <a-input v-model="phpConfig.max_execution_time" />
-                  </a-form-item>
-                </a-col>
-              </a-row>
-              <a-button type="outline">保存 PHP 配置</a-button>
-            </a-form>
-          </a-collapse-item>
-          <a-collapse-item header="OpenLiteSpeed 虚拟主机配置" key="ols">
-            <a-typography-text type="secondary">仅供参考，手动修改可能导致面板管理失效</a-typography-text>
-            <pre class="config-preview">
-docRoot                   $VH_ROOT/html/
-vhDomain                  $VH_NAME
-vhAliases                 www.$VH_NAME
-index {
-  useServer               0
-  indexFiles              index.php, index.html
-}
-            </pre>
+        <a-collapse :bordered="false" default-active-key="wp">
+          <a-collapse-item header="wp-config.php 配置管理" key="wp">
+            <a-typography-text type="secondary">在此修改 WordPress 核心配置文件，修改前请确保了解各参数含义</a-typography-text>
+            <div style="margin-top: 16px">
+              <a-textarea 
+                v-model="wpConfigContent" 
+                :auto-size="{ minRows: 10, maxRows: 20 }" 
+                style="font-family: monospace; background-color: #f8f9fa"
+                placeholder="正在加载 wp-config.php 内容..."
+              />
+              <div style="margin-top: 16px">
+                <a-button type="primary" @click="saveWpConfig" :loading="wpConfigLoading">
+                  保存 wp-config 配置
+                </a-button>
+                <a-button type="outline" style="margin-left: 12px" @click="fetchWpConfig">
+                  重置/刷新
+                </a-button>
+              </div>
+            </div>
           </a-collapse-item>
         </a-collapse>
       </a-tab-pane>
@@ -308,11 +292,8 @@ const domainList = computed(() => [
   { domain: `www.${site.value.domain}`, type: '别名' }
 ])
 
-const phpConfig = reactive({
-  memory_limit: '256M',
-  post_max_size: '64M',
-  max_execution_time: '300'
-})
+const wpConfigContent = ref('')
+const wpConfigLoading = ref(false)
 
 const getScoreColor = (score) => {
   if (score >= 90) return '#00b42a'
@@ -326,6 +307,31 @@ const fetchSiteDetail = async () => {
     site.value = res
   } catch (error) {
     Message.error('获取站点详情失败')
+  }
+}
+
+const fetchWpConfig = async () => {
+  wpConfigLoading.value = true
+  try {
+    const res = await request.get(`/sites/${siteId}/wp-config`)
+    wpConfigContent.value = res.content
+  } catch (error) {
+    // 如果不是 WordPress 站点，可能会报错，静默处理或提示
+    console.error('获取 wp-config.php 失败:', error)
+  } finally {
+    wpConfigLoading.value = false
+  }
+}
+
+const saveWpConfig = async () => {
+  wpConfigLoading.value = true
+  try {
+    await request.post(`/sites/${siteId}/wp-config`, { content: wpConfigContent.value })
+    Message.success('wp-config.php 已保存')
+  } catch (error) {
+    Message.error('保存失败: ' + (error.response?.data?.detail || error.message))
+  } finally {
+    wpConfigLoading.value = false
   }
 }
 
@@ -370,6 +376,7 @@ const handlePurgeCache = async () => {
 
 onMounted(() => {
   fetchSiteDetail()
+  fetchWpConfig()
 })
 </script>
 

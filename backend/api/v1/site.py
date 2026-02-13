@@ -3,7 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from backend.api import deps
 from backend.models.site import Site as SiteModel, SharedDatabase as SharedDatabaseModel
-from backend.schemas.site import Site, SiteCreate, SiteUpdate, SharedDatabase, SharedDatabaseCreate
+from backend.schemas.site import Site, SiteCreate, SiteUpdate, SharedDatabase, SharedDatabaseCreate, WpConfigUpdate
+import os
 
 router = APIRouter()
 
@@ -172,6 +173,60 @@ def purge_site_cache(
     
     # Logic to purge OLS LSCache: usually deleting files in lscache directory or calling API
     return {"success": True, "message": f"Cache purged for {site.domain}"}
+
+@router.get("/{id}/wp-config")
+def read_wp_config(
+    *,
+    db: Session = Depends(deps.get_db),
+    id: int,
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    """
+    Read wp-config.php content.
+    """
+    site = db.query(SiteModel).filter(SiteModel.id == id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    
+    config_path = os.path.join(site.root_path, "wp-config.php")
+    if not os.path.exists(config_path):
+        # Return empty or standard template if not found
+        return {"content": "/* wp-config.php not found */"}
+    
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        return {"content": content}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read wp-config.php: {str(e)}")
+
+@router.post("/{id}/wp-config")
+def update_wp_config(
+    *,
+    db: Session = Depends(deps.get_db),
+    id: int,
+    config_in: WpConfigUpdate,
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    """
+    Update wp-config.php content.
+    """
+    site = db.query(SiteModel).filter(SiteModel.id == id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    
+    config_path = os.path.join(site.root_path, "wp-config.php")
+    
+    # Ensure directory exists (though it should)
+    if not os.path.exists(site.root_path):
+        os.makedirs(site.root_path, exist_ok=True)
+    
+    try:
+        with open(config_path, "w", encoding="utf-8") as f:
+            f.write(config_in.content)
+        return {"success": True, "message": "wp-config.php updated"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update wp-config.php: {str(e)}")
 
 @router.post("/{id}/ssl")
 def configure_ssl(

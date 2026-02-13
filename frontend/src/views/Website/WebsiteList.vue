@@ -61,6 +61,13 @@
               <a-tag color="arcoblue">{{ record.php_version }}</a-tag>
             </template>
           </a-table-column>
+          <a-table-column title="数据库">
+            <template #cell="{ record }">
+              <a-link @click="handleOpenPMA(record)">
+                访问
+              </a-link>
+            </template>
+          </a-table-column>
           <a-table-column title="操作">
             <template #cell="{ record }">
               <a-space>

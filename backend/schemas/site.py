@@ -73,6 +73,9 @@ class Site(SiteBase):
     class Config:
         from_attributes = True
 
+class WpConfigUpdate(BaseModel):
+    content: str
+
 class SharedDatabaseBase(BaseModel):
     name: str
     db_host: str = "localhost"
