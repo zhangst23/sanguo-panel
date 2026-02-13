@@ -121,37 +121,51 @@ async def pma_proxy(request: Request, path: str):
             status_code=rp_resp.status_code
         )
         
-        # Forward headers correctly (avoiding dict collapse for multiple Set-Cookie)
-        for name, value in rp_resp.headers.items():
-            name_lower = name.lower()
+        # Forward headers correctly (avoiding dict collapse or comma merging)
+        # Use raw headers to handle multiple Set-Cookie properly
+        for name, value in rp_resp.headers.raw:
+            # name and value are bytes from httpx
+            name_str = name.decode('latin-1')
+            name_lower = name_str.lower()
+            
             if name_lower in ["content-length", "content-encoding", "transfer-encoding", "connection"]:
                 continue
             
-            header_value = value
+            val_str = value.decode('latin-1')
             if name_lower == "set-cookie":
-                print(f"--- PMA Proxy: PHP setting cookie: {header_value}")
-
-            if name_lower == "location":
+                print(f"--- PMA Proxy: PHP setting cookie: {val_str}")
+                response.headers.append("set-cookie", val_str)
+            elif name_lower == "location":
                 import urllib.parse
-                parsed = urllib.parse.urlparse(header_value)
-                
-                if not parsed.netloc or \
-                   parsed.netloc == f"{pma.host}:{pma.port}" or \
-                   parsed.netloc == "127.0.0.1" or \
-                   parsed.netloc == "localhost":
-                    
-                    path = parsed.path
-                    if not path.startswith("/phpmyadmin"):
-                        path = "/phpmyadmin" + (path if path.startswith("/") else "/" + path)
-                    
-                    header_value = path
-                    if parsed.query:
-                        header_value += f"?{parsed.query}"
-                    if parsed.fragment:
-                        header_value += f"#{parsed.fragment}"
-            
-            # Use append to preserve multiple headers like Set-Cookie
-            response.headers.append(name, header_value)
+                location = val_str
+                if location.startswith(('http://', 'https://')):
+                    parsed_loc = urllib.parse.urlparse(location)
+                    # Check if it's our PHP server redirecting
+                    if not parsed_loc.netloc or \
+                       parsed_loc.netloc == f"{pma.host}:{pma.port}" or \
+                       parsed_loc.netloc == "127.0.0.1" or \
+                       parsed_loc.netloc == "localhost":
+                        
+                        new_loc = parsed_loc.path
+                        if not new_loc.startswith("/phpmyadmin"):
+                            new_loc = "/phpmyadmin" + (new_loc if new_loc.startswith("/") else "/" + new_loc)
+                        
+                        if parsed_loc.query:
+                            new_loc += f"?{parsed_loc.query}"
+                        if parsed_loc.fragment:
+                            new_loc += f"#{parsed_loc.fragment}"
+                        response.headers.append("location", new_loc)
+                    else:
+                        response.headers.append("location", location)
+                else:
+                    if not location.startswith('/phpmyadmin'):
+                        if location.startswith('/'):
+                            location = f"/phpmyadmin{location}"
+                        else:
+                            location = f"/phpmyadmin/{location}"
+                    response.headers.append("location", location)
+            else:
+                response.headers.append(name_str, val_str)
             
         return response
 

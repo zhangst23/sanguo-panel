@@ -36,7 +36,25 @@ class PMAServer:
         print(f"--- PMA PHP Server: Starting at {self.host}:{self.port} in {self.pma_dir} using {php_bin} ---")
 
         # Use -S for built-in server
-        cmd = [php_bin, "-S", f"{self.host}:{self.port}", "-t", self.pma_dir]
+        # Force session name and storage path via auto_prepend_file
+        # This is the most reliable way to override phpMyAdmin's internal session management
+        # Use forward slashes for PHP ini settings even on Windows
+        pre_config = os.path.join(self.pma_dir, 'pre-config.php').replace('\\', '/')
+        sessions_dir = os.path.join(self.pma_dir, 'sessions').replace('\\', '/')
+        if not os.path.exists(sessions_dir):
+            try:
+                os.makedirs(sessions_dir, exist_ok=True)
+            except:
+                pass
+
+        cmd = [
+            php_bin, 
+            "-S", f"{self.host}:{self.port}", 
+            "-t", self.pma_dir,
+            "-d", f"auto_prepend_file=\"{pre_config}\"",
+            "-d", "session.name=SanguoPMA",
+            "-d", f"session.save_path=\"{sessions_dir}\""
+        ]
         
         try:
             self.process = subprocess.Popen(

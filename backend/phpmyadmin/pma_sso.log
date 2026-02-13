@@ -555,3 +555,128 @@
 [2026-02-13 10:14:43] Session ID: 6p9o76m316jddra8lbvkocd05i
 [2026-02-13 10:14:43] Session data: {"redirect_count":0}
 [2026-02-13 10:14:43] No session and no token. Access denied.
+[2026-02-13 10:16:27] --- SSO SCRIPT START ---
+[2026-02-13 10:16:27] Request URI: /index.php?pma_token=d2766bbd-6e8f-4dd3-9d51-ec378bfcdd4b&db=db_yunying_com
+[2026-02-13 10:16:27] Cookies received by PHP: {"pma_lang":"en","PMA_SSO":"svo8d19a8dmc92gfebc0gdn8cv","SanguoPMA":"6p9o76m316jddra8lbvkocd05i","phpMyAdmin":"ocqcabr0v2d61qvrtqeq89coug"}
+[2026-02-13 10:16:27] Session ID: ocqcabr0v2d61qvrtqeq89coug
+[2026-02-13 10:16:27] Session data: {" PMA_token ":"4d556b665f7c69785848416d685a4a61"," HMAC_secret ":"S)0AcY&4|\\WLQ.At","browser_access_time":{"default":1770973984},"relation":{"1":{"version":"5.2.1","user":"root","db":"phpmyadmin","bookmark":"pma__bookmark","central_columns":"pma__central_columns","column_info":"pma__column_info","designer_settings":"pma__designer_settings","export_templates":"pma__export_templates","favorite":"pma__favorite","history":"pma__history","navigationhiding":"pma__navigationhiding","pdf_pages":"pma__pdf_pages","recent":"pma__recent","relation":"pma__relation","savedsearches":"pma__savedsearches","table_coords":"pma__table_coords","table_info":"pma__table_info","table_uiprefs":"pma__table_uiprefs","tracking":"pma__tracking","userconfig":"pma__userconfig","usergroups":"pma__usergroups","users":"pma__users","bookmarkwork":true,"mimework":true,"centralcolumnswork":true,"commwork":true,"menuswork":true,"designersettingswork":true,"displaywork":true,"exporttemplateswork":true,"favoritework":true,"navwork":true,"pdfwork":true,"recentwork":true,"relwork":true,"savedsearcheswork":true,"historywork":true,"trackingwork":true,"uiprefswork":true,"userconfigwork":true,"allworks":true}},"tmpval":{"favoriteTables":{"1":[]},"recentTables":{"1":[{"db":"wp_dev","table":"wp_waimao_backup_records"},{"db":"wp_dev","table":"wp_waimao_backup_files"},{"db":"wp_dev","table":"wp_waimao_backup_schedules"},{"db":"wp_dev","table":"wp_waimao_backup_restores"},{"db":"wp_dev","table":"wp_waimao_backup_logs"},{"db":"wp_dev","table":"wp_options"},{"db":"wp_dev","table":"wp_users"},{"db":"wp_dev","table":"wp_waimao_snippets"},{"db":"shipblog","table":"wp_users"},{"db":"shipblog","table":"wp_posts"}]},"table_limit_offset":0,"table_limit_offset_db":"db_yunying2_com"},"two_factor_check":true,"cache":{"server_1":{"userprefs_mtime":1770973984,"userprefs_type":"db","config_mtime":1447170388,"userprefs":{"Console":{"Mode":"collapse"}}},"server_1_root":{"is_create_db_priv":true,"is_reload_priv":true,"db_to_create":"","dbs_where_create_table_allowed":["*"],"dbs_to_test":false,"proc_priv":true,"table_priv":true,"col_priv":true,"db_priv":true,"menu-levels-db":{"structure":"Structure","sql":"SQL","search":"Search","query":"Query","export":"Export","import":"Import","operation":"Operations","privileges":"Privileges","routines":"Routines","events":"Events","triggers":"Triggers","tracking":"Tracking","designer":"Designer","central_columns":"Central columns"},"binary_logs":[],"menu-levels-server":{"databases":"Databases","sql":"SQL","status":"Status","rights":"Users","export":"Export","import":"Import","settings":"Settings","binlog":"Binary log","replication":"Replication","vars":"Variables","charset":"Charsets","plugins":"Plugins","engine":"Engines"},"mysql_cur_user":"root@localhost","is_superuser":true,"is_grantuser":true}},"flashMessages":[],"ConfigFile1":{"Console":{"Mode":"collapse"},"Servers":{"1":{"only_db":"","hide_db":""}}},"debug":[],"errors":[],"redirect_count":1,"PMA_single_signon_user":"root","PMA_single_signon_password":"","PMA_single_signon_host":"localhost","PMA_single_signon_port":3306,"PMA_single_signon_error":"","PMA_single_signon_db":"db_yunying2_com"}
+[2026-02-13 10:16:27] sso.php included by phpMyAdmin.
+[2026-02-13 10:16:27] Session valid for user: root
+[2026-02-13 10:16:28] --- SSO SCRIPT START ---
+[2026-02-13 10:16:28] Request URI: /sso.php
+[2026-02-13 10:16:28] Cookies received by PHP: {"pma_lang":"en","PMA_SSO":"svo8d19a8dmc92gfebc0gdn8cv","SanguoPMA":"6p9o76m316jddra8lbvkocd05i","phpMyAdmin":"ocqcabr0v2d61qvrtqeq89coug"}
+[2026-02-13 10:16:28] Session ID: 6p9o76m316jddra8lbvkocd05i
+[2026-02-13 10:16:28] Session data: {"redirect_count":0}
+[2026-02-13 10:16:28] No session and no token. Access denied.
+[2026-02-13 10:17:56] --- SSO SCRIPT START ---
+[2026-02-13 10:17:56] Request URI: /index.php?pma_token=30c09ef3-2021-4616-8a77-ba884ee63b48&db=db_yunying2_com
+[2026-02-13 10:17:56] Cookies received by PHP: {"pma_lang":"en","PMA_SSO":"svo8d19a8dmc92gfebc0gdn8cv","SanguoPMA":"6p9o76m316jddra8lbvkocd05i","phpMyAdmin":"ocqcabr0v2d61qvrtqeq89coug"}
+[2026-02-13 10:17:56] Session ID: ocqcabr0v2d61qvrtqeq89coug
+[2026-02-13 10:17:56] Session data: {" PMA_token ":"4d556b665f7c69785848416d685a4a61"," HMAC_secret ":"S)0AcY&4|\\WLQ.At","browser_access_time":{"default":1770974187},"relation":{"1":{"version":"5.2.1","user":"root","db":"phpmyadmin","bookmark":"pma__bookmark","central_columns":"pma__central_columns","column_info":"pma__column_info","designer_settings":"pma__designer_settings","export_templates":"pma__export_templates","favorite":"pma__favorite","history":"pma__history","navigationhiding":"pma__navigationhiding","pdf_pages":"pma__pdf_pages","recent":"pma__recent","relation":"pma__relation","savedsearches":"pma__savedsearches","table_coords":"pma__table_coords","table_info":"pma__table_info","table_uiprefs":"pma__table_uiprefs","tracking":"pma__tracking","userconfig":"pma__userconfig","usergroups":"pma__usergroups","users":"pma__users","bookmarkwork":true,"mimework":true,"centralcolumnswork":true,"commwork":true,"menuswork":true,"designersettingswork":true,"displaywork":true,"exporttemplateswork":true,"favoritework":true,"navwork":true,"pdfwork":true,"recentwork":true,"relwork":true,"savedsearcheswork":true,"historywork":true,"trackingwork":true,"uiprefswork":true,"userconfigwork":true,"allworks":true}},"tmpval":{"favoriteTables":{"1":[]},"recentTables":{"1":[{"db":"wp_dev","table":"wp_waimao_backup_records"},{"db":"wp_dev","table":"wp_waimao_backup_files"},{"db":"wp_dev","table":"wp_waimao_backup_schedules"},{"db":"wp_dev","table":"wp_waimao_backup_restores"},{"db":"wp_dev","table":"wp_waimao_backup_logs"},{"db":"wp_dev","table":"wp_options"},{"db":"wp_dev","table":"wp_users"},{"db":"wp_dev","table":"wp_waimao_snippets"},{"db":"shipblog","table":"wp_users"},{"db":"shipblog","table":"wp_posts"}]},"table_limit_offset":0,"table_limit_offset_db":"db_yunying2_com"},"two_factor_check":true,"cache":{"server_1":{"userprefs_mtime":1770973984,"userprefs_type":"db","config_mtime":1447170388,"userprefs":{"Console":{"Mode":"collapse"}}},"server_1_root":{"is_create_db_priv":true,"is_reload_priv":true,"db_to_create":"","dbs_where_create_table_allowed":["*"],"dbs_to_test":false,"proc_priv":true,"table_priv":true,"col_priv":true,"db_priv":true,"menu-levels-db":{"structure":"Structure","sql":"SQL","search":"Search","query":"Query","export":"Export","import":"Import","operation":"Operations","privileges":"Privileges","routines":"Routines","events":"Events","triggers":"Triggers","tracking":"Tracking","designer":"Designer","central_columns":"Central columns"},"binary_logs":[],"menu-levels-server":{"databases":"Databases","sql":"SQL","status":"Status","rights":"Users","export":"Export","import":"Import","settings":"Settings","binlog":"Binary log","replication":"Replication","vars":"Variables","charset":"Charsets","plugins":"Plugins","engine":"Engines"},"mysql_cur_user":"root@localhost","is_superuser":true,"is_grantuser":true}},"flashMessages":[],"ConfigFile1":{"Console":{"Mode":"collapse"},"Servers":{"1":{"only_db":"","hide_db":""}}},"debug":[],"errors":[],"redirect_count":1,"PMA_single_signon_user":"root","PMA_single_signon_password":"","PMA_single_signon_host":"localhost","PMA_single_signon_port":3306,"PMA_single_signon_error":"","PMA_single_signon_db":"db_yunying2_com","LAST_SIGNON_URL":"sso.php"}
+[2026-02-13 10:17:56] sso.php included by phpMyAdmin.
+[2026-02-13 10:17:56] Session valid for user: root
+[2026-02-13 10:20:25] --- SSO SCRIPT START ---
+[2026-02-13 10:20:25] Request URI: /index.php?pma_token=26d9a220-e494-4907-91c2-92aae14cfe11&db=db_yunying2_com
+[2026-02-13 10:20:25] Cookies received by PHP: {"pma_lang":"en","PMA_SSO":"svo8d19a8dmc92gfebc0gdn8cv","SanguoPMA":"6p9o76m316jddra8lbvkocd05i","phpMyAdmin":"ocqcabr0v2d61qvrtqeq89coug"}
+[2026-02-13 10:20:25] Session ID: ocqcabr0v2d61qvrtqeq89coug
+[2026-02-13 10:20:25] Session data: {" PMA_token ":"4d556b665f7c69785848416d685a4a61"," HMAC_secret ":"S)0AcY&4|\\WLQ.At","browser_access_time":{"default":1770974276},"relation":{"1":{"version":"5.2.1","user":"root","db":"phpmyadmin","bookmark":"pma__bookmark","central_columns":"pma__central_columns","column_info":"pma__column_info","designer_settings":"pma__designer_settings","export_templates":"pma__export_templates","favorite":"pma__favorite","history":"pma__history","navigationhiding":"pma__navigationhiding","pdf_pages":"pma__pdf_pages","recent":"pma__recent","relation":"pma__relation","savedsearches":"pma__savedsearches","table_coords":"pma__table_coords","table_info":"pma__table_info","table_uiprefs":"pma__table_uiprefs","tracking":"pma__tracking","userconfig":"pma__userconfig","usergroups":"pma__usergroups","users":"pma__users","bookmarkwork":true,"mimework":true,"centralcolumnswork":true,"commwork":true,"menuswork":true,"designersettingswork":true,"displaywork":true,"exporttemplateswork":true,"favoritework":true,"navwork":true,"pdfwork":true,"recentwork":true,"relwork":true,"savedsearcheswork":true,"historywork":true,"trackingwork":true,"uiprefswork":true,"userconfigwork":true,"allworks":true}},"tmpval":{"favoriteTables":{"1":[]},"recentTables":{"1":[{"db":"wp_dev","table":"wp_waimao_backup_records"},{"db":"wp_dev","table":"wp_waimao_backup_files"},{"db":"wp_dev","table":"wp_waimao_backup_schedules"},{"db":"wp_dev","table":"wp_waimao_backup_restores"},{"db":"wp_dev","table":"wp_waimao_backup_logs"},{"db":"wp_dev","table":"wp_options"},{"db":"wp_dev","table":"wp_users"},{"db":"wp_dev","table":"wp_waimao_snippets"},{"db":"shipblog","table":"wp_users"},{"db":"shipblog","table":"wp_posts"}]},"table_limit_offset":0,"table_limit_offset_db":"db_yunying2_com"},"two_factor_check":true,"cache":{"server_1":{"userprefs_mtime":1770973984,"userprefs_type":"db","config_mtime":1447170388,"userprefs":{"Console":{"Mode":"collapse"}}},"server_1_root":{"is_create_db_priv":true,"is_reload_priv":true,"db_to_create":"","dbs_where_create_table_allowed":["*"],"dbs_to_test":false,"proc_priv":true,"table_priv":true,"col_priv":true,"db_priv":true,"menu-levels-db":{"structure":"Structure","sql":"SQL","search":"Search","query":"Query","export":"Export","import":"Import","operation":"Operations","privileges":"Privileges","routines":"Routines","events":"Events","triggers":"Triggers","tracking":"Tracking","designer":"Designer","central_columns":"Central columns"},"binary_logs":[],"menu-levels-server":{"databases":"Databases","sql":"SQL","status":"Status","rights":"Users","export":"Export","import":"Import","settings":"Settings","binlog":"Binary log","replication":"Replication","vars":"Variables","charset":"Charsets","plugins":"Plugins","engine":"Engines"},"mysql_cur_user":"root@localhost","is_superuser":true,"is_grantuser":true}},"flashMessages":[],"ConfigFile1":{"Console":{"Mode":"collapse"},"Servers":{"1":{"only_db":"","hide_db":""}}},"debug":[],"errors":[],"redirect_count":1,"PMA_single_signon_user":"root","PMA_single_signon_password":"","PMA_single_signon_host":"localhost","PMA_single_signon_port":3306,"PMA_single_signon_error":"","PMA_single_signon_db":"db_yunying2_com","LAST_SIGNON_URL":"sso.php"}
+[2026-02-13 10:20:25] sso.php included by phpMyAdmin.
+[2026-02-13 10:20:25] Session valid for user: root
+[2026-02-13 10:20:26] --- SSO SCRIPT START ---
+[2026-02-13 10:20:26] Request URI: /sso.php
+[2026-02-13 10:20:26] Cookies received by PHP: {"pma_lang":"en","PMA_SSO":"svo8d19a8dmc92gfebc0gdn8cv","SanguoPMA":"6p9o76m316jddra8lbvkocd05i","phpMyAdmin":"ocqcabr0v2d61qvrtqeq89coug"}
+[2026-02-13 10:20:26] Session ID: 6p9o76m316jddra8lbvkocd05i
+[2026-02-13 10:20:26] Session data: {"redirect_count":0}
+[2026-02-13 10:20:26] No session and no token. Access denied.
+[2026-02-13 10:20:48] --- SSO SCRIPT START ---
+[2026-02-13 10:20:48] Request URI: /index.php?pma_token=4adb6176-2cd3-46ec-9547-06541c1b560c&db=db_yunying2_com
+[2026-02-13 10:20:48] Cookies received by PHP: []
+[2026-02-13 10:20:48] Session ID: misqgu2rpmchht4tevj2qbvm0f
+[2026-02-13 10:20:48] Session data: {" PMA_token ":"603d6d7b7827563265686b442657593e"," HMAC_secret ":"r|ND]&L:!mc3O;&Y"}
+[2026-02-13 10:20:48] sso.php included by phpMyAdmin.
+[2026-02-13 10:20:48] No session during PMA inclusion. Session ID: misqgu2rpmchht4tevj2qbvm0f
+[2026-02-13 10:20:48] Received token: 4adb6176-2cd3-46ec-9547-06541c1b560c
+[2026-02-13 10:20:48] Verification successful for user: root
+[2026-02-13 10:20:48] Setting target database to: db_yunying2_com
+[2026-02-13 10:20:48] Redirecting to index.php after token verification. Redirect URL: index.php?db=db_yunying2_com
+[2026-02-13 10:20:49] --- SSO SCRIPT START ---
+[2026-02-13 10:20:49] Request URI: /index.php?db=db_yunying2_com
+[2026-02-13 10:20:49] Cookies received by PHP: {"phpMyAdmin":"misqgu2rpmchht4tevj2qbvm0f","pma_lang":"en"}
+[2026-02-13 10:20:49] Session ID: misqgu2rpmchht4tevj2qbvm0f
+[2026-02-13 10:20:49] Session data: {" PMA_token ":"603d6d7b7827563265686b442657593e"," HMAC_secret ":"r|ND]&L:!mc3O;&Y","redirect_count":1,"PMA_single_signon_user":"root","PMA_single_signon_password":"","PMA_single_signon_host":"localhost","PMA_single_signon_port":3306,"PMA_single_signon_error":"","PMA_single_signon_db":"db_yunying2_com"}
+[2026-02-13 10:20:49] sso.php included by phpMyAdmin.
+[2026-02-13 10:20:49] Session valid for user: root
+[2026-02-13 10:20:49] --- SSO SCRIPT START ---
+[2026-02-13 10:20:49] Request URI: /sso.php
+[2026-02-13 10:20:49] Cookies received by PHP: {"phpMyAdmin":"misqgu2rpmchht4tevj2qbvm0f","pma_lang":"en"}
+[2026-02-13 10:20:49] Session ID: oun55ah5vmt2ktd1ffachvj6oe
+[2026-02-13 10:20:49] Session data: []
+[2026-02-13 10:20:49] No session and no token. Access denied.
+[2026-02-13 10:26:23] --- SSO SCRIPT START ---
+[2026-02-13 10:26:23] Request URI: /index.php?pma_token=87002ca1-7200-4e36-a551-331f465f4694&db=db_yunying2_com
+[2026-02-13 10:26:23] Cookies received by PHP: {"pma_lang":"en","PMA_SSO":"svo8d19a8dmc92gfebc0gdn8cv","SanguoPMA":"6p9o76m316jddra8lbvkocd05i","phpMyAdmin":"ocqcabr0v2d61qvrtqeq89coug"}
+[2026-02-13 10:26:23] Session ID: l6b354qvdof8eapqonjbkp2mng
+[2026-02-13 10:26:23] Session data: {" PMA_token ":"27303e3e3326442a3b646f742e346e46"," HMAC_secret ":"A8A.L5ep''nz_VZR"}
+[2026-02-13 10:26:23] sso.php included by phpMyAdmin.
+[2026-02-13 10:26:23] No session during PMA inclusion. Session ID: l6b354qvdof8eapqonjbkp2mng
+[2026-02-13 10:26:23] Received token: 87002ca1-7200-4e36-a551-331f465f4694
+[2026-02-13 10:26:23] Verification successful for user: root
+[2026-02-13 10:26:23] Setting target database to: db_yunying2_com
+[2026-02-13 10:26:23] Redirecting to index.php after token verification. Redirect URL: index.php?db=db_yunying2_com
+[2026-02-13 10:26:24] --- SSO SCRIPT START ---
+[2026-02-13 10:26:24] Request URI: /sso.php
+[2026-02-13 10:26:24] Cookies received by PHP: {"pma_lang":"en","PMA_SSO":"svo8d19a8dmc92gfebc0gdn8cv","SanguoPMA":"6p9o76m316jddra8lbvkocd05i","phpMyAdmin":"ocqcabr0v2d61qvrtqeq89coug"}
+[2026-02-13 10:26:24] Session ID: 6p9o76m316jddra8lbvkocd05i
+[2026-02-13 10:26:24] Session data: {"redirect_count":0}
+[2026-02-13 10:26:24] No session and no token. Access denied.
+[2026-02-13 10:41:07] --- SSO SCRIPT START ---
+[2026-02-13 10:41:07] Request URI: /index.php?pma_token=99d8e52c-f9b8-49a8-a59c-9b94d1f944d6&db=db_yunying2_com
+[2026-02-13 10:41:07] Cookies received by PHP: {"pma_lang":"en","PMA_SSO":"svo8d19a8dmc92gfebc0gdn8cv","SanguoPMA":"6p9o76m316jddra8lbvkocd05i","phpMyAdmin":"ocqcabr0v2d61qvrtqeq89coug"}
+[2026-02-13 10:41:07] Session ID: cdatpqdj13djuqr9aljk1a87k7
+[2026-02-13 10:41:07] Session data: {" PMA_token ":"653831375e51433f7e2c2d373d3d4e71"," HMAC_secret ":"=#w{MeDe4N]^'[j>"}
+[2026-02-13 10:41:07] sso.php included by phpMyAdmin.
+[2026-02-13 10:41:07] No session during PMA inclusion. Session ID: cdatpqdj13djuqr9aljk1a87k7
+[2026-02-13 10:41:07] Received token: 99d8e52c-f9b8-49a8-a59c-9b94d1f944d6
+[2026-02-13 10:41:07] Verification successful for user: root
+[2026-02-13 10:41:07] Setting target database to: db_yunying2_com
+[2026-02-13 10:41:07] Redirecting to index.php after token verification. Redirect URL: index.php?db=db_yunying2_com
+[2026-02-13 10:41:08] --- SSO SCRIPT START ---
+[2026-02-13 10:41:08] Request URI: /sso.php
+[2026-02-13 10:41:08] Cookies received by PHP: {"pma_lang":"en","PMA_SSO":"svo8d19a8dmc92gfebc0gdn8cv","SanguoPMA":"6p9o76m316jddra8lbvkocd05i","phpMyAdmin":"ocqcabr0v2d61qvrtqeq89coug"}
+[2026-02-13 10:41:08] Session ID: 6p9o76m316jddra8lbvkocd05i
+[2026-02-13 10:41:08] Session data: {"redirect_count":0}
+[2026-02-13 10:41:08] No session and no token. Access denied.
+[2026-02-13 10:45:54] --- SSO SCRIPT START ---
+[2026-02-13 10:45:54] Request URI: /index.php?pma_token=7ec1bd6b-e17a-4fd4-9059-b5f760db5475&db=db_yunying2_com
+[2026-02-13 10:45:54] Cookies received by PHP: {"pma_lang":"en","PMA_SSO":"svo8d19a8dmc92gfebc0gdn8cv","SanguoPMA":"6p9o76m316jddra8lbvkocd05i","phpMyAdmin":"ocqcabr0v2d61qvrtqeq89coug"}
+[2026-02-13 10:45:54] Session ID: uheeiutlgat01c3jp7tfbok9ga
+[2026-02-13 10:45:54] Session data: {" PMA_token ":"3b5d7429377275775c794a43552b447c"," HMAC_secret ":"\/NRj^LFOzs\"mAux)"}
+[2026-02-13 10:45:54] sso.php included by phpMyAdmin.
+[2026-02-13 10:45:54] No session during PMA inclusion. Session ID: uheeiutlgat01c3jp7tfbok9ga
+[2026-02-13 10:45:54] Received token: 7ec1bd6b-e17a-4fd4-9059-b5f760db5475
+[2026-02-13 10:45:54] Verification successful for user: root
+[2026-02-13 10:45:54] Setting target database to: db_yunying2_com
+[2026-02-13 10:45:54] Redirecting to index.php after token verification. Redirect URL: index.php?db=db_yunying2_com
+[2026-02-13 10:45:55] --- SSO SCRIPT START ---
+[2026-02-13 10:45:55] Request URI: /sso.php
+[2026-02-13 10:45:55] Cookies received by PHP: {"pma_lang":"en","PMA_SSO":"svo8d19a8dmc92gfebc0gdn8cv","SanguoPMA":"6p9o76m316jddra8lbvkocd05i","phpMyAdmin":"ocqcabr0v2d61qvrtqeq89coug"}
+[2026-02-13 10:45:55] Session ID: 6p9o76m316jddra8lbvkocd05i
+[2026-02-13 10:45:55] Session data: {"redirect_count":0}
+[2026-02-13 10:45:55] No session and no token. Access denied.
+[2026-02-13 10:50:05] --- SSO SCRIPT START ---
+[2026-02-13 10:50:05] Request URI: /index.php?pma_token=b95a5005-0449-4aa1-8b82-b406eca8d822&db=db_yunying2_com
+[2026-02-13 10:50:05] Cookies received by PHP: {"pma_lang":"en","PMA_SSO":"svo8d19a8dmc92gfebc0gdn8cv","SanguoPMA":"6p9o76m316jddra8lbvkocd05i","phpMyAdmin":"ocqcabr0v2d61qvrtqeq89coug"}
+[2026-02-13 10:50:05] Session ID: rc4n3bmdg53mo9lrs162dkphfe
+[2026-02-13 10:50:05] Session data: {" PMA_token ":"7b7a5725753e564c405c6855336b2359"," HMAC_secret ":"#D8kvCG@>Einw?fv"}
+[2026-02-13 10:50:05] sso.php included by phpMyAdmin.
+[2026-02-13 10:50:05] No session during PMA inclusion. Session ID: rc4n3bmdg53mo9lrs162dkphfe
+[2026-02-13 10:50:05] Received token: b95a5005-0449-4aa1-8b82-b406eca8d822
+[2026-02-13 10:50:05] Verification successful for user: root
+[2026-02-13 10:50:05] Setting target database to: db_yunying2_com
+[2026-02-13 10:50:05] Redirecting to index.php after token verification. Redirect URL: index.php?db=db_yunying2_com
+[2026-02-13 10:50:05] --- SSO SCRIPT START ---
+[2026-02-13 10:50:05] Request URI: /sso.php
+[2026-02-13 10:50:05] Cookies received by PHP: {"pma_lang":"en","PMA_SSO":"svo8d19a8dmc92gfebc0gdn8cv","SanguoPMA":"6p9o76m316jddra8lbvkocd05i","phpMyAdmin":"ocqcabr0v2d61qvrtqeq89coug"}
+[2026-02-13 10:50:05] Session ID: 6p9o76m316jddra8lbvkocd05i
+[2026-02-13 10:50:05] Session data: {"redirect_count":0}
+[2026-02-13 10:50:05] No session and no token. Access denied.

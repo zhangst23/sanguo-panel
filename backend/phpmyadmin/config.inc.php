@@ -15,6 +15,7 @@ $cfg['Servers'][$i]['auth_type'] = 'signon';
 $cfg['Servers'][$i]['SignonSession'] = 'SanguoPMA';
 $cfg['Servers'][$i]['SignonScript'] = 'sso.php';
 $cfg['Servers'][$i]['SignonURL'] = 'sso.php';
+$cfg['SessionName'] = 'SanguoPMA';
 $cfg['Servers'][$i]['host'] = 'localhost';
 $cfg['Servers'][$i]['compress'] = false;
 $cfg['Servers'][$i]['AllowNoPassword'] = false;

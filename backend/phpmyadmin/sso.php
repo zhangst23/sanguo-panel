@@ -27,30 +27,7 @@ function pma_log($msg) {
 
 // Initialize session if not already started
 if (session_status() === PHP_SESSION_NONE) {
-    // Set session name to something unique to avoid clashing with other phpMyAdmin instances
-    $sessionName = 'SanguoPMA';
-    session_name($sessionName);
-    
-    // Use a local session path to avoid permission issues and isolation
-    $sessionPath = __DIR__ . '/sessions';
-    if (!is_dir($sessionPath)) {
-        @mkdir($sessionPath, 0777, true);
-    }
-    if (is_writable($sessionPath)) {
-        session_save_path($sessionPath);
-    }
-    
-    // Set cookie parameters for the proxy environment
-    // Use a very permissive setup first to rule out cookie rejection
-    session_set_cookie_params([
-        'lifetime' => 0,
-        'path' => '/', 
-        'domain' => '',
-        'secure' => false,
-        'httponly' => false, // Set to false to see if it helps with proxy
-        'samesite' => 'Lax'
-    ]);
-    
+    // Session is now handled by pre-config.php via auto_prepend_file
     session_start();
 }
 
