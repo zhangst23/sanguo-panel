@@ -7,32 +7,30 @@
 
       <!-- WordPress 安全加固标签页 -->
       <a-tab-pane key="wordpress" title="WordPress 安全加固">
-        <a-card title="WordPress 安全加固">
+        <a-card title="一键安全加固 (针对所有站点)" :loading="loading.wp">
           <template #extra>
-            <a-select v-model="selectedSiteId" placeholder="选择站点" style="width: 200px" @change="handleSiteChange">
-              <a-option v-for="site in sites" :key="site.id" :value="site.id">{{ site.domain }}</a-option>
-            </a-select>
+            <a-tag color="arcoblue">共检测到 {{ sites.length }} 个 WordPress 站点</a-tag>
           </template>
           <a-list>
             <a-list-item>
-              <a-list-item-meta title="后台路径隐藏" :description="currentSite?.wp_hide_login_path ? `当前路径: /${currentSite.wp_hide_login_path}` : '修改 /wp-admin 为自定义随机路径'" />
+              <a-list-item-meta title="后台路径隐藏" description="将所有 WordPress 站点的 /wp-admin 修改为统一的自定义随机路径，防止扫描与暴力破解。" />
+              <div v-if="commonLoginPath" style="margin-right: 20px;">
+                <a-tag color="green" bordered>当前统一路径: /{{ commonLoginPath }}</a-tag>
+              </div>
               <template #actions>
-                <a-space>
-                  <a-button v-if="currentSite?.wp_hide_login_path" type="text" size="small" @click="handleHideLogin(null)">禁用</a-button>
-                  <a-button type="outline" size="small" @click="showHideLoginModal = true">配置</a-button>
-                </a-space>
+                <a-button type="outline" size="small" @click="showHideLoginModal = true">一键配置</a-button>
               </template>
             </a-list-item>
             <a-list-item>
-              <a-list-item-meta title="禁用 XML-RPC" description="防止针对 xmlrpc.php 的暴力破解与 DDoS" />
+              <a-list-item-meta title="禁用 XML-RPC" description="在所有站点中禁用 xmlrpc.php，防止针对该接口的暴力破解与 DDoS 攻击。" />
               <template #actions>
-                <a-switch :model-value="currentSite?.wp_disable_xmlrpc" @change="handleToggleXmlRpc" />
+                <a-button type="outline" size="small" @click="handleBatchAction('toggle-xmlrpc', { enable: true })">一键禁用</a-button>
               </template>
             </a-list-item>
             <a-list-item>
-              <a-list-item-meta title="文件权限修复" description="恢复 WP 目录 755、文件 644 的标准权限" />
+              <a-list-item-meta title="文件权限修复" description="批量恢复所有站点的目录 755、文件 644 的标准安全权限。" />
               <template #actions>
-                <a-button type="outline" size="small" @click="handleFixPermissions">立即修复</a-button>
+                <a-button type="outline" size="small" @click="handleBatchAction('fix-permissions')">立即修复</a-button>
               </template>
             </a-list-item>
           </a-list>
@@ -112,15 +110,22 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import request from '@/utils/request'
 import { Message } from '@arco-design/web-vue'
 
-const activeTab = ref('system')
+const activeTab = ref('wordpress')
 const loading = reactive({
   firewall: false,
   wp: false
 })
 
 const sites = ref([])
-const selectedSiteId = ref(null)
-const currentSite = computed(() => sites.value.find(s => s.id === selectedSiteId.value))
+
+const commonLoginPath = computed(() => {
+  if (!sites.value || sites.value.length === 0) return ''
+  // 打印调试信息，确保数据已加载
+  console.log('Current sites:', sites.value)
+  // 获取第一个有配置路径的站点路径作为展示
+  const siteWithPath = sites.value.find(s => s.wp_hide_login_path)
+  return siteWithPath ? siteWithPath.wp_hide_login_path : ''
+})
 
 const showHideLoginModal = ref(false)
 const hideLoginPath = ref('')
@@ -145,9 +150,6 @@ const fetchData = async () => {
 
     const sitesRes = await request.get('/sites/')
     sites.value = sitesRes
-    if (sitesRes.length > 0 && !selectedSiteId.value) {
-      selectedSiteId.value = sitesRes[0].id
-    }
   } catch (error) {
     console.error(error)
   }
@@ -166,46 +168,38 @@ const handleFirewallToggle = async (val) => {
   }
 }
 
-const handleSiteChange = (val) => {
-  if (currentSite.value) {
-    hideLoginPath.value = currentSite.value.wp_hide_login_path || ''
+const handleBatchAction = async (action, params = {}) => {
+  if (sites.value.length === 0) {
+    Message.warning('未检测到 WordPress 站点')
+    return
   }
-}
-
-const handleHideLogin = async (path) => {
-  if (!selectedSiteId.value) return
+  
   loading.wp = true
   try {
-    await request.post(`/security/wordpress/hide-login?site_id=${selectedSiteId.value}&path=${path || ''}`)
-    Message.success(path ? '隐藏后台路径已生效' : '已禁用隐藏后台路径')
-    showHideLoginModal.value = false
+    // 这里循环调用现有 API 实现批量操作，未来可由后端提供批量接口优化
+    const promises = sites.value.map(site => {
+      if (action === 'hide-login') {
+        return request.post(`/security/wordpress/hide-login?site_id=${site.id}&path=${params.path || ''}`)
+      } else if (action === 'toggle-xmlrpc') {
+        return request.post(`/security/wordpress/toggle-xmlrpc?site_id=${site.id}&enable=${params.enable}`)
+      } else if (action === 'fix-permissions') {
+        return request.post(`/security/wordpress/fix-permissions?site_id=${site.id}`)
+      }
+    })
+    
+    await Promise.all(promises)
+    Message.success('一键加固操作已成功应用至所有站点')
+    if (action === 'hide-login') showHideLoginModal.value = false
     fetchData()
   } catch (error) {
-    Message.error('操作失败')
+    Message.error('部分或全部站点操作失败，请检查系统日志')
   } finally {
     loading.wp = false
   }
 }
 
-const handleToggleXmlRpc = async (val) => {
-  if (!selectedSiteId.value) return
-  try {
-    await request.post(`/security/wordpress/toggle-xmlrpc?site_id=${selectedSiteId.value}&enable=${val}`)
-    Message.success(val ? '已启用 XML-RPC' : '已禁用 XML-RPC')
-    fetchData()
-  } catch (error) {
-    Message.error('操作失败')
-  }
-}
-
-const handleFixPermissions = async () => {
-  if (!selectedSiteId.value) return
-  try {
-    await request.post(`/security/wordpress/fix-permissions?site_id=${selectedSiteId.value}`)
-    Message.success('文件权限修复任务已启动')
-  } catch (error) {
-    Message.error('操作失败')
-  }
+const handleHideLogin = (path) => {
+  handleBatchAction('hide-login', { path })
 }
 
 const handleUnbanIp = async (ip) => {

@@ -65,6 +65,7 @@ class Site(SiteBase):
     static_optimization: bool = True
     image_optimization: bool = True
     assets_optimization: bool = True
+    wp_hide_login_path: Optional[str] = None
     ssl_expire_at: Optional[str] = None
     backup_count: int = 0
     ssl_mode: str = "none"

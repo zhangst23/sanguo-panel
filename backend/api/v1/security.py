@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from backend.core.database import get_db
 from backend.api.deps import get_current_user
-from backend.utils.site_utils import update_wp_config_redis, update_wp_hide_login
+from backend.utils.site_utils import update_wp_config_redis, update_wp_hide_login, fix_site_permissions, update_wp_xmlrpc
 from backend.models.site import Site
 from backend.core import security as security_utils
 from backend.models.user import User
@@ -36,13 +36,39 @@ def set_wp_hide_login(
 @router.post("/wordpress/toggle-xmlrpc")
 def toggle_wp_xmlrpc(
     site_id: int,
-    enabled: bool,
+    enable: bool,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
-    # This would involve adding a filter to functions.php or a MU-plugin
-    # For now, we'll just mock it or implement it similarly to hide-login
-    return {"success": True}
+    site = db.query(Site).filter(Site.id == site_id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    
+    # Invert 'enable' logic because the frontend sends 'enable=true' to DISABLE it (based on UI context)
+    # Actually, let's look at the UI again.
+    # Frontend: handleBatchAction('toggle-xmlrpc', { enable: true }) -> "一键禁用"
+    # So enable=true means WE WANT TO DISABLE XML-RPC.
+    # The utils function update_wp_xmlrpc(site, enabled) expects enabled=False to disable it.
+    
+    if update_wp_xmlrpc(site, enabled=not enable):
+        return {"success": True}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to update XML-RPC configuration")
+
+@router.post("/wordpress/fix-permissions")
+def fix_wp_permissions(
+    site_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    site = db.query(Site).filter(Site.id == site_id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    
+    if fix_site_permissions(site):
+        return {"success": True}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to fix permissions")
 
 # --- Admin Security Endpoints ---
 
