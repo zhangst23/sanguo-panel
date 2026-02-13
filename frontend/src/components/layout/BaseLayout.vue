@@ -8,7 +8,7 @@
       @collapse="onCollapse"
     >
       <div class="logo">
-        <span v-if="!collapsed">Sanguo Panel</span>
+        <span v-if="!collapsed">三国WP面板</span>
         <span v-else>SG</span>
       </div>
       <a-menu

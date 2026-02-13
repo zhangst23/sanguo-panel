@@ -1,6 +1,6 @@
 <template>
   <div class="tools-container">
-    <a-typography-title :heading="2">一键工具（超级卖点）</a-typography-title>
+    <a-typography-title :heading="2">一键提速工具</a-typography-title>
     <a-typography-paragraph>
       将多个优化、修复步骤组合为一个原子化操作，用户点击即可完成全链路加速或故障恢复。
     </a-typography-paragraph>

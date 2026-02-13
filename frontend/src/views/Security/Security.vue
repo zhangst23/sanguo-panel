@@ -3,62 +3,7 @@
     <a-typography-title :heading="2">安全中心</a-typography-title>
 
     <a-tabs v-model:active-key="activeTab">
-      <!-- 系统安全标签页 -->
-      <a-tab-pane key="system" title="系统安全">
-        <a-row :gutter="20">
-          <a-col :span="16">
-            <a-card title="系统防火墙" hoverable>
-              <template #extra>
-                <a-switch :model-value="firewall.active" @change="handleFirewallToggle" :loading="loading.firewall" />
-              </template>
-              <a-table :data="firewall.rules" :pagination="false">
-                <template #columns>
-                  <a-table-column title="端口" data-index="port" />
-                  <a-table-column title="协议" data-index="protocol" />
-                  <a-table-column title="状态">
-                    <template #cell>
-                      <a-tag color="green">允许</a-tag>
-                    </template>
-                  </a-table-column>
-                  <a-table-column title="操作">
-                    <template #cell="{ record }">
-                      <a-button type="text" status="danger" size="small">删除</a-button>
-                    </template>
-                  </a-table-column>
-                </template>
-              </a-table>
-              <div style="margin-top: 15px;">
-                <a-button type="outline" size="small">
-                  <template #icon><icon-plus /></template>
-                  添加规则
-                </a-button>
-              </div>
-            </a-card>
-          </a-col>
-
-          <a-col :span="8">
-            <a-card title="入侵防御 (Fail2ban)">
-              <div class="status-item">
-                <span class="label">服务状态:</span>
-                <a-tag :color="fail2ban.active ? 'green' : 'red'">{{ fail2ban.active ? '运行中' : '已停止' }}</a-tag>
-              </div>
-              <a-divider />
-              <div class="banned-ips">
-                <div style="margin-bottom: 10px; font-weight: bold;">已封禁 IP 列表:</div>
-                <a-list size="small" :max-height="300">
-                  <a-list-item v-for="ip in fail2ban.banned_ips" :key="ip">
-                    {{ ip }}
-                    <template #actions>
-                      <a-button type="text" size="small" @click="handleUnbanIp(ip)">解封</a-button>
-                    </template>
-                  </a-list-item>
-                  <template #empty>暂无封禁记录</template>
-                </a-list>
-              </div>
-            </a-card>
-          </a-col>
-        </a-row>
-      </a-tab-pane>
+      
 
       <!-- WordPress 安全加固标签页 -->
       <a-tab-pane key="wordpress" title="WordPress 安全加固">
@@ -91,6 +36,60 @@
               </template>
             </a-list-item>
           </a-list>
+        </a-card>
+      </a-tab-pane>
+
+      <!-- 入侵防御标签页 -->
+      <a-tab-pane key="fail2ban" title="入侵防御">
+        <a-card title="入侵防御 (Fail2ban)">
+          <div class="status-item">
+            <span class="label">服务状态:</span>
+            <a-tag :color="fail2ban.active ? 'green' : 'red'">{{ fail2ban.active ? '运行中' : '已停止' }}</a-tag>
+          </div>
+          <a-divider />
+          <div class="banned-ips">
+            <div style="margin-bottom: 10px; font-weight: bold;">已封禁 IP 列表:</div>
+            <a-list size="small" :max-height="300">
+              <a-list-item v-for="ip in fail2ban.banned_ips" :key="ip">
+                {{ ip }}
+                <template #actions>
+                  <a-button type="text" size="small" @click="handleUnbanIp(ip)">解封</a-button>
+                </template>
+              </a-list-item>
+              <template #empty>暂无封禁记录</template>
+            </a-list>
+          </div>
+        </a-card>
+      </a-tab-pane>
+
+      <!-- 系统安全标签页 -->
+      <a-tab-pane key="system" title="系统安全">
+        <a-card title="系统防火墙" hoverable>
+          <template #extra>
+            <a-switch :model-value="firewall.active" @change="handleFirewallToggle" :loading="loading.firewall" />
+          </template>
+          <a-table :data="firewall.rules" :pagination="false">
+            <template #columns>
+              <a-table-column title="端口" data-index="port" />
+              <a-table-column title="协议" data-index="protocol" />
+              <a-table-column title="状态">
+                <template #cell>
+                  <a-tag color="green">允许</a-tag>
+                </template>
+              </a-table-column>
+              <a-table-column title="操作">
+                <template #cell="{ record }">
+                  <a-button type="text" status="danger" size="small">删除</a-button>
+                </template>
+              </a-table-column>
+            </template>
+          </a-table>
+          <div style="margin-top: 15px;">
+            <a-button type="outline" size="small">
+              <template #icon><icon-plus /></template>
+              添加规则
+            </a-button>
+          </div>
         </a-card>
       </a-tab-pane>
 

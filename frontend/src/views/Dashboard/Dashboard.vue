@@ -1,30 +1,30 @@
 <template>
   <div class="dashboard-container">
-    <a-typography-title :heading="2">Dashboard</a-typography-title>
+    <a-typography-title :heading="2">仪表盘</a-typography-title>
     <a-row :gutter="20">
       <a-col :span="8">
-        <a-card title="CPU Usage" hoverable>
+        <a-card title="CPU 使用率" hoverable>
           <a-statistic :value="metrics.cpu.percent" :precision="1" suffix="%" />
           <template #extra>
-            <a-tag color="blue">{{ metrics.cpu.count }} Cores</a-tag>
+            <a-tag color="blue">{{ metrics.cpu.count }} 核心</a-tag>
           </template>
         </a-card>
       </a-col>
       <a-col :span="8">
-        <a-card title="Memory Usage" hoverable>
+        <a-card title="内存使用率" hoverable>
           <a-statistic :value="metrics.memory.percent" :precision="1" suffix="%" />
           <div style="margin-top: 10px; font-size: 12px; color: var(--arco-gray-6)">
-            Used: {{ (metrics.memory.used / 1024 / 1024 / 1024).toFixed(2) }} GB / 
-            Total: {{ (metrics.memory.total / 1024 / 1024 / 1024).toFixed(2) }} GB
+            已用: {{ (metrics.memory.used / 1024 / 1024 / 1024).toFixed(2) }} GB / 
+            总量: {{ (metrics.memory.total / 1024 / 1024 / 1024).toFixed(2) }} GB
           </div>
         </a-card>
       </a-col>
       <a-col :span="8">
-        <a-card title="Disk Usage" hoverable>
+        <a-card title="磁盘使用率" hoverable>
           <a-statistic :value="metrics.disk.percent" :precision="1" suffix="%" />
           <div style="margin-top: 10px; font-size: 12px; color: var(--arco-gray-6)">
-            Used: {{ (metrics.disk.used / 1024 / 1024 / 1024).toFixed(2) }} GB / 
-            Total: {{ (metrics.disk.total / 1024 / 1024 / 1024).toFixed(2) }} GB
+            已用: {{ (metrics.disk.used / 1024 / 1024 / 1024).toFixed(2) }} GB / 
+            总量: {{ (metrics.disk.total / 1024 / 1024 / 1024).toFixed(2) }} GB
           </div>
         </a-card>
       </a-col>
