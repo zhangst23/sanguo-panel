@@ -48,6 +48,7 @@
           <a-menu-item key="PHP">PHP</a-menu-item>
           <a-menu-item key="LiteSpeed">OpenLiteSpeed</a-menu-item>
           <a-menu-item key="Linux">Linux</a-menu-item>
+          <a-menu-item key="SystemSettings">系统设置</a-menu-item>
         </a-sub-menu>
       </a-menu>
     </a-layout-sider>

@@ -94,6 +94,12 @@ const routes = [
         meta: { requiresAuth: true },
       },
       {
+        path: 'system/settings',
+        name: 'SystemSettings',
+        component: () => import('@/views/System/Settings.vue'),
+        meta: { requiresAuth: true },
+      },
+      {
         path: 'mariadb',
         name: 'MariaDB',
         component: () => import('@/views/MariaDB/MariaDB.vue'),
