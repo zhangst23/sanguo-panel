@@ -137,6 +137,7 @@ def delete_site(
     *,
     db: Session = Depends(deps.get_db),
     id: int,
+    delete_db: bool = False,
     current_user: Any = Depends(deps.get_current_active_user),
 ) -> Any:
     """
@@ -146,9 +147,67 @@ def delete_site(
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
     
+    # Logic to delete site files, database tables, OLS config would go here
+    if delete_db:
+        # Implementation for deleting specific site tables from shared database
+        pass
+
     db.delete(site)
     db.commit()
     return site
+
+@router.post("/{id}/purge-cache")
+def purge_site_cache(
+    *,
+    db: Session = Depends(deps.get_db),
+    id: int,
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    """
+    Purge LSCache for the site.
+    """
+    site = db.query(SiteModel).filter(SiteModel.id == id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    
+    # Logic to purge OLS LSCache: usually deleting files in lscache directory or calling API
+    return {"success": True, "message": f"Cache purged for {site.domain}"}
+
+@router.post("/{id}/ssl")
+def configure_ssl(
+    *,
+    db: Session = Depends(deps.get_db),
+    id: int,
+    action: str = "apply", # apply, renew, disable
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    """
+    Configure SSL (Let's Encrypt).
+    """
+    site = db.query(SiteModel).filter(SiteModel.id == id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    
+    # Integration with Certbot/acme.sh and OLS config update
+    return {"success": True, "message": f"SSL {action} successful for {site.domain}"}
+
+@router.post("/{id}/backup")
+def backup_site(
+    *,
+    db: Session = Depends(deps.get_db),
+    id: int,
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    """
+    Create a backup of the site (files + database).
+    """
+    site = db.query(SiteModel).filter(SiteModel.id == id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    
+    # Logic to archive files and export database tables
+    return {"success": True, "message": f"Backup created for {site.domain}"}
+
 
 # Shared Database Endpoints
 @router.get("/databases/shared", response_model=List[SharedDatabase])

@@ -1,17 +1,23 @@
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 from backend.core.config import settings
 from backend.api.v1.api import api_router
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup logic
+    print(f"--- {settings.PROJECT_NAME} is starting up ---")
+    yield
+    # Shutdown logic
+    print(f"--- {settings.PROJECT_NAME} is shutting down ---")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
+    lifespan=lifespan,
 )
-
-@app.on_event("startup")
-async def startup_event():
-    print(f"--- {settings.PROJECT_NAME} is starting up ---")
 
 # Set all CORS enabled origins
 if settings.BACKEND_CORS_ORIGINS:

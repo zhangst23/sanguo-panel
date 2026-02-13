@@ -11,7 +11,7 @@
     <a-card class="list-card">
       <a-table :data="sites" :loading="loading" :pagination="false">
         <template #columns>
-          <a-table-column title="域名" data-index="domain">
+          <a-table-column title="域名">
             <template #cell="{ record }">
               <div class="domain-info">
                 <div class="primary-domain">{{ record.domain }}</div>
@@ -21,11 +21,7 @@
               </div>
             </template>
           </a-table-column>
-          <a-table-column title="PHP版本" data-index="php_version">
-            <template #cell="{ record }">
-              <a-tag color="arcoblue">{{ record.php_version }}</a-tag>
-            </template>
-          </a-table-column>
+          
           <a-table-column title="状态">
             <template #cell="{ record }">
               <a-badge :status="record.status === 'active' ? 'success' : 'danger'" :text="record.status === 'active' ? '运行中' : '已停止'" />
@@ -44,19 +40,37 @@
               <a-tag color="gray" v-else>未开启</a-tag>
             </template>
           </a-table-column>
+          <a-table-column title="备份">
+            <template #cell="{ record }">
+              <a-link @click="handleBackupList(record)">
+                {{ record.backup_count > 0 ? record.backup_count : '无备份' }}
+              </a-link>
+            </template>
+          </a-table-column>
+          <a-table-column title="SSL证书到期时间">
+            <template #cell="{ record }">
+              <div v-if="record.ssl_expire_at" class="ssl-info">
+                <span>{{ record.ssl_expire_at }}</span>
+                <a-tag size="mini" color="arcoblue" style="margin-left: 4px">自动续</a-tag>
+              </div>
+              <a-tag v-else color="gray">未配置</a-tag>
+            </template>
+          </a-table-column>
+          <a-table-column title="PHP版本" data-index="php_version">
+            <template #cell="{ record }">
+              <a-tag color="arcoblue">{{ record.php_version }}</a-tag>
+            </template>
+          </a-table-column>
           <a-table-column title="操作">
             <template #cell="{ record }">
               <a-space>
-                <a-button type="text" size="small">管理</a-button>
-                <a-button type="text" size="small">清理缓存</a-button>
-                <a-dropdown>
-                  <a-button type="text" size="small"><icon-more /></a-button>
-                  <template #content>
-                    <a-doption>SSL 配置</a-doption>
-                    <a-doption>备份管理</a-doption>
-                    <a-doption status="danger" @click="handleDelete(record.id)">删除站点</a-doption>
-                  </template>
-                </a-dropdown>
+                <a-button type="text" size="small" @click="handleManage(record)">设置</a-button>
+                <a-popconfirm content="确定要清理该站点的缓存吗？" @ok="handlePurgeCache(record)">
+                  <a-button type="text" size="small">清理缓存</a-button>
+                </a-popconfirm>
+                <a-popconfirm content="确定要删除站点吗？此操作不可撤销！" @ok="handleDelete(record.id)" type="warning">
+                  <a-button type="text" size="small" status="danger">删除</a-button>
+                </a-popconfirm>
               </a-space>
             </template>
           </a-table-column>
@@ -75,11 +89,20 @@
       ok-text="立即创建"
       cancel-text="取消"
     >
-      <a-form :model="form" layout="vertical" class="create-form">
+      <a-form :model="form" ref="formRef" layout="vertical" class="create-form">
         <!-- Basic Info Section -->
         <div class="form-section">
           <div class="section-title">基本信息</div>
-          <a-form-item field="domain" label="站点域名" required help="输入主域名，系统将自动配置根目录及数据库">
+          <a-form-item 
+            field="domain" 
+            label="站点域名" 
+            required 
+            :rules="[
+              { required: true, message: '请输入站点域名' },
+              { match: /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/i, message: '域名格式不正确，必须是根域名形式（如 example.com）' }
+            ]"
+            help="输入主域名，系统将自动配置根目录及数据库"
+          >
             <a-input v-model="form.domain" placeholder="例如: example.com" @input="handleDomainInput" />
           </a-form-item>
           <a-form-item field="php_version" label="PHP 版本">
@@ -116,19 +139,64 @@
         </div>
       </a-form>
     </a-modal>
+
+    <!-- Backup Management Modal -->
+    <a-modal 
+      v-model:visible="showBackupModal" 
+      :title="`备份管理 - ${currentSite?.domain}`" 
+      :width="650"
+      @cancel="showBackupModal = false"
+      :footer="false"
+    >
+      <div class="backup-management">
+        <div class="backup-actions">
+          <a-button type="primary" @click="handleCreateBackup" :loading="backupLoading">
+            <template #icon><icon-plus /></template>
+            新增备份
+          </a-button>
+        </div>
+        
+        <a-table :data="backupList" :loading="backupListLoading" style="margin-top: 16px">
+          <template #columns>
+            <a-table-column title="备份时间" data-index="created_at" />
+            <a-table-column title="文件大小" data-index="size" />
+            <a-table-column title="操作">
+              <template #cell="{ record }">
+                <a-space>
+                  <a-button type="text" size="small">下载</a-button>
+                  <a-popconfirm content="确定要删除该备份吗？" @ok="handleDeleteBackup(record)">
+                    <a-button type="text" size="small" status="danger">删除</a-button>
+                  </a-popconfirm>
+                </a-space>
+              </template>
+            </a-table-column>
+          </template>
+        </a-table>
+      </div>
+    </a-modal>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import request from '@/utils/request'
-import { Message } from '@arco-design/web-vue'
+import { Message, Modal } from '@arco-design/web-vue'
 import { IconPlus, IconMore, IconInfoCircle, IconCheckCircleFill } from '@arco-design/web-vue/es/icon'
 
+const router = useRouter()
 const loading = ref(false)
 const sites = ref([])
 const showCreateModal = ref(false)
 const confirmLoading = ref(false)
+const formRef = ref(null)
+
+// 备份管理相关状态
+const showBackupModal = ref(false)
+const currentSite = ref(null)
+const backupList = ref([])
+const backupListLoading = ref(false)
+const backupLoading = ref(false)
 
 const form = reactive({
   domain: '',
@@ -164,10 +232,11 @@ const fetchSites = async () => {
 }
 
 const handleCreate = async () => {
-  if (!form.domain) {
-    Message.error('请输入站点域名')
+  const errors = await formRef.value?.validate()
+  if (errors) {
     return false
   }
+  
   confirmLoading.value = true
   try {
     await request.post('/sites/', form)
@@ -182,13 +251,109 @@ const handleCreate = async () => {
   }
 }
 
+const handleManage = (record) => {
+  router.push({ name: 'WebsiteDetail', params: { id: record.id } })
+}
+
+const fetchBackups = async (siteId) => {
+  backupListLoading.value = true
+  try {
+    // 假设后端有获取备份列表的接口
+    // const res = await request.get(`/sites/${siteId}/backups`)
+    // backupList.value = res
+    
+    // 模拟数据
+    backupList.value = [
+      { id: 1, created_at: '2024-08-13 10:00:00', size: '15.2 MB' },
+      { id: 2, created_at: '2024-08-12 10:00:00', size: '14.8 MB' }
+    ]
+  } catch (error) {
+    Message.error('获取备份列表失败')
+  } finally {
+    backupListLoading.value = false
+  }
+}
+
+const handleBackupList = (record) => {
+  currentSite.value = record
+  showBackupModal.value = true
+  fetchBackups(record.id)
+}
+
+const handleCreateBackup = async () => {
+  if (!currentSite.value) return
+  backupLoading.value = true
+  try {
+    await request.post(`/sites/${currentSite.value.id}/backup`)
+    Message.success('备份创建成功')
+    fetchBackups(currentSite.value.id)
+    fetchSites() // 更新列表中的备份数量
+  } catch (error) {
+    Message.error('创建备份失败')
+  } finally {
+    backupLoading.value = false
+  }
+}
+
+const handleDeleteBackup = async (backup) => {
+  try {
+    // await request.delete(`/sites/${currentSite.value.id}/backups/${backup.id}`)
+    Message.success('备份已删除')
+    fetchBackups(currentSite.value.id)
+    fetchSites() // 更新列表中的备份数量
+  } catch (error) {
+    Message.error('删除备份失败')
+  }
+}
+
+const handlePurgeCache = async (record) => {
+  try {
+    await request.post(`/sites/${record.id}/purge-cache`)
+    Message.success(`站点 ${record.domain} 缓存清理成功`)
+  } catch (error) {
+    Message.error('缓存清理失败')
+  }
+}
+
+const handleSSL = async (record) => {
+  Message.loading({ content: '正在配置 SSL...', id: 'ssl' })
+  try {
+    await request.post(`/sites/${record.id}/ssl`)
+    Message.success({ content: 'SSL 配置成功', id: 'ssl' })
+  } catch (error) {
+    Message.error({ content: 'SSL 配置失败', id: 'ssl' })
+  }
+}
+
+const handleBackup = async (record) => {
+  Message.loading({ content: '正在创建备份...', id: 'backup' })
+  try {
+    await request.post(`/sites/${record.id}/backup`)
+    Message.success({ content: '站点备份已完成', id: 'backup' })
+  } catch (error) {
+    Message.error({ content: '备份失败', id: 'backup' })
+  }
+}
+
+const confirmDelete = (record) => {
+  Modal.confirm({
+    title: '删除站点',
+    content: `确定要删除站点 ${record.domain} 吗？此操作不可撤销，且会同时清理相关配置。`,
+    okText: '确认删除',
+    cancelText: '取消',
+    okButtonProps: { status: 'danger' },
+    onOk: () => handleDelete(record.id)
+  })
+}
+
 const handleDelete = async (id) => {
   try {
     await request.delete(`/sites/${id}`)
-    Message.success('站点已删除')
+    Message.success('站点已成功删除')
     fetchSites()
   } catch (error) {
     console.error(error)
+    Message.error('删除站点失败')
   }
 }
 

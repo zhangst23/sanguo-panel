@@ -1,5 +1,6 @@
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+import re
 from datetime import datetime
 
 class SiteBase(BaseModel):
@@ -21,6 +22,14 @@ class SiteCreate(BaseModel):
     performance_preset: str = "balanced"
     notes: Optional[str] = None
 
+    @field_validator('domain')
+    @classmethod
+    def validate_domain(cls, v: str) -> str:
+        domain_regex = r'^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$'
+        if not re.match(domain_regex, v.lower()):
+            raise ValueError('域名格式不正确，必须是根域名形式（如 example.com）')
+        return v.lower()
+
 class SiteUpdate(BaseModel):
     aliases: Optional[List[str]] = None
     php_version: Optional[str] = None
@@ -40,6 +49,8 @@ class Site(SiteBase):
     redis_enabled: bool
     opcache_enabled: bool
     browser_cache_enabled: bool
+    ssl_expire_at: Optional[str] = None
+    backup_count: int = 0
     created_at: datetime
     updated_at: datetime
 

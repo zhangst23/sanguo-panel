@@ -28,6 +28,12 @@ const routes = [
         meta: { requiresAuth: true },
       },
       {
+        path: 'website/:id',
+        name: 'WebsiteDetail',
+        component: () => import('@/views/Website/WebsiteDetail.vue'),
+        meta: { requiresAuth: true },
+      },
+      {
         path: 'cache',
         name: 'Cache',
         component: () => import('@/views/Cache/Cache.vue'),

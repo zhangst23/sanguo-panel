@@ -47,4 +47,7 @@ class Site(Base):
     opcache_enabled = Column(Boolean, default=True)
     browser_cache_enabled = Column(Boolean, default=True)
     
+    ssl_expire_at = Column(String(32)) # YYYY-MM-DD
+    backup_count = Column(Integer, default=0)
+    
     shared_db = relationship("SharedDatabase", back_populates="sites")
