@@ -95,13 +95,16 @@
       v-model:visible="showCreateModal" 
       title="创建 WordPress 站点" 
       :width="550"
-      @ok="handleCreate"
       @cancel="resetForm"
-      :confirm-loading="confirmLoading"
-      ok-text="立即创建"
-      cancel-text="取消"
+      :footer="!confirmLoading"
       :mask-closable="false"
+      :esc-to-close="false"
+      :closable="!confirmLoading"
     >
+      <template #footer>
+        <a-button @click="showCreateModal = false">取消</a-button>
+        <a-button type="primary" :loading="confirmLoading" @click="handleCreate">立即创建</a-button>
+      </template>
       <div v-if="confirmLoading" class="install-loading">
         <a-spin :size="32">
           <template #icon>
@@ -120,8 +123,13 @@
             MariaDB 数据库安装中...
           </div>
           <div class="step-item" :class="{ active: installStep >= 3 }">
-            <icon-loading v-if="installStep === 3" class="spin-icon" />
+            <icon-check-circle-fill v-if="installStep > 3" class="done-icon" />
+            <icon-loading v-else-if="installStep === 3" class="spin-icon" />
             配置优化中...
+          </div>
+          <div class="step-item" :class="{ active: installStep >= 4 }">
+            <icon-check-circle-fill v-if="installStep >= 4" class="done-icon" />
+            <span v-if="installStep >= 4">WordPress 站点创建完成！</span>
           </div>
         </div>
       </div>
@@ -295,6 +303,8 @@ const handleCreate = async () => {
         const statusRes = await request.get(`/sites/${siteId}`)
         const notes = statusRes.notes || ''
         
+        console.log('Current installation status:', notes)
+        
         if (notes.includes('step1:')) {
           installStep.value = 1
         } else if (notes.includes('step2:')) {
@@ -304,11 +314,15 @@ const handleCreate = async () => {
         } else if (notes.includes('completed:')) {
           installStep.value = 4
           clearInterval(pollInterval)
-          Message.success('WordPress 站点创建成功！')
-          showCreateModal.value = false
-          confirmLoading.value = false
-          resetForm()
-          fetchSites()
+          
+          // 延迟 1.5 秒再关闭，让用户看清完成状态
+          setTimeout(() => {
+            Message.success('WordPress 站点创建成功！')
+            showCreateModal.value = false
+            confirmLoading.value = false
+            resetForm()
+            fetchSites()
+          }, 1500)
         } else if (notes.includes('failed:')) {
           clearInterval(pollInterval)
           confirmLoading.value = false
@@ -317,7 +331,7 @@ const handleCreate = async () => {
       } catch (pollError) {
         console.error('Polling error:', pollError)
       }
-    }, 2000)
+    }, 1500) // 缩短轮询间隔至 1.5s，反馈更及时
 
   } catch (error) {
     console.error(error)
