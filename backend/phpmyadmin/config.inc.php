@@ -12,8 +12,9 @@ $i = 0;
 $i++;
 /* Authentication type */
 $cfg['Servers'][$i]['auth_type'] = 'signon';
-$cfg['Servers'][$i]['SignonSession'] = 'PMA_SSO';
+$cfg['Servers'][$i]['SignonSession'] = 'SanguoPMA';
 $cfg['Servers'][$i]['SignonScript'] = 'sso.php';
+$cfg['Servers'][$i]['SignonURL'] = 'sso.php';
 $cfg['Servers'][$i]['host'] = 'localhost';
 $cfg['Servers'][$i]['compress'] = false;
 $cfg['Servers'][$i]['AllowNoPassword'] = false;
@@ -27,5 +28,5 @@ $cfg['SaveDir'] = '';
 $cfg['DefaultLang'] = 'zh_CN';
 $cfg['ServerDefault'] = 1;
 
-// Use the same session name for everything to avoid conflicts
-$cfg['SessionName'] = 'PMA_SSO';
+// 强制 phpMyAdmin 使用统一的 Session 名称
+$cfg['SessionName'] = 'SanguoPMA';

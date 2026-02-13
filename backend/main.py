@@ -69,16 +69,24 @@ async def pma_proxy(request: Request, path: str):
     if request.query_params:
         url += f"?{request.query_params}"
 
+    # print(f"Proxying request: {request.method} {request.url} -> {url}")
+
     async with httpx.AsyncClient() as client:
         # Forward the request to the PHP server
         content = await request.body()
         
-        # Prepare headers: forward all except 'host'
-        headers = {}
-        for k, v in request.headers.items():
-            if k.lower() != 'host':
-                headers[k] = v
-                
+        # Prepare request to PHP server
+        headers = {k: v for k, v in request.headers.items() if k.lower() not in ["host", "content-length"]}
+        
+        # Add original Host for PHP to handle absolute URLs correctly if needed
+        headers["X-Forwarded-Host"] = request.headers.get("host", "")
+        headers["X-Forwarded-Proto"] = request.url.scheme
+        
+        # Debug: Log incoming cookies
+        cookie_header = headers.get("cookie", "")
+        if "SanguoPMA" in cookie_header:
+            print(f"--- PMA Proxy: Browser sent SanguoPMA cookie: {cookie_header[:50]}...")
+        
         try:
             rp_resp = await client.request(
                 method=request.method,
@@ -86,11 +94,19 @@ async def pma_proxy(request: Request, path: str):
                 content=content,
                 headers=headers,
                 follow_redirects=False,
-                timeout=30.0
+                timeout=60.0 # Increase timeout to 60s
             )
+            
+            # Debug: Log all headers from PHP
+            # print(f"--- PMA Proxy: PHP Response Headers: {list(rp_resp.headers.items())}")
+            
+            content = rp_resp.content
         except Exception as e:
             # Check if it's a connection error (server not running)
             error_detail = str(e)
+            print(f"PMA Proxy Exception: {error_detail}") # Log to console
+            print(f"Request: {request.method} {url}")
+            print(f"Headers: {headers}")
             if "Connection refused" in error_detail or "WinError 10061" in error_detail:
                 error_msg = pma.last_error if pma.last_error else "PHP Server for phpMyAdmin is not running."
                 return Response(
@@ -105,31 +121,38 @@ async def pma_proxy(request: Request, path: str):
             status_code=rp_resp.status_code
         )
         
-        # Forward headers from the PHP response to the browser
-        # Use raw headers to preserve multiple Set-Cookie headers
-        exclude_headers = ["content-length", "content-encoding", "transfer-encoding", "connection"]
-        for name, value in rp_resp.headers.raw:
-            name_str = name.decode("latin-1").lower()
-            if name_str not in exclude_headers:
-                header_value = value.decode("latin-1")
-                # Rewrite Location header to be relative to the proxy or absolute for the browser
-                if name_str == "location":
-                    if header_value.startswith("http://127.0.0.1") or header_value.startswith(f"http://{pma.host}"):
-                        # Convert absolute PHP URL back to relative/proxy URL
-                        import urllib.parse
-                        parsed = urllib.parse.urlparse(header_value)
-                        path = parsed.path
-                        # IMPORTANT: Prefix with /phpmyadmin because the browser needs to hit the proxy
-                        if not path.startswith("/phpmyadmin"):
-                            path = "/phpmyadmin" + (path if path.startswith("/") else "/" + path)
-                        
-                        header_value = path
-                        if parsed.query:
-                            header_value += f"?{parsed.query}"
+        # Forward headers correctly (avoiding dict collapse for multiple Set-Cookie)
+        for name, value in rp_resp.headers.items():
+            name_lower = name.lower()
+            if name_lower in ["content-length", "content-encoding", "transfer-encoding", "connection"]:
+                continue
+            
+            header_value = value
+            if name_lower == "set-cookie":
+                print(f"--- PMA Proxy: PHP setting cookie: {header_value}")
+
+            if name_lower == "location":
+                import urllib.parse
+                parsed = urllib.parse.urlparse(header_value)
                 
-                # print(f"Response header: {name_str}: {header_value}")
-                response.headers.append(name_str, header_value)
-                
+                if not parsed.netloc or \
+                   parsed.netloc == f"{pma.host}:{pma.port}" or \
+                   parsed.netloc == "127.0.0.1" or \
+                   parsed.netloc == "localhost":
+                    
+                    path = parsed.path
+                    if not path.startswith("/phpmyadmin"):
+                        path = "/phpmyadmin" + (path if path.startswith("/") else "/" + path)
+                    
+                    header_value = path
+                    if parsed.query:
+                        header_value += f"?{parsed.query}"
+                    if parsed.fragment:
+                        header_value += f"#{parsed.fragment}"
+            
+            # Use append to preserve multiple headers like Set-Cookie
+            response.headers.append(name, header_value)
+            
         return response
 
 @app.get("/")

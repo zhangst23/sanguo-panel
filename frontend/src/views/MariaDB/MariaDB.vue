@@ -28,7 +28,7 @@
                   <a-popover title="管理员数据库凭据">
                     <a-button type="outline" size="small" style="margin-left: 10px">
                       <template #icon><icon-safe /></template>
-                      查看管理凭据
+                      查看管理员凭据
                     </a-button>
                     <template #content>
                       <div class="admin-creds">
@@ -76,7 +76,7 @@
                   <a-table-column title="操作">
                     <template #cell="{ record }">
                       <a-space>
-                        <a-link @click="handleOpenPMA(record)">访问</a-link>
+                        <a-link @click="handleOpenPMA(record)">管理</a-link>
                         <a-popconfirm content="确定要重置该数据库的密码吗？" @ok="handleChangePassword(record)">
                           <a-link>改密</a-link>
                         </a-popconfirm>

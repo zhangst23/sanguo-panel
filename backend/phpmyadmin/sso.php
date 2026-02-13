@@ -4,55 +4,97 @@
  * This script integrates with the Sanguo Panel backend to verify tokens
  */
 
-if (session_status() === PHP_SESSION_NONE) {
-     session_name('PMA_SSO');
-     // Use a more permissive cookie setup for the proxy environment
-     session_set_cookie_params([
-         'lifetime' => 0,
-         'path' => '/', // Try root path to ensure it's captured by the browser
-         'domain' => '',
-         'secure' => false,
-         'httponly' => false, // Set to false temporarily for debugging
-         'samesite' => 'Lax'
-     ]);
-     session_start();
- }
+/**
+ * Required function for phpMyAdmin SignOn authentication plugin when SignonScript is used.
+ * @param string $user Default user from config
+ * @return array [username, password]
+ */
+function get_login_credentials($user) {
+    return [
+        $_SESSION['PMA_single_signon_user'] ?? '',
+        $_SESSION['PMA_single_signon_password'] ?? ''
+    ];
+}
+
+// Enable error reporting for debugging
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
 
 // Debug logging
 function pma_log($msg) {
     file_put_contents(__DIR__ . '/pma_sso.log', date('[Y-m-d H:i:s] ') . $msg . "\n", FILE_APPEND);
 }
 
-pma_log("--- SSO SCRIPT START ---");
-pma_log("Request URI: " . $_SERVER['REQUEST_URI']);
-pma_log("PHP Self: " . $_SERVER['PHP_SELF']);
-pma_log("Included files: " . count(get_included_files()));
-
-if (defined('PHPMYADMIN')) {
-    pma_log("Included by phpMyAdmin. PHPMYADMIN constant is defined.");
+// Initialize session if not already started
+if (session_status() === PHP_SESSION_NONE) {
+    // Set session name to something unique to avoid clashing with other phpMyAdmin instances
+    $sessionName = 'SanguoPMA';
+    session_name($sessionName);
+    
+    // Use a local session path to avoid permission issues and isolation
+    $sessionPath = __DIR__ . '/sessions';
+    if (!is_dir($sessionPath)) {
+        @mkdir($sessionPath, 0777, true);
+    }
+    if (is_writable($sessionPath)) {
+        session_save_path($sessionPath);
+    }
+    
+    // Set cookie parameters for the proxy environment
+    // Use a very permissive setup first to rule out cookie rejection
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => '/', 
+        'domain' => '',
+        'secure' => false,
+        'httponly' => false, // Set to false to see if it helps with proxy
+        'samesite' => 'Lax'
+    ]);
+    
+    session_start();
 }
 
+pma_log("--- SSO SCRIPT START ---");
+pma_log("Request URI: " . $_SERVER['REQUEST_URI']);
+pma_log("Cookies received by PHP: " . json_encode($_COOKIE));
 pma_log("Session ID: " . session_id());
- pma_log("Cookies: " . json_encode($_COOKIE));
- 
- // Add a flag to prevent infinite loops if index.php redirects back to sso.php
- if (isset($_GET['redirect_count']) && $_GET['redirect_count'] > 3) {
-     pma_log("Too many redirects, stopping.");
-     die("Redirect loop detected. Please clear your cookies and try again.");
- }
+pma_log("Session data: " . json_encode($_SESSION));
 
- if (isset($_GET['pma_token'])) {
+// If we are being included by phpMyAdmin, we just need to provide the credentials
+if (defined('PHPMYADMIN')) {
+    pma_log("sso.php included by phpMyAdmin.");
+    if (!empty($_SESSION['PMA_single_signon_user'])) {
+        pma_log("Session valid for user: " . $_SESSION['PMA_single_signon_user']);
+        return;
+    } else {
+        pma_log("No session during PMA inclusion. Session ID: " . session_id());
+        // Do NOT return yet, let it fall through or handle it
+    }
+}
+
+// Prevent redirect loops
+if (!isset($_SESSION['redirect_count'])) $_SESSION['redirect_count'] = 0;
+if (isset($_GET['pma_token'])) {
+    $_SESSION['redirect_count'] = 0; // Reset on new token
+}
+
+if ($_SESSION['redirect_count'] > 5) {
+    pma_log("Redirect loop detected. Stopping.");
+    $_SESSION['redirect_count'] = 0;
+    die("检测到重定向死循环。请尝试清除浏览器 Cookie 并重新登录。");
+}
+
+if (isset($_GET['pma_token'])) {
     pma_log("Received token: " . $_GET['pma_token']);
     $token = $_GET['pma_token'];
-    // Call the backend API to verify the token and get credentials
-    // Use 127.0.0.1 instead of localhost to avoid IPv6 resolution issues on Windows
-    $apiUrl = "http://127.0.0.1:8000/api/v1/database/pma-sso-verify/" . urlencode($token);
     
+    // Call backend API
+    $apiUrl = "http://127.0.0.1:8000/api/v1/database/pma-sso-verify/" . urlencode($token);
     $context = stream_context_create([
         'http' => [
             'method' => 'GET',
             'header' => 'Accept: application/json',
-            'timeout' => 5
+            'timeout' => 10
         ]
     ]);
     
@@ -60,53 +102,52 @@ pma_log("Session ID: " . session_id());
     
     if ($response === false) {
         pma_log("Failed to verify token with API: " . $apiUrl);
-        die("Failed to verify token with backend API. Please ensure the backend is running.");
+        die("无法通过后端 API 验证 Token。请确保后端服务（端口 8000）正在运行。");
     }
     
     $data = json_decode($response, true);
     
     if (isset($data['db_user'])) {
         pma_log("Verification successful for user: " . $data['db_user']);
-        // Set credentials for phpMyAdmin signon authentication
+        
+        // Set credentials
         $_SESSION['PMA_single_signon_user'] = $data['db_user'];
         $_SESSION['PMA_single_signon_password'] = $data['db_password'];
         $_SESSION['PMA_single_signon_host'] = $data['db_host'];
         $_SESSION['PMA_single_signon_port'] = $data['db_port'];
+        $_SESSION['PMA_single_signon_error'] = '';
         
-        // If a specific database was requested via URL, set it
         if (isset($_GET['db'])) {
             $_SESSION['PMA_single_signon_db'] = $_GET['db'];
             pma_log("Setting target database to: " . $_GET['db']);
         }
-        
-        // If we are being included by phpMyAdmin, we DON'T need to redirect.
-        // We just set the session and let phpMyAdmin continue.
-        if (defined('PHPMYADMIN')) {
-            pma_log("Token verified during inclusion. Continuing without redirect.");
-            return;
+        if (isset($_GET['route'])) {
+            $_SESSION['PMA_single_signon_route'] = $_GET['route'];
+            pma_log("Setting target route to: " . $_GET['route']);
         }
-        
-        // Save session and redirect to phpMyAdmin main page
+
+        $_SESSION['redirect_count']++;
         session_write_close();
-        pma_log("Redirecting to index.php with session " . session_id());
-        header('Location: index.php');
+        
+        // 关键修复：重定向回 index.php，phpMyAdmin 会再次调用 sso.php（这次是通过 Include）
+        $redirectUrl = 'index.php';
+        $params = [];
+        if (isset($_GET['db'])) $params['db'] = $_GET['db'];
+        if (isset($_GET['route'])) $params['route'] = $_GET['route'];
+        if (!empty($params)) $redirectUrl .= '?' . http_build_query($params);
+        
+        pma_log("Redirecting to index.php after token verification. Redirect URL: " . $redirectUrl);
+        header('Location: ' . $redirectUrl);
         exit;
     } else {
-        pma_log("Invalid or expired token response: " . $response);
-        die("Invalid or expired phpMyAdmin token. Please try again from the Sanguo Panel.");
+        pma_log("Invalid token response: " . $response);
+        die("Token 无效或已过期。请从三国面板重新点击进入。");
     }
 }
 
-// If no token or verification fails, check if we have a valid session
+// Check if already logged in
 if (empty($_SESSION['PMA_single_signon_user'])) {
-    // If we are being included by phpMyAdmin, don't show the error page,
-    // just let phpMyAdmin handle the lack of credentials (it might show login form)
-    if (defined('PHPMYADMIN')) {
-        pma_log("No session found during phpMyAdmin inclusion. Silently returning.");
-        return;
-    }
-
-    pma_log("Access denied - no session and no token.");
+    pma_log("No session and no token. Access denied.");
     ?>
     <!DOCTYPE html>
     <html lang="zh">
@@ -121,14 +162,29 @@ if (empty($_SESSION['PMA_single_signon_user'])) {
     </head>
     <body>
         <div class="card">
-            <h2>访问拒绝</h2>
+            <h2>访问拒绝 (Access Denied)</h2>
             <p>请通过三国面板点击“管理”按钮访问数据库。</p>
-            <a href="http://localhost:5173/mariadb" class="btn">返回面板</a>
+            <p style="font-size: 12px; color: #999;">Session ID: <?php echo session_id(); ?></p>
+            <a href="/mariadb" class="btn">返回面板</a>
         </div>
     </body>
     </html>
     <?php
     exit;
 }
-pma_log("Session valid for user: " . $_SESSION['PMA_single_signon_user']);
+
+// Already logged in, redirect to index.php if accessing sso.php directly
+pma_log("Session valid for user: " . $_SESSION['PMA_single_signon_user'] . ". Redirecting to index.php");
+$_SESSION['redirect_count']++;
+session_write_close();
+
+$redirectUrl = 'index.php';
+$params = [];
+if (isset($_GET['db'])) $params['db'] = $_GET['db'];
+if (isset($_GET['route'])) $params['route'] = $_GET['route'];
+if (!empty($params)) $redirectUrl .= '?' . http_build_query($params);
+
+header('Location: ' . $redirectUrl);
+exit;
+
 ?>

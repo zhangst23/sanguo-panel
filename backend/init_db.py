@@ -30,7 +30,7 @@ def init_db():
             name="Default MySQL",
             db_host="localhost",
             db_port=3306,
-            db_name="sanguo_shared",
+            db_name="wp_db",
             db_user="root",
             db_password="",
             max_table_count=1000,

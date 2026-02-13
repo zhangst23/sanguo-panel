@@ -201,7 +201,7 @@ def create_site(
                 name="Default MariaDB",
                 db_host="localhost",
                 db_port=3306,
-                db_name="sanguo_shared",
+                db_name="wp_db",
                 db_user="root",
                 db_password="",
                 status="active"

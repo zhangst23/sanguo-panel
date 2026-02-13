@@ -69,7 +69,7 @@
           <a-table-column title="数据库">
             <template #cell="{ record }">
               <a-link @click="handleOpenPMA(record)">
-                访问
+                管理
               </a-link>
             </template>
           </a-table-column>
