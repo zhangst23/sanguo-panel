@@ -2,9 +2,6 @@
   <div class="litespeed-container">
     <div class="header-section">
       <a-typography-title :heading="2">OpenLiteSpeed 管理</a-typography-title>
-      <a-button type="outline" @click="expertMode = !expertMode">
-        {{ expertMode ? '简易模式' : '专家模式' }}
-      </a-button>
     </div>
 
     <a-tabs default-active-key="1">
@@ -76,7 +73,7 @@
         </a-row>
       </a-tab-pane>
 
-      <a-tab-pane key="2" title="虚拟主机" v-if="expertMode">
+      <a-tab-pane key="2" title="虚拟主机">
         <a-table :data="vhosts" :loading="loading">
           <template #columns>
             <a-table-column title="主机名" data-index="name"></a-table-column>
@@ -92,7 +89,7 @@
         </a-table>
       </a-tab-pane>
 
-      <a-tab-pane key="3" title="安全设置" v-if="expertMode">
+      <a-tab-pane key="3" title="安全设置">
         <a-card title="防盗链 / IP 黑白名单">
           <a-form :model="securityConfig" layout="vertical">
             <a-form-item label="Referer 白名单 (每行一个)">
@@ -106,7 +103,7 @@
         </a-card>
       </a-tab-pane>
 
-      <a-tab-pane key="4" title="高级配置" v-if="expertMode">
+      <a-tab-pane key="4" title="高级配置">
         <a-alert type="warning">手动修改配置文件可能会导致服务无法启动，请谨慎操作。</a-alert>
         <div class="editor-container" style="margin-top: 20px;">
           <a-textarea :auto-size="{ minRows: 15 }" v-model="rawConfig" />
@@ -129,7 +126,6 @@ const olsStatus = ref({
   uptime: ''
 })
 const loading = ref(false)
-const expertMode = ref(false)
 const vhosts = ref([])
 const features = reactive({
   http2: true,
