@@ -10,12 +10,12 @@
             <a-card>
               <template #title>
                 <a-space size="large">
-                  <a-button type="primary" @click="showManualModal = true">
+                  <a-button type="primary" @click="handleOpenManualModal">
                     <template #icon><icon-plus /></template>
                     创建手动备份
                   </a-button>
                   <a-typography-text type="secondary">
-                    备份文件目录：<a-typography-text code>/www/backup</a-typography-text>
+                    备份文件目录：<a-typography-text code>backup</a-typography-text>
                   </a-typography-text>
                 </a-space>
               </template>
@@ -199,9 +199,14 @@
           </a-radio-group>
         </a-form-item>
         <a-form-item label="选择对象" v-if="manualForm.target !== 'full'">
-          <a-select v-model="manualForm.id" placeholder="请选择备份对象">
-            <a-option v-for="item in items" :key="item.id" :value="item.id">{{ item.name }}</a-option>
+          <a-select v-model="manualForm.id" :placeholder="manualForm.target === 'site' ? '请选择站点' : '请选择数据库'">
+            <a-option v-for="item in items" :key="item.id" :value="item.id">
+              {{ manualForm.target === 'site' ? item.name : (item.db_name || item.name) }}
+            </a-option>
           </a-select>
+          <template #extra v-if="items.length === 0">
+            <span style="color: #ff7d00;">未发现可用站点，请先前往“站点管理”创建</span>
+          </template>
         </a-form-item>
       </a-form>
     </a-modal>
@@ -225,6 +230,14 @@ const backups = ref([])
 const activeTasks = ref([])
 const items = ref([])
 let pollTimer = null
+
+const handleOpenManualModal = async () => {
+  showManualModal.value = true
+  await fetchData()
+  if (items.value.length > 0 && !manualForm.id) {
+    manualForm.id = items.value[0].id
+  }
+}
 
 const scheduleForm = reactive({
   site_id: null,
@@ -261,21 +274,42 @@ const allSitesBackupConfig = reactive({
 const fetchData = async () => {
   loading.fetch = true
   try {
-    const res = await request.get('/security/backups')
-    backups.value = res
-    
-    const schedules = await request.get('/security/backups/schedule')
-    if (schedules && schedules.length > 0) {
-      Object.assign(scheduleForm, schedules[0])
+    // 1. 获取备份记录
+    try {
+      const res = await request.get('/security/backups')
+      backups.value = res || []
+    } catch (e) {
+      console.error('Failed to fetch backups:', e)
     }
     
-    const sites = await request.get('/sites/')
-    items.value = sites.map(s => ({ id: s.id, name: s.domain }))
-    if (items.value.length > 0 && !scheduleForm.site_id) {
-      scheduleForm.site_id = items.value[0].id
+    // 2. 获取站点列表 (这是下拉菜单的数据源)
+    try {
+      const sitesRes = await request.get('/sites/')
+      // 兼容多种返回格式: 直接数组 或 { items: [] }
+      const sitesList = Array.isArray(sitesRes) ? sitesRes : (sitesRes.items || [])
+      items.value = sitesList.map(s => ({ 
+        id: s.id, 
+        name: s.domain,
+        db_name: s.db_name 
+      }))
+      
+      if (items.value.length > 0 && !scheduleForm.site_id) {
+        scheduleForm.site_id = items.value[0].id
+      }
+    } catch (e) {
+      console.error('Failed to fetch sites:', e)
     }
-  } catch (error) {
-    console.error(error)
+
+    // 3. 获取定时任务配置
+    try {
+      const schedules = await request.get('/security/backups/schedule')
+      if (schedules && schedules.length > 0) {
+        Object.assign(scheduleForm, schedules[0])
+      }
+    } catch (e) {
+      console.error('Failed to fetch schedules:', e)
+    }
+    
   } finally {
     loading.fetch = false
   }
@@ -396,8 +430,14 @@ const handleDownload = async (record) => {
   }
 }
 
-const handleRestore = (record) => {
-  Message.info('恢复功能开发中...')
+const handleRestore = async (record) => {
+  try {
+    await request.post(`/security/backups/${record.id}/restore`)
+    Message.success('恢复任务已启动')
+    fetchTasks()
+  } catch (error) {
+    Message.error('启动恢复失败')
+  }
 }
 
 const handleDelete = async (record) => {

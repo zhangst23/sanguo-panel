@@ -8,7 +8,7 @@ from backend.models.site import Site
 from backend.models.backup import Backup as BackupModel, BackupSchedule as BackupScheduleModel
 from backend.models.task import Task as TaskModel, TaskStatus
 from backend.schemas.backup import Backup, BackupCreate, BackupSchedule, BackupScheduleCreate
-from backend.utils.backup_utils import create_site_backup
+from backend.utils.backup_utils import create_site_backup, restore_site_backup
 from backend.core import security as security_utils
 from backend.models.user import User
 from typing import List, Optional
@@ -352,6 +352,7 @@ def download_backup(
             media_type='application/zip'
         )
     raise HTTPException(status_code=404, detail="Backup file not found on disk")
+@router.delete("/backups/{backup_id}")
 def delete_backup(
     backup_id: int,
     db: Session = Depends(get_db),
@@ -362,15 +363,49 @@ def delete_backup(
         raise HTTPException(status_code=404, detail="Backup not found")
     
     # Delete physical file
-    if backup.file_path and os.path.exists(backup.file_path):
-        try:
+    try:
+        if backup.file_path and os.path.exists(backup.file_path):
             os.remove(backup.file_path)
-        except Exception as e:
-            print(f"Failed to delete file: {e}")
-            
+    except Exception as e:
+        print(f"Failed to delete physical file: {e}")
+
     db.delete(backup)
     db.commit()
     return {"success": True}
+
+@router.post("/backups/{backup_id}/restore")
+def restore_backup(
+    backup_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    backup = db.query(BackupModel).filter(BackupModel.id == backup_id).first()
+    if not backup:
+        raise HTTPException(status_code=404, detail="Backup not found")
+    
+    if not backup.file_path or not os.path.exists(backup.file_path):
+        raise HTTPException(status_code=404, detail="Backup file not found on disk")
+
+    site = db.query(Site).filter(Site.id == backup.site_id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Associated site not found")
+
+    task_uuid = str(uuid.uuid4())
+    new_task = TaskModel(
+        task_uuid=task_uuid,
+        type="restore",
+        site_id=site.id,
+        status=TaskStatus.pending,
+        progress=0,
+        message=f"Scheduled restore for {site.domain} from {backup.name}",
+        created_by=current_user.id
+    )
+    db.add(new_task)
+    db.commit()
+
+    background_tasks.add_task(restore_site_backup, db, backup.id, task_uuid)
+    return {"success": True, "message": "Restore task started", "task_uuid": task_uuid}
 
 @router.post("/migration/import")
 def import_site(panel_type: str, file_path: str, current_user=Depends(get_current_user)):
