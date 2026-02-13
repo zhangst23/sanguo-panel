@@ -1,29 +1,29 @@
 <template>
   <div class="redis-container">
-    <a-typography-title :heading="2">Redis & Cache Management</a-typography-title>
+    <a-typography-title :heading="2">Redis 管理</a-typography-title>
     
     <a-row :gutter="20">
       <!-- Redis Service Metrics -->
       <a-col :span="16">
-        <a-card title="Redis Service Metrics" hoverable>
+        <a-card title="运行状态指标" hoverable>
           <template #extra>
             <a-tag :color="metrics.status === 'running' ? 'green' : 'red'">
-              {{ metrics.status.toUpperCase() }}
+              {{ metrics.status === 'running' ? '运行中' : '已停止' }}
             </a-tag>
           </template>
           
           <a-row :gutter="20">
             <a-col :span="6">
-              <a-statistic title="Used Memory" :value="metrics.used_memory_human" />
+              <a-statistic title="已用内存" :value="metrics.used_memory_human" />
             </a-col>
             <a-col :span="6">
-              <a-statistic title="Max Memory" :value="metrics.maxmemory_human" />
+              <a-statistic title="最大内存" :value="metrics.maxmemory_human" />
             </a-col>
             <a-col :span="6">
-              <a-statistic title="Connected Clients" :value="metrics.connected_clients" />
+              <a-statistic title="客户端连接" :value="metrics.connected_clients" />
             </a-col>
             <a-col :span="6">
-              <a-statistic title="Hit Rate" :value="metrics.hit_rate" unit="%" />
+              <a-statistic title="命中率" :value="metrics.hit_rate" unit="%" />
             </a-col>
           </a-row>
 
@@ -31,33 +31,33 @@
 
           <a-space size="large">
             <div class="metric-item">
-              <span class="label">Uptime:</span>
+              <span class="label">运行时间:</span>
               <span class="value">{{ formatUptime(metrics.uptime_in_seconds) }}</span>
             </div>
             <div class="metric-item">
-              <span class="label">Fragmentation:</span>
+              <span class="label">内存碎片率:</span>
               <span class="value">{{ metrics.mem_fragmentation_ratio }}</span>
             </div>
             <div class="metric-item">
-              <span class="label">Version:</span>
+              <span class="label">Redis 版本:</span>
               <span class="value">{{ metrics.version }}</span>
             </div>
           </a-space>
         </a-card>
 
         <!-- Memory Config -->
-        <a-card title="Redis Configuration" style="margin-top: 20px">
+        <a-card title="Redis 配置" style="margin-top: 20px">
           <a-form :model="configForm" layout="vertical" @submit="handleUpdateConfig">
             <a-row :gutter="20">
               <a-col :span="8">
-                <a-form-item label="Max Memory (MB)" help="Recommended: 1/4 of total system RAM">
+                <a-form-item label="最大内存 (MB)" help="建议设置为系统总内存的 1/4">
                   <a-input-number v-model="configForm.maxmemory_mb" :min="64" :max="16384" />
                 </a-form-item>
               </a-col>
               <a-col :span="8">
-                <a-form-item label="Eviction Policy" help="LRU is recommended for object caching">
+                <a-form-item label="淘汰策略" help="对象缓存建议使用 LRU 策略">
                   <a-select v-model="configForm.policy">
-                    <a-option value="allkeys-lru">allkeys-lru (Recommended)</a-option>
+                    <a-option value="allkeys-lru">allkeys-lru (推荐)</a-option>
                     <a-option value="volatile-lru">volatile-lru</a-option>
                     <a-option value="allkeys-random">allkeys-random</a-option>
                     <a-option value="noeviction">noeviction</a-option>
@@ -65,29 +65,29 @@
                 </a-form-item>
               </a-col>
               <a-col :span="8">
-                <a-form-item label="Redis Password" help="Leave empty to disable password">
-                  <a-input-password v-model="configForm.password" placeholder="New Password" />
+                <a-form-item label="Redis 密码" help="留空则禁用密码验证">
+                  <a-input-password v-model="configForm.password" placeholder="设置新密码" />
                 </a-form-item>
               </a-col>
             </a-row>
-            <a-button type="primary" html-type="submit" :loading="loading.config">Update Configuration</a-button>
+            <a-button type="primary" html-type="submit" :loading="loading.config">保存配置</a-button>
           </a-form>
         </a-card>
       </a-col>
 
       <!-- Redis Actions -->
       <a-col :span="8">
-        <a-card title="Quick Actions" hoverable>
+        <a-card title="快捷操作" hoverable>
           <a-space direction="vertical" fill size="large">
             <a-button type="primary" long @click="handleAction('redis', 'restart')" :loading="loading.redis">
               <template #icon><icon-refresh /></template>
-              Restart Redis Service
+              重启 Redis 服务
             </a-button>
             
-            <a-popconfirm content="Are you sure to clear all Redis keys? This may temporarily slow down sites." @ok="handleFlush">
+            <a-popconfirm content="确定要清空所有 Redis 缓存吗？这可能会导致站点响应暂时变慢。" @ok="handleFlush">
               <a-button status="danger" long :loading="loading.flush">
                 <template #icon><icon-delete /></template>
-                Flush All Cache (FLUSHALL)
+                清空全站缓存 (FLUSHALL)
               </a-button>
             </a-popconfirm>
 
@@ -96,24 +96,24 @@
             <div class="info-box">
               <icon-info-circle />
               <div class="text">
-                Redis is used as an <b>Object Cache</b> for WordPress sites to significantly reduce database load.
+                Redis 被用作 WordPress 站点的 <b>对象缓存 (Object Cache)</b>，能够显著减轻数据库负载并提升访问速度。
               </div>
             </div>
           </a-space>
         </a-card>
 
-        <a-card title="Site Isolation Status" style="margin-top: 20px">
+        <a-card title="站点隔离状态" style="margin-top: 20px">
           <div class="desc">
-            Each site is automatically assigned a unique Redis database index (0-15) to prevent key collisions.
+            系统为每个站点自动分配唯一的 Redis 数据库索引 (0-15)，确保数据互不冲突。
           </div>
           <a-list size="small" :bordered="false">
             <a-list-item v-for="site in sites" :key="site.id">
-              <a-list-item-meta :title="site.domain" :description="'Redis DB Index: ' + (site.id % 16)" />
+              <a-list-item-meta :title="site.domain" :description="'Redis 数据库索引: ' + (site.id % 16)" />
               <template #actions>
-                <a-tag v-if="site.redis_enabled" color="green">Active</a-tag>
-                <a-tag v-else color="gray">Inactive</a-tag>
+                <a-tag v-if="site.redis_enabled" color="green">已开启</a-tag>
+                <a-tag v-else color="gray">未启用</a-tag>
                 <a-button v-if="site.redis_enabled" type="text" size="small" @click="handleFlush(site.id)" :loading="loading['flush_' + site.id]">
-                  Clear
+                  清理
                 </a-button>
               </template>
             </a-list-item>
