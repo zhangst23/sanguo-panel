@@ -285,27 +285,44 @@ const handleCreate = async () => {
   confirmLoading.value = true
   installStep.value = 1
   
-  // 模拟进度显示
-  const timer1 = setTimeout(() => installStep.value = 2, 2000)
-  const timer2 = setTimeout(() => installStep.value = 3, 5000)
-
   try {
-    await request.post('/sites/', form)
-    clearTimeout(timer1)
-    clearTimeout(timer2)
-    installStep.value = 4
-    Message.success('WordPress 站点创建成功！')
-    showCreateModal.value = false
-    resetForm()
-    fetchSites()
+    const newSite = await request.post('/sites/', form)
+    const siteId = newSite.id
+    
+    // 开始轮询状态
+    const pollInterval = setInterval(async () => {
+      try {
+        const statusRes = await request.get(`/sites/${siteId}`)
+        const notes = statusRes.notes || ''
+        
+        if (notes.includes('step1:')) {
+          installStep.value = 1
+        } else if (notes.includes('step2:')) {
+          installStep.value = 2
+        } else if (notes.includes('step3:')) {
+          installStep.value = 3
+        } else if (notes.includes('completed:')) {
+          installStep.value = 4
+          clearInterval(pollInterval)
+          Message.success('WordPress 站点创建成功！')
+          showCreateModal.value = false
+          confirmLoading.value = false
+          resetForm()
+          fetchSites()
+        } else if (notes.includes('failed:')) {
+          clearInterval(pollInterval)
+          confirmLoading.value = false
+          Message.error('创建失败: ' + notes.replace('failed:', ''))
+        }
+      } catch (pollError) {
+        console.error('Polling error:', pollError)
+      }
+    }, 2000)
+
   } catch (error) {
-    clearTimeout(timer1)
-    clearTimeout(timer2)
     console.error(error)
-    Message.error('创建失败: ' + (error.response?.data?.detail || error.message))
-  } finally {
+    Message.error('请求失败: ' + (error.response?.data?.detail || error.message))
     confirmLoading.value = false
-    installStep.value = 1
   }
 }
 
