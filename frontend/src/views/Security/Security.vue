@@ -91,41 +91,6 @@
         </a-row>
       </a-tab-pane>
 
-      <!-- 管理安全标签页 -->
-      <a-tab-pane key="admin" title="管理安全">
-        <a-row :gutter="20">
-          <a-col :span="12">
-            <a-card title="修改管理密码">
-              <a-form :model="passwordForm" layout="vertical" @submit="handlePasswordChange">
-                <a-form-item label="当前密码" required>
-                  <a-input-password v-model="passwordForm.old_password" placeholder="请输入当前密码" />
-                </a-form-item>
-                <a-form-item label="新密码" required>
-                  <a-input-password v-model="passwordForm.new_password" placeholder="请输入新密码" />
-                </a-form-item>
-                <a-form-item label="确认新密码" required>
-                  <a-input-password v-model="passwordForm.confirm_password" placeholder="请再次输入新密码" />
-                </a-form-item>
-                <a-button type="primary" html-type="submit" :loading="loading.password">更新密码</a-button>
-              </a-form>
-            </a-card>
-          </a-col>
-          <a-col :span="12">
-            <a-card title="面板访问设置">
-              <a-form :model="panelConfig" layout="vertical">
-                <a-form-item label="登录超时时间 (分钟)">
-                  <a-input-number v-model="panelConfig.session_timeout" :min="5" :max="1440" />
-                </a-form-item>
-                <a-form-item label="两步验证 (2FA)">
-                  <a-switch v-model="panelConfig.enable_2fa" disabled />
-                  <span style="margin-left: 10px; color: #86909c;">(开发中)</span>
-                </a-form-item>
-                <a-button type="outline" @click="handleSavePanelConfig">保存设置</a-button>
-              </a-form>
-            </a-card>
-          </a-col>
-        </a-row>
-      </a-tab-pane>
     </a-tabs>
 
     <!-- 隐藏后台路径弹窗 -->
@@ -148,8 +113,7 @@ import { Message } from '@arco-design/web-vue'
 const activeTab = ref('system')
 const loading = reactive({
   firewall: false,
-  wp: false,
-  password: false
+  wp: false
 })
 
 const sites = ref([])
@@ -167,17 +131,6 @@ const firewall = reactive({
 const fail2ban = reactive({
   active: false,
   banned_ips: []
-})
-
-const passwordForm = reactive({
-  old_password: '',
-  new_password: '',
-  confirm_password: ''
-})
-
-const panelConfig = reactive({
-  session_timeout: 60,
-  enable_2fa: false
 })
 
 const fetchData = async () => {
@@ -260,34 +213,6 @@ const handleUnbanIp = async (ip) => {
     fetchData()
   } catch (error) {
     Message.error('操作失败')
-  }
-}
-
-const handlePasswordChange = async () => {
-  if (passwordForm.new_password !== passwordForm.confirm_password) {
-    Message.error('两次输入的新密码不一致')
-    return
-  }
-  loading.password = true
-  try {
-    await request.post(`/security/password?old_password=${passwordForm.old_password}&new_password=${passwordForm.new_password}`)
-    Message.success('密码更新成功')
-    passwordForm.old_password = ''
-    passwordForm.new_password = ''
-    passwordForm.confirm_password = ''
-  } catch (error) {
-    Message.error(error.response?.data?.detail || '密码更新失败')
-  } finally {
-    loading.password = false
-  }
-}
-
-const handleSavePanelConfig = async () => {
-  try {
-    await request.post('/security/panel-config', panelConfig)
-    Message.success('面板配置已保存')
-  } catch (error) {
-    Message.error('保存失败')
   }
 }
 
