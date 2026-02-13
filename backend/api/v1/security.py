@@ -101,6 +101,8 @@ def update_security_settings(settings: dict, current_user=Depends(get_current_us
     return {"success": True}
 
 # --- System Security (Firewall & Fail2ban) ---
+
+def run_shell(command):
     try:
         result = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=30)
         return {
@@ -140,22 +142,90 @@ def toggle_firewall(enable: bool, current_user=Depends(get_current_user)):
     run_shell(f"systemctl {'enable' if enable else 'disable'} firewalld")
     return {"success": True}
 
+# 全局 Mock 数据，用于在 Windows 环境下模拟状态变更
+F2B_MOCK_DATA = {
+    "active": True,
+    "banned_ips": ["1.2.3.4"],
+    "config": {"bantime": 600, "findtime": 600, "maxretry": 5}
+}
+
 @router.get("/fail2ban/status")
 def get_fail2ban_status(current_user=Depends(get_current_user)):
-    if os.name == 'nt': return {"active": True, "banned_ips": ["1.2.3.4"]}
+    if os.name == 'nt': 
+        return F2B_MOCK_DATA
+    
     res = run_shell("systemctl is-active fail2ban")
     active = res["stdout"].strip() == "active"
     
     banned_ips = []
+    config = {"bantime": 600, "findtime": 600, "maxretry": 5}
+    
     if active:
-        res = run_shell("fail2ban-client status sshd")
-        # Parse banned IPs from output
+        # 获取所有 jail 的封禁 IP
+        res = run_shell("fail2ban-client status")
         import re
-        match = re.search(r"Banned IP list:\s*(.*)", res["stdout"])
-        if match:
-            banned_ips = match.group(1).split()
+        jails_match = re.search(r"Jail list:\s*(.*)", res["stdout"])
+        if jails_match:
+            jails = jails_match.group(1).replace(",", "").split()
+            for jail in jails:
+                res_jail = run_shell(f"fail2ban-client status {jail}")
+                ip_match = re.search(r"Banned IP list:\s*(.*)", res_jail["stdout"])
+                if ip_match:
+                    ips = ip_match.group(1).split()
+                    banned_ips.extend(ips)
+        
+        # 尝试读取基本配置 (从 jail.local 或 jail.conf)
+        # 这里仅作示例，实际可能需要更复杂的解析
+        res_config = run_shell("fail2ban-client get sshd bantime")
+        if res_config["success"]:
+            try:
+                config["bantime"] = int(res_config["stdout"].strip())
+            except: pass
             
-    return {"active": active, "banned_ips": banned_ips}
+    return {"active": active, "banned_ips": list(set(banned_ips)), "config": config}
+
+@router.post("/fail2ban/ban")
+def ban_ip(ip: str, current_user=Depends(get_current_user)):
+    if os.name == 'nt': 
+        if ip not in F2B_MOCK_DATA["banned_ips"]:
+            F2B_MOCK_DATA["banned_ips"].append(ip)
+        return {"success": True}
+    # 默认封禁在 sshd jail 中，或者创建一个专门的 jail
+    res = run_shell(f"fail2ban-client set sshd banip {ip}")
+    if res["success"]:
+        return {"success": True}
+    else:
+        raise HTTPException(status_code=500, detail=f"Failed to ban IP: {res['stderr']}")
+
+@router.post("/fail2ban/unban")
+def unban_ip(ip: str, current_user=Depends(get_current_user)):
+    if os.name == 'nt': 
+        if ip in F2B_MOCK_DATA["banned_ips"]:
+            F2B_MOCK_DATA["banned_ips"].remove(ip)
+        return {"success": True}
+    res = run_shell(f"fail2ban-client set sshd unbanip {ip}")
+    if res["success"]:
+        return {"success": True}
+    else:
+        raise HTTPException(status_code=500, detail=f"Failed to unban IP: {res['stderr']}")
+
+@router.post("/fail2ban/config")
+def update_fail2ban_config(config: dict, current_user=Depends(get_current_user)):
+    if os.name == 'nt': 
+        F2B_MOCK_DATA["config"].update(config)
+        return {"success": True}
+    # config: { bantime: int, findtime: int, maxretry: int }
+    bantime = config.get("bantime", 600)
+    findtime = config.get("findtime", 600)
+    maxretry = config.get("maxretry", 5)
+    
+    # 修改 fail2ban 配置通常需要修改文件并重启
+    # 这里简写：直接使用 client 设置（部分设置支持热更新）
+    run_shell(f"fail2ban-client set sshd bantime {bantime}")
+    run_shell(f"fail2ban-client set sshd findtime {findtime}")
+    run_shell(f"fail2ban-client set sshd maxretry {maxretry}")
+    
+    return {"success": True}
 
 # --- Backup Endpoints ---
 

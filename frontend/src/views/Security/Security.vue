@@ -38,26 +38,53 @@
       </a-tab-pane>
 
       <!-- 入侵防御标签页 -->
-      <a-tab-pane key="fail2ban" title="入侵防御">
-        <a-card title="入侵防御 (Fail2ban)">
-          <div class="status-item">
-            <span class="label">服务状态:</span>
-            <a-tag :color="fail2ban.active ? 'green' : 'red'">{{ fail2ban.active ? '运行中' : '已停止' }}</a-tag>
-          </div>
-          <a-divider />
-          <div class="banned-ips">
-            <div style="margin-bottom: 10px; font-weight: bold;">已封禁 IP 列表:</div>
-            <a-list size="small" :max-height="300">
-              <a-list-item v-for="ip in fail2ban.banned_ips" :key="ip">
-                {{ ip }}
-                <template #actions>
-                  <a-button type="text" size="small" @click="handleUnbanIp(ip)">解封</a-button>
-                </template>
-              </a-list-item>
-              <template #empty>暂无封禁记录</template>
-            </a-list>
-          </div>
-        </a-card>
+      <a-tab-pane key="fail2ban" title="IP封禁">
+        <a-grid :cols="24" :col-gap="16">
+          <a-grid-item :span="10">
+            <a-card title="基本封禁策略">
+              <a-form :model="fail2ban.config" layout="vertical" @submit="handleUpdateF2bConfig">
+                <a-form-item label="封禁时长 (秒)" field="bantime">
+                  <a-input-number v-model="fail2ban.config.bantime" :min="60" />
+                </a-form-item>
+                <a-form-item label="检测窗口 (秒)" field="findtime">
+                  <a-input-number v-model="fail2ban.config.findtime" :min="60" />
+                </a-form-item>
+                <a-form-item label="最大重试次数" field="maxretry">
+                  <a-input-number v-model="fail2ban.config.maxretry" :min="1" :max="20" />
+                </a-form-item>
+                <a-button type="primary" html-type="submit" long>保存策略</a-button>
+              </a-form>
+            </a-card>
+          </a-grid-item>
+          
+          <a-grid-item :span="14">
+            <a-card title="入侵防御 (Fail2ban)">
+              <template #extra>
+                <a-button type="primary" size="small" @click="showBanIpModal = true">
+                  <template #icon><icon-plus /></template>
+                  主动封禁 IP
+                </a-button>
+              </template>
+              <div class="status-item">
+                <span class="label">服务状态:</span>
+                <a-tag :color="fail2ban.active ? 'green' : 'red'">{{ fail2ban.active ? '运行中' : '已停止' }}</a-tag>
+              </div>
+              <a-divider />
+              <div class="banned-ips">
+                <div style="margin-bottom: 10px; font-weight: bold;">已封禁 IP 列表:</div>
+                <a-list size="small" :max-height="300">
+                  <a-list-item v-for="ip in fail2ban.banned_ips" :key="ip">
+                    {{ ip }}
+                    <template #actions>
+                      <a-button type="text" size="small" @click="handleUnbanIp(ip)">解封</a-button>
+                    </template>
+                  </a-list-item>
+                  <template #empty>暂无封禁记录</template>
+                </a-list>
+              </div>
+            </a-card>
+          </a-grid-item>
+        </a-grid>
       </a-tab-pane>
 
       <!-- 系统安全标签页 -->
@@ -102,6 +129,15 @@
         <a-alert type="warning">请务必牢记此路径，否则您将无法进入 WordPress 后台。</a-alert>
       </a-form>
     </a-modal>
+
+    <!-- 主动封禁 IP 弹窗 -->
+    <a-modal v-model:visible="showBanIpModal" title="主动封禁 IP" @ok="handleBanIp">
+      <a-form :model="{ ip: banIpValue }" layout="vertical">
+        <a-form-item label="IP 地址" help="输入需要手动封禁的 IP 地址">
+          <a-input v-model="banIpValue" placeholder="例如: 1.2.3.4" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
@@ -129,6 +165,8 @@ const commonLoginPath = computed(() => {
 
 const showHideLoginModal = ref(false)
 const hideLoginPath = ref('')
+const showBanIpModal = ref(false)
+const banIpValue = ref('')
 
 const firewall = reactive({
   active: false,
@@ -137,7 +175,12 @@ const firewall = reactive({
 
 const fail2ban = reactive({
   active: false,
-  banned_ips: []
+  banned_ips: [],
+  config: {
+    bantime: 600,
+    findtime: 600,
+    maxretry: 5
+  }
 })
 
 const fetchData = async () => {
@@ -209,6 +252,29 @@ const handleUnbanIp = async (ip) => {
     fetchData()
   } catch (error) {
     Message.error('操作失败')
+  }
+}
+
+const handleBanIp = async () => {
+  if (!banIpValue.value) return
+  try {
+    await request.post(`/security/fail2ban/ban?ip=${banIpValue.value}`)
+    Message.success(`IP ${banIpValue.value} 已封禁`)
+    banIpValue.value = ''
+    showBanIpModal.value = false
+    fetchData()
+  } catch (error) {
+    Message.error('操作失败')
+  }
+}
+
+const handleUpdateF2bConfig = async () => {
+  try {
+    await request.post('/security/fail2ban/config', fail2ban.config)
+    Message.success('封禁策略已更新')
+    fetchData()
+  } catch (error) {
+    Message.error('策略更新失败')
   }
 }
 
