@@ -42,12 +42,22 @@ class Site(Base):
     
     # Performance & Cache
     performance_preset = Column(String(20), default="balanced") # basic, balanced, ultimate
-    lscache_enabled = Column(Boolean, default=True)
-    redis_enabled = Column(Boolean, default=True)
-    opcache_enabled = Column(Boolean, default=True)
-    browser_cache_enabled = Column(Boolean, default=True)
+    lscache_enabled = Column(Boolean, default=True) # OpenLiteSpeed 技术底座 (LSCache)
+    mariadb_optimized = Column(Boolean, default=True) # MariaDB 专属优化
+    redis_enabled = Column(Boolean, default=True) # Redis 对象缓存
+    opcache_enabled = Column(Boolean, default=True) # OPcache 深度优化
+    browser_cache_enabled = Column(Boolean, default=True) # 浏览器缓存
+    static_optimization = Column(Boolean, default=True) # 全站静态化
+    image_optimization = Column(Boolean, default=True) # 图片自动化压缩
+    assets_optimization = Column(Boolean, default=True) # CSS/JS 合并
     
     ssl_expire_at = Column(String(32)) # YYYY-MM-DD
     backup_count = Column(Integer, default=0)
+    
+    # SSL Extended Config
+    ssl_mode = Column(String(20), default="none") # none, cloudflare, letsencrypt
+    ssl_email = Column(String(255))
+    ssl_auto_renew = Column(Boolean, default=True)
+    https_force = Column(Boolean, default=True)
     
     shared_db = relationship("SharedDatabase", back_populates="sites")

@@ -37,20 +37,36 @@ class SiteUpdate(BaseModel):
     status: Optional[str] = None
     performance_preset: Optional[str] = None
     lscache_enabled: Optional[bool] = None
+    mariadb_optimized: Optional[bool] = None
     redis_enabled: Optional[bool] = None
     opcache_enabled: Optional[bool] = None
     browser_cache_enabled: Optional[bool] = None
+    static_optimization: Optional[bool] = None
+    image_optimization: Optional[bool] = None
+    assets_optimization: Optional[bool] = None
+    ssl_mode: Optional[str] = None
+    ssl_email: Optional[str] = None
+    ssl_auto_renew: Optional[bool] = None
+    https_force: Optional[bool] = None
 
 class Site(SiteBase):
     id: int
     status: str
     performance_preset: str
     lscache_enabled: bool
+    mariadb_optimized: bool = True
     redis_enabled: bool
     opcache_enabled: bool
     browser_cache_enabled: bool
+    static_optimization: bool = True
+    image_optimization: bool = True
+    assets_optimization: bool = True
     ssl_expire_at: Optional[str] = None
     backup_count: int = 0
+    ssl_mode: str = "none"
+    ssl_email: Optional[str] = None
+    ssl_auto_renew: bool = True
+    https_force: bool = True
     created_at: datetime
     updated_at: datetime
 
