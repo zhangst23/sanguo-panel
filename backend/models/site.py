@@ -55,6 +55,9 @@ class Site(Base):
     image_optimization = Column(Boolean, default=True) # 图片自动化压缩
     assets_optimization = Column(Boolean, default=True) # CSS/JS 合并
     
+    # Security
+    wp_hide_login_path = Column(String(100)) # WordPress custom login path slug
+    
     ssl_expire_at = Column(String(32)) # YYYY-MM-DD
     backup_count = Column(Integer, default=0)
     

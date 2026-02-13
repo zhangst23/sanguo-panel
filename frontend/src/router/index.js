@@ -100,15 +100,21 @@ const routes = [
         meta: { requiresAuth: true },
       },
       {
-        path: 'redis',
-        name: 'Redis',
-        component: () => import('@/views/Redis/Redis.vue'),
-        meta: { requiresAuth: true },
-      },
-      {
         path: 'security',
         name: 'Security',
         component: () => import('@/views/Security/Security.vue'),
+        meta: { requiresAuth: true },
+      },
+      {
+        path: 'backup',
+        name: 'Backup',
+        component: () => import('@/views/Backup/Backup.vue'),
+        meta: { requiresAuth: true },
+      },
+      {
+        path: 'redis',
+        name: 'Redis',
+        component: () => import('@/views/Redis/Redis.vue'),
         meta: { requiresAuth: true },
       },
       {
@@ -127,12 +133,6 @@ const routes = [
         path: 'apps',
         name: 'Apps',
         component: () => import('@/views/Apps/OneClick.vue'),
-        meta: { requiresAuth: true },
-      },
-      {
-        path: 'backup',
-        name: 'Backup',
-        component: () => import('@/views/Backup/Backup.vue'),
         meta: { requiresAuth: true },
       },
     ],

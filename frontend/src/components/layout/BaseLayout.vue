@@ -18,22 +18,31 @@
       >
         <a-menu-item key="Dashboard">
           <template #icon><icon-dashboard /></template>
-          Dashboard
+          仪表盘
         </a-menu-item>
         <a-menu-item key="Website">
           <template #icon><icon-common /></template>
-          Websites
+          站点管理
         </a-menu-item>
         <a-menu-item key="MariaDB">
           <template #icon><icon-storage /></template>
-          MariaDB
+          数据库管理
+        </a-menu-item>
+        <a-menu-item key="Security">
+          <template #icon><icon-safe /></template>
+          安全中心
+        </a-menu-item>
+        <a-menu-item key="Backup">
+          <template #icon><icon-cloud-download /></template>
+          备份迁移
         </a-menu-item>
         <a-sub-menu key="System">
           <template #icon><icon-settings /></template>
-          <template #title>System</template>
+          <template #title>系统管理</template>
+          <a-menu-item key="Monitor">监控中心</a-menu-item>
           <a-menu-item key="Redis">Redis</a-menu-item>
           <a-menu-item key="PHP">PHP</a-menu-item>
-          <a-menu-item key="LiteSpeed">LiteSpeed</a-menu-item>
+          <a-menu-item key="LiteSpeed">OpenLiteSpeed</a-menu-item>
           <a-menu-item key="Linux">Linux</a-menu-item>
         </a-sub-menu>
       </a-menu>
