@@ -4,7 +4,7 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 from backend.core.config import settings
-from backend.core.db import SessionLocal
+from backend.core.database import SessionLocal
 from backend.models.user import User
 from backend.schemas.token import TokenPayload
 

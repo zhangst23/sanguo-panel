@@ -1,4 +1,4 @@
-from backend.core.db import engine, SessionLocal
+from backend.core.database import engine, SessionLocal
 from backend.models.base import Base
 # Import all models to ensure they are registered with Base.metadata
 from backend.models.user import User
