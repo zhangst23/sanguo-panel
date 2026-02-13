@@ -35,11 +35,21 @@ def list_php_versions(
     List installed and available PHP versions
     """
     if os.name == 'nt':
-        return [
-            {"version": "8.1", "status": "installed", "is_default": False},
-            {"version": "8.2", "status": "installed", "is_default": True},
-            {"version": "8.3", "status": "not_installed", "is_default": False},
-        ]
+        from backend.utils.php_utils import find_php_executable, get_php_version
+        php_bin = find_php_executable()
+        if php_bin:
+            version = get_php_version(php_bin)
+            # Remove minor version if it's like 8.2.12 -> 8.2
+            v_parts = version.split('.')
+            if len(v_parts) >= 2:
+                version = f"{v_parts[0]}.{v_parts[1]}"
+            return [
+                {"version": version, "status": "installed", "is_default": True},
+            ]
+        else:
+            return [
+                {"version": "None", "status": "not_installed", "is_default": False},
+            ]
     
     # On Linux, check for lsphpXX directories
     lsws_path = "/usr/local/lsws"
@@ -63,15 +73,25 @@ def list_extensions(
     """
     List PHP extensions for a specific version
     """
-    v_short = version.replace(".", "")
     if os.name == 'nt':
-        return [
-            {"name": "opcache", "status": "enabled"},
-            {"name": "redis", "status": "enabled"},
-            {"name": "mysqli", "status": "enabled"},
-            {"name": "imagick", "status": "disabled"},
-        ]
+        from backend.utils.php_utils import find_php_executable
+        php_bin = find_php_executable()
+        if not php_bin:
+            return []
+        
+        res = run_shell(f'"{php_bin}" -m')
+        if res["success"]:
+            enabled_exts = [line.strip() for line in res["stdout"].split('\n') if line.strip() and not line.startswith('[')]
+            # Common extensions we want to show status for
+            common_exts = ["opcache", "redis", "mysqli", "imagick", "gd", "curl", "mbstring", "zip", "openssl"]
+            result = []
+            for ext in common_exts:
+                status = "enabled" if any(ext.lower() in e.lower() for e in enabled_exts) else "disabled"
+                result.append({"name": ext, "status": status})
+            return result
+        return []
     
+    v_short = version.replace(".", "")
     cmd = f"/usr/local/lsws/lsphp{v_short}/bin/php -m"
     res = run_shell(cmd)
     if res["success"]:

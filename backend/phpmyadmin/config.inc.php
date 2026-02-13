@@ -26,3 +26,6 @@ $cfg['UploadDir'] = '';
 $cfg['SaveDir'] = '';
 $cfg['DefaultLang'] = 'zh_CN';
 $cfg['ServerDefault'] = 1;
+
+// Use the same session name for everything to avoid conflicts
+$cfg['SessionName'] = 'PMA_SSO';

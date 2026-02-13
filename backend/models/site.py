@@ -34,6 +34,7 @@ class Site(Base):
     php_version = Column(String(10), default="8.2")
     
     shared_db_id = Column(Integer, ForeignKey("shared_databases.id"), nullable=False)
+    db_name = Column(String(64)) # The actual database name created for this site
     table_prefix = Column(String(64), nullable=False)
     
     ssl_status = Column(Integer, default=0) # 0: off, 1: on, 2: force https

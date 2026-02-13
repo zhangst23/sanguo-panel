@@ -1,0 +1,62 @@
+[2026-02-13 06:53:43] Received token: ca9e58d1-0da4-4759-8dea-978cd4d7bac3
+[2026-02-13 06:53:43] Verification successful for user: sanguo_user
+[2026-02-13 06:53:43] Redirecting to index.php
+[2026-02-13 07:02:09] Received token: 169d192f-7a12-4528-bbf3-9dae2bf06c32
+[2026-02-13 07:02:09] Verification successful for user: sanguo_user
+[2026-02-13 07:02:09] Redirecting to index.php
+[2026-02-13 07:28:20] sso.php accessed. Path: /sso.php?pma_token=f42faa09-3639-4110-82cc-50af0d264fc7 Cookies: {"pma_lang":"en","__next_hmr_refresh_hash__":"987","PMA_SSO":"r2omfvu8386bj55cbpdhl7dbqi","phpMyAdmin":"p16c3velo6e3opbs3ia0o33ehk"}
+[2026-02-13 07:28:20] Received token: f42faa09-3639-4110-82cc-50af0d264fc7
+[2026-02-13 07:28:20] Verification successful for user: sanguo_user
+[2026-02-13 07:28:20] Redirecting to index.php
+[2026-02-13 07:31:08] sso.php accessed. Session ID: r2omfvu8386bj55cbpdhl7dbqi Path: /sso.php?pma_token=82055861-4aa9-4711-870f-1670bf5df366 Cookies: {"pma_lang":"en","__next_hmr_refresh_hash__":"987","PMA_SSO":"r2omfvu8386bj55cbpdhl7dbqi","phpMyAdmin":"p16c3velo6e3opbs3ia0o33ehk"}
+[2026-02-13 07:31:08] Received token: 82055861-4aa9-4711-870f-1670bf5df366
+[2026-02-13 07:31:08] Verification successful for user: sanguo_user
+[2026-02-13 07:31:08] Redirecting to index.php
+[2026-02-13 07:33:17] --- SSO SCRIPT START ---
+[2026-02-13 07:33:17] Request URI: /sso.php?pma_token=7c2f9441-3d38-4c69-a532-5cff2c29cb83
+[2026-02-13 07:33:17] Session ID: r2omfvu8386bj55cbpdhl7dbqi
+[2026-02-13 07:33:17] Cookies: {"pma_lang":"en","__next_hmr_refresh_hash__":"987","PMA_SSO":"r2omfvu8386bj55cbpdhl7dbqi","phpMyAdmin":"p16c3velo6e3opbs3ia0o33ehk"}
+[2026-02-13 07:33:17] Received token: 7c2f9441-3d38-4c69-a532-5cff2c29cb83
+[2026-02-13 07:33:17] Verification successful for user: sanguo_user
+[2026-02-13 07:33:17] Redirecting to index.php
+[2026-02-13 07:42:26] --- SSO SCRIPT START ---
+[2026-02-13 07:42:26] Request URI: /sso.php?pma_token=dfa4fa4d-f402-4370-8a06-7d056b6d4e67
+[2026-02-13 07:42:26] Session ID: r2omfvu8386bj55cbpdhl7dbqi
+[2026-02-13 07:42:26] Cookies: {"pma_lang":"en","__next_hmr_refresh_hash__":"987","PMA_SSO":"r2omfvu8386bj55cbpdhl7dbqi","phpMyAdmin":"p16c3velo6e3opbs3ia0o33ehk"}
+[2026-02-13 07:42:26] Received token: dfa4fa4d-f402-4370-8a06-7d056b6d4e67
+[2026-02-13 07:42:26] Verification successful for user: sanguo_user
+[2026-02-13 07:42:26] Redirecting to index.php with session r2omfvu8386bj55cbpdhl7dbqi
+[2026-02-13 07:42:30] --- SSO SCRIPT START ---
+[2026-02-13 07:42:30] Request URI: /sso.php?pma_token=43b91e18-7b19-4916-bdfa-fb0a04ebd2de
+[2026-02-13 07:42:30] Session ID: r2omfvu8386bj55cbpdhl7dbqi
+[2026-02-13 07:42:30] Cookies: {"pma_lang":"en","__next_hmr_refresh_hash__":"987","PMA_SSO":"r2omfvu8386bj55cbpdhl7dbqi","phpMyAdmin":"p16c3velo6e3opbs3ia0o33ehk"}
+[2026-02-13 07:42:30] Received token: 43b91e18-7b19-4916-bdfa-fb0a04ebd2de
+[2026-02-13 07:42:30] Verification successful for user: sanguo_user
+[2026-02-13 07:42:30] Redirecting to index.php with session r2omfvu8386bj55cbpdhl7dbqi
+[2026-02-13 07:51:28] --- SSO SCRIPT START ---
+[2026-02-13 07:51:28] Request URI: /sso.php?pma_token=56648f7e-f286-47f3-9748-746694902b6b&db=sanguo_shared
+[2026-02-13 07:51:28] Session ID: r2omfvu8386bj55cbpdhl7dbqi
+[2026-02-13 07:51:28] Cookies: {"pma_lang":"en","__next_hmr_refresh_hash__":"987","PMA_SSO":"r2omfvu8386bj55cbpdhl7dbqi","phpMyAdmin":"p16c3velo6e3opbs3ia0o33ehk"}
+[2026-02-13 07:51:28] Received token: 56648f7e-f286-47f3-9748-746694902b6b
+[2026-02-13 07:51:28] Verification successful for user: sanguo_user
+[2026-02-13 07:51:28] Setting target database to: sanguo_shared
+[2026-02-13 07:51:28] Redirecting to index.php with session r2omfvu8386bj55cbpdhl7dbqi
+[2026-02-13 07:52:15] --- SSO SCRIPT START ---
+[2026-02-13 07:52:15] Request URI: /sso.php?pma_token=b782323d-37d0-423a-92ed-b7c7e7a38f4b&db=sanguo_shared
+[2026-02-13 07:52:15] Session ID: r2omfvu8386bj55cbpdhl7dbqi
+[2026-02-13 07:52:15] Cookies: {"pma_lang":"en","__next_hmr_refresh_hash__":"987","PMA_SSO":"r2omfvu8386bj55cbpdhl7dbqi","phpMyAdmin":"p16c3velo6e3opbs3ia0o33ehk"}
+[2026-02-13 07:52:15] Received token: b782323d-37d0-423a-92ed-b7c7e7a38f4b
+[2026-02-13 07:52:15] Verification successful for user: sanguo_user
+[2026-02-13 07:52:15] Setting target database to: sanguo_shared
+[2026-02-13 07:52:15] Redirecting to index.php with session r2omfvu8386bj55cbpdhl7dbqi
+[2026-02-13 07:56:47] --- SSO SCRIPT START ---
+[2026-02-13 07:56:47] Request URI: /index.php?pma_token=7dc122dc-d32c-4aea-98b1-ec14693baa8e&db=sanguo_shared
+[2026-02-13 07:56:47] PHP Self: /index.php
+[2026-02-13 07:56:47] Included files: 278
+[2026-02-13 07:56:47] Included by phpMyAdmin. PHPMYADMIN constant is defined.
+[2026-02-13 07:56:47] Session ID: p16c3velo6e3opbs3ia0o33ehk
+[2026-02-13 07:56:47] Cookies: {"pma_lang":"en","__next_hmr_refresh_hash__":"987","PMA_SSO":"r2omfvu8386bj55cbpdhl7dbqi","phpMyAdmin":"p16c3velo6e3opbs3ia0o33ehk"}
+[2026-02-13 07:56:47] Received token: 7dc122dc-d32c-4aea-98b1-ec14693baa8e
+[2026-02-13 07:56:47] Verification successful for user: sanguo_user
+[2026-02-13 07:56:47] Setting target database to: sanguo_shared
+[2026-02-13 07:56:47] Token verified during inclusion. Continuing without redirect.

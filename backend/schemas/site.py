@@ -9,6 +9,7 @@ class SiteBase(BaseModel):
     root_path: str
     php_version: str = "8.2"
     shared_db_id: int
+    db_name: Optional[str] = None
     table_prefix: str
     notes: Optional[str] = None
 

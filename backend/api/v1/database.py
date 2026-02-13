@@ -22,10 +22,13 @@ def list_databases(
     for site in sites:
         shared_db = db.query(SharedDatabaseModel).filter(SharedDatabaseModel.id == site.shared_db_id).first()
         if shared_db:
+            # Determine the actual database name used
+            actual_db_name = site.db_name if site.db_name else shared_db.db_name
+            
             results.append({
                 "site_id": site.id,
                 "domain": site.domain,
-                "db_name": shared_db.db_name,
+                "db_name": actual_db_name,
                 "db_user": shared_db.db_user,
                 "db_password": shared_db.db_password,
                 "created_at": site.created_at.strftime("%Y-%m-%d %H:%M:%S") if hasattr(site, 'created_at') and site.created_at else "N/A",
@@ -114,9 +117,11 @@ def get_pma_jump_url(
         "expires_at": time.time() + 300  # Token valid for 5 minutes
     }
     
-    # Return the jump URL pointing to our SSO entry point
-    # We use the proxy route which will forward to the PHP built-in server
-    pma_url = f"/phpmyadmin/sso.php?pma_token={token}"
+    # Return the jump URL pointing to phpMyAdmin index.php with the token
+    # Our sso.php is configured as the SignonScript, so it will handle the token
+    target_db = site.db_name if hasattr(site, 'db_name') and site.db_name else shared_db.db_name
+    
+    pma_url = f"/phpmyadmin/index.php?pma_token={token}&db={target_db}"
     
     return {"url": pma_url}
 
@@ -136,6 +141,9 @@ def verify_pma_token(token: str):
     
     # One-time use token
     # del pma_sso_tokens[token] 
+    
+    # Debug: Log the credentials being sent
+    # print(f"Verifying token {token}, returning user: {data['db_user']}")
     
     return data
 

@@ -12,31 +12,29 @@ class PMAServer:
         self.port = port
         self.process = None
         self._stop_event = threading.Event()
+        self.last_error = None
 
     def is_port_in_use(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             return s.connect_ex((self.host, self.port)) == 0
 
     def start(self):
+        self.last_error = None
         if self.is_port_in_use():
             print(f"--- PMA PHP Server: Port {self.port} already in use, assuming it's running ---")
             return True
 
         # Try to find php executable
-        php_bin = "php"
-        if os.name == 'nt':
-            # On Windows, try to find in common paths if not in PATH
-            # But usually it should be in PATH
-            pass
-        else:
-            # On Linux, try common paths
-            for path in ["/usr/bin/php", "/usr/local/bin/php"]:
-                if os.path.exists(path):
-                    php_bin = path
-                    break
+        from backend.utils.php_utils import find_php_executable
+        php_bin = find_php_executable()
 
-        print(f"--- PMA PHP Server: Starting at {self.host}:{self.port} in {self.pma_dir} ---")
-        
+        if not php_bin:
+            self.last_error = "PHP executable not found. Please install PHP and add it to PATH, or install it via the panel's PHP management."
+            print(f"--- PMA PHP Server Error: {self.last_error} ---")
+            return False
+
+        print(f"--- PMA PHP Server: Starting at {self.host}:{self.port} in {self.pma_dir} using {php_bin} ---")
+
         # Use -S for built-in server
         cmd = [php_bin, "-S", f"{self.host}:{self.port}", "-t", self.pma_dir]
         
@@ -54,13 +52,20 @@ class PMAServer:
             time.sleep(1)
             if self.process.poll() is not None:
                 _, stderr = self.process.communicate()
-                print(f"--- PMA PHP Server Error: {stderr.decode()} ---")
+                try:
+                    # On Windows, try GBK first if UTF-8 fails
+                    error_msg = stderr.decode('utf-8')
+                except UnicodeDecodeError:
+                    error_msg = stderr.decode('gbk', errors='replace')
+                self.last_error = f"PHP Server failed to start: {error_msg}"
+                print(f"--- PMA PHP Server Error: {self.last_error} ---")
                 return False
             
             print(f"--- PMA PHP Server: Started successfully (PID: {self.process.pid}) ---")
             return True
         except Exception as e:
-            print(f"--- PMA PHP Server: Failed to start: {str(e)} ---")
+            self.last_error = f"Failed to start PHP process: {str(e)}"
+            print(f"--- PMA PHP Server Error: {self.last_error} ---")
             return False
 
     def stop(self):
@@ -77,7 +82,14 @@ pma_manager = None
 def get_pma_manager():
     global pma_manager
     if pma_manager is None:
-        pma_path = os.path.join(os.getcwd(), "phpmyadmin")
+        # Get the directory where backend is located
+        backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        pma_path = os.path.join(backend_dir, "phpmyadmin")
         if os.path.exists(pma_path):
             pma_manager = PMAServer(pma_path)
+        else:
+            # Also check if it's in the current working directory for fallback
+            pma_path_cwd = os.path.join(os.getcwd(), "phpmyadmin")
+            if os.path.exists(pma_path_cwd):
+                pma_manager = PMAServer(pma_path_cwd)
     return pma_manager

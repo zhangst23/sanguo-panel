@@ -49,7 +49,21 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 async def pma_proxy(request: Request, path: str):
     pma = get_pma_manager()
     if not pma:
-        return Response(content="phpMyAdmin not installed", status_code=404)
+        # Re-check if it was just installed
+        import backend.utils.pma_server as pma_server
+        pma_server.pma_manager = None 
+        pma = get_pma_manager()
+        if not pma:
+            return Response(content="phpMyAdmin not installed in backend/phpmyadmin", status_code=404)
+    
+    # Ensure it's started (in case lifespan didn't start it or it crashed)
+    if not pma.is_port_in_use():
+        success = pma.start()
+        if not success:
+            return Response(
+                content=f"PHP Server for phpMyAdmin failed to start: {pma.last_error}",
+                status_code=503
+            )
     
     url = f"http://{pma.host}:{pma.port}/{path}"
     if request.query_params:
@@ -58,11 +72,13 @@ async def pma_proxy(request: Request, path: str):
     async with httpx.AsyncClient() as client:
         # Forward the request to the PHP server
         content = await request.body()
-        headers = dict(request.headers)
-        # Remove host header to avoid issues with PHP built-in server
-        if "host" in headers:
-            del headers["host"]
-            
+        
+        # Prepare headers: forward all except 'host'
+        headers = {}
+        for k, v in request.headers.items():
+            if k.lower() != 'host':
+                headers[k] = v
+                
         try:
             rp_resp = await client.request(
                 method=request.method,
@@ -73,14 +89,47 @@ async def pma_proxy(request: Request, path: str):
                 timeout=30.0
             )
         except Exception as e:
-            return Response(content=f"PMA Proxy Error: {str(e)}", status_code=502)
+            # Check if it's a connection error (server not running)
+            error_detail = str(e)
+            if "Connection refused" in error_detail or "WinError 10061" in error_detail:
+                error_msg = pma.last_error if pma.last_error else "PHP Server for phpMyAdmin is not running."
+                return Response(
+                    content=f"{error_msg} Please check if PHP is installed and in your PATH.",
+                    status_code=503
+                )
+            return Response(content=f"PMA Proxy Error: {error_detail}", status_code=502)
 
         # Return the response from the PHP server
         response = Response(
             content=rp_resp.content,
-            status_code=rp_resp.status_code,
-            headers=dict(rp_resp.headers)
+            status_code=rp_resp.status_code
         )
+        
+        # Forward headers from the PHP response to the browser
+        # Use raw headers to preserve multiple Set-Cookie headers
+        exclude_headers = ["content-length", "content-encoding", "transfer-encoding", "connection"]
+        for name, value in rp_resp.headers.raw:
+            name_str = name.decode("latin-1").lower()
+            if name_str not in exclude_headers:
+                header_value = value.decode("latin-1")
+                # Rewrite Location header to be relative to the proxy or absolute for the browser
+                if name_str == "location":
+                    if header_value.startswith("http://127.0.0.1") or header_value.startswith(f"http://{pma.host}"):
+                        # Convert absolute PHP URL back to relative/proxy URL
+                        import urllib.parse
+                        parsed = urllib.parse.urlparse(header_value)
+                        path = parsed.path
+                        # IMPORTANT: Prefix with /phpmyadmin because the browser needs to hit the proxy
+                        if not path.startswith("/phpmyadmin"):
+                            path = "/phpmyadmin" + (path if path.startswith("/") else "/" + path)
+                        
+                        header_value = path
+                        if parsed.query:
+                            header_value += f"?{parsed.query}"
+                
+                # print(f"Response header: {name_str}: {header_value}")
+                response.headers.append(name_str, header_value)
+                
         return response
 
 @app.get("/")

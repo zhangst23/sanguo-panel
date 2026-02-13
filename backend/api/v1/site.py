@@ -85,6 +85,49 @@ def create_site(
     db.commit()
     db.refresh(site)
     
+    # --- MariaDB/MySQL Database Creation Logic ---
+    try:
+        shared_db = db.query(SharedDatabaseModel).filter(SharedDatabaseModel.id == site.shared_db_id).first()
+        if shared_db:
+            import mysql.connector
+            from mysql.connector import errorcode
+            
+            # Connect to the MySQL/MariaDB server using the shared database credentials
+            # In a real system, this should use a root or administrative account
+            conn = mysql.connector.connect(
+                host=shared_db.db_host,
+                port=shared_db.db_port,
+                user=shared_db.db_user,
+                password=shared_db.db_password
+            )
+            cursor = conn.cursor()
+            
+            # Create a dedicated database for this site if it doesn't exist
+            # We use the domain as the base for the database name (sanitized)
+            safe_domain = site.domain.replace('.', '_').replace('-', '_')
+            db_name = f"db_{safe_domain}"
+            
+            # 1. Create database
+            cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{db_name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
+            
+            # 2. Update site record with this specific database info
+            site.db_name = db_name
+            site.notes = f"Database created: {db_name}"
+            db.add(site)
+            db.commit()
+            
+            cursor.close()
+            conn.close()
+    except Exception as e:
+        print(f"Error creating MariaDB database for site: {e}")
+        print(f"Please check if the Shared Database settings are correct in the panel.")
+        # We don't raise an exception here to allow the site to be created even if DB creation fails
+        # (The user can manually fix it later)
+        site.notes = f"Database creation failed: {e}. Please create it manually."
+        db.add(site)
+        db.commit()
+    # ----------------------------------------------
+    
     # After creation, update table_prefix with actual ID if it was the placeholder
     if site.table_prefix == "wp_tmp_":
         site.table_prefix = f"wp_{site.id}_"

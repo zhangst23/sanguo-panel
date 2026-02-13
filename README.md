@@ -27,9 +27,13 @@ pip install -r backend/requirements.txt
 $env:PYTHONPATH="."
 python backend/init_db.py
 
-# 启动开发服务器
-# Windows PowerShell
-$env:PYTHONPATH="."
+```
+
+### 运行后端
+
+请确保在项目根目录 `sanguo-panel` 下运行以下命令：
+
+```bash
 python -m uvicorn backend.main:app --reload --reload-exclude "*.db" --port 8000
 ```
 
