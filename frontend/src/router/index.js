@@ -88,6 +88,12 @@ const routes = [
         meta: { requiresAuth: true },
       },
       {
+        path: 'linux',
+        name: 'Linux',
+        component: () => import('@/views/Linux/Linux.vue'),
+        meta: { requiresAuth: true },
+      },
+      {
         path: 'mariadb',
         name: 'MariaDB',
         component: () => import('@/views/MariaDB/MariaDB.vue'),
