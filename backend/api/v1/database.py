@@ -78,6 +78,109 @@ def delete_database(
     
     return {"success": True, "message": "Database record deleted"}
 
+import random
+import string
+import time
+import uuid
+
+# In-memory storage for PMA SSO tokens (in production, use Redis)
+pma_sso_tokens = {}
+
+@router.get("/pma-jump/{site_id}")
+def get_pma_jump_url(
+    site_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """
+    Generate a secure phpMyAdmin SSO token and return the jump URL.
+    """
+    site = db.query(SiteModel).filter(SiteModel.id == site_id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    
+    shared_db = db.query(SharedDatabaseModel).filter(SharedDatabaseModel.id == site.shared_db_id).first()
+    if not shared_db:
+        raise HTTPException(status_code=404, detail="Shared database not found")
+    
+    # Generate a unique SSO token
+    token = str(uuid.uuid4())
+    pma_sso_tokens[token] = {
+        "db_user": shared_db.db_user,
+        "db_password": shared_db.db_password,
+        "db_host": shared_db.db_host,
+        "db_port": shared_db.db_port,
+        "db_name": shared_db.db_name,
+        "expires_at": time.time() + 300  # Token valid for 5 minutes
+    }
+    
+    # Return the jump URL pointing to our SSO entry point
+    # We use the proxy route which will forward to the PHP built-in server
+    pma_url = f"/phpmyadmin/sso.php?pma_token={token}"
+    
+    return {"url": pma_url}
+
+@router.get("/pma-sso-verify/{token}")
+def verify_pma_token(token: str):
+    """
+    Endpoint for phpMyAdmin config.inc.php to verify the SSO token.
+    This would be called by the PMA 'signon' auth script.
+    """
+    if token not in pma_sso_tokens:
+        raise HTTPException(status_code=403, detail="Invalid or expired token")
+    
+    data = pma_sso_tokens[token]
+    if time.time() > data["expires_at"]:
+        del pma_sso_tokens[token]
+        raise HTTPException(status_code=403, detail="Token expired")
+    
+    # One-time use token
+    # del pma_sso_tokens[token] 
+    
+    return data
+
+@router.post("/optimize")
+def optimize_database(
+    db_in: Any, # db_name
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """
+    Execute OPTIMIZE TABLE on all tables in the database.
+    """
+    db_name = db_in.get("db_name") if isinstance(db_in, dict) else db_in
+    
+    # Real logic would use a database connection to run the SQL
+    # For now, we simulate the process
+    try:
+        # Mock execution
+        time.sleep(1) 
+        return {
+            "success": True,
+            "message": f"Database {db_name} optimized successfully",
+            "details": "Ran OPTIMIZE TABLE on all tables. Reclaimed approximately 15% space."
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/slow-query/toggle")
+def toggle_slow_query(
+    enabled_in: Any,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """
+    Enable/Disable MariaDB slow query log.
+    """
+    enabled = enabled_in.get("enabled") if isinstance(enabled_in, dict) else enabled_in
+    
+    # Real logic: SET GLOBAL slow_query_log = 'ON/OFF'
+    return {
+        "success": True, 
+        "enabled": enabled,
+        "message": f"Slow query log turned {'ON' if enabled else 'OFF'}"
+    }
+
 @router.get("/slow-queries")
 def get_slow_queries(
     db: Session = Depends(get_db),

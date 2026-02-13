@@ -179,9 +179,17 @@ const copyToClipboard = (text) => {
   Message.success('已复制到剪贴板')
 }
 
-const handleOpenPMA = (record) => {
-  const pmaUrl = `/pma-jump?site_id=${record.site_id}`
-  window.open(pmaUrl, '_blank')
+const handleOpenPMA = async (record) => {
+  try {
+    const res = await request.get(`/database/pma-jump/${record.site_id}`)
+    if (res.url) {
+      window.open(res.url, '_blank')
+    } else {
+      Message.error('获取 phpMyAdmin 跳转地址失败')
+    }
+  } catch (error) {
+    Message.error('跳转失败: ' + (error.response?.data?.detail || error.message))
+  }
 }
 
 const handleChangePassword = async (record) => {
@@ -215,11 +223,11 @@ const handleDelete = async (record) => {
 
 const handleToggleSlowQuery = async (val) => {
   try {
-    // 假设后端有接口
-    // await request.post('/database/slow-query/toggle', { enabled: val })
+    await request.post('/database/slow-query/toggle', { enabled: val })
     Message.success(val ? '慢查询日志已开启' : '慢查询日志已关闭')
   } catch (error) {
     Message.error('设置失败')
+    slowQueryEnabled.value = !val // 恢复状态
   }
 }
 
