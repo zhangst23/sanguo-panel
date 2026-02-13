@@ -3,8 +3,8 @@
     <a-typography-title :heading="2">安全中心</a-typography-title>
 
     <a-tabs v-model:active-key="activeTab">
-      <!-- 系统与网站安全标签页 -->
-      <a-tab-pane key="system" title="系统与网站安全">
+      <!-- 系统安全标签页 -->
+      <a-tab-pane key="system" title="系统安全">
         <a-row :gutter="20">
           <a-col :span="16">
             <a-card title="系统防火墙" hoverable>
@@ -34,37 +34,6 @@
                 </a-button>
               </div>
             </a-card>
-
-            <a-card title="WordPress 安全加固" style="margin-top: 20px;">
-              <template #extra>
-                <a-select v-model="selectedSiteId" placeholder="选择站点" style="width: 200px" @change="handleSiteChange">
-                  <a-option v-for="site in sites" :key="site.id" :value="site.id">{{ site.domain }}</a-option>
-                </a-select>
-              </template>
-              <a-list>
-                <a-list-item>
-                  <a-list-item-meta title="后台路径隐藏" :description="currentSite?.wp_hide_login_path ? `当前路径: /${currentSite.wp_hide_login_path}` : '修改 /wp-admin 为自定义随机路径'" />
-                  <template #actions>
-                    <a-space>
-                      <a-button v-if="currentSite?.wp_hide_login_path" type="text" size="small" @click="handleHideLogin(null)">禁用</a-button>
-                      <a-button type="outline" size="small" @click="showHideLoginModal = true">配置</a-button>
-                    </a-space>
-                  </template>
-                </a-list-item>
-                <a-list-item>
-                  <a-list-item-meta title="禁用 XML-RPC" description="防止针对 xmlrpc.php 的暴力破解与 DDoS" />
-                  <template #actions>
-                    <a-switch :model-value="currentSite?.wp_disable_xmlrpc" @change="handleToggleXmlRpc" />
-                  </template>
-                </a-list-item>
-                <a-list-item>
-                  <a-list-item-meta title="文件权限修复" description="恢复 WP 目录 755、文件 644 的标准权限" />
-                  <template #actions>
-                    <a-button type="outline" size="small" @click="handleFixPermissions">立即修复</a-button>
-                  </template>
-                </a-list-item>
-              </a-list>
-            </a-card>
           </a-col>
 
           <a-col :span="8">
@@ -89,6 +58,40 @@
             </a-card>
           </a-col>
         </a-row>
+      </a-tab-pane>
+
+      <!-- WordPress 安全加固标签页 -->
+      <a-tab-pane key="wordpress" title="WordPress 安全加固">
+        <a-card title="WordPress 安全加固">
+          <template #extra>
+            <a-select v-model="selectedSiteId" placeholder="选择站点" style="width: 200px" @change="handleSiteChange">
+              <a-option v-for="site in sites" :key="site.id" :value="site.id">{{ site.domain }}</a-option>
+            </a-select>
+          </template>
+          <a-list>
+            <a-list-item>
+              <a-list-item-meta title="后台路径隐藏" :description="currentSite?.wp_hide_login_path ? `当前路径: /${currentSite.wp_hide_login_path}` : '修改 /wp-admin 为自定义随机路径'" />
+              <template #actions>
+                <a-space>
+                  <a-button v-if="currentSite?.wp_hide_login_path" type="text" size="small" @click="handleHideLogin(null)">禁用</a-button>
+                  <a-button type="outline" size="small" @click="showHideLoginModal = true">配置</a-button>
+                </a-space>
+              </template>
+            </a-list-item>
+            <a-list-item>
+              <a-list-item-meta title="禁用 XML-RPC" description="防止针对 xmlrpc.php 的暴力破解与 DDoS" />
+              <template #actions>
+                <a-switch :model-value="currentSite?.wp_disable_xmlrpc" @change="handleToggleXmlRpc" />
+              </template>
+            </a-list-item>
+            <a-list-item>
+              <a-list-item-meta title="文件权限修复" description="恢复 WP 目录 755、文件 644 的标准权限" />
+              <template #actions>
+                <a-button type="outline" size="small" @click="handleFixPermissions">立即修复</a-button>
+              </template>
+            </a-list-item>
+          </a-list>
+        </a-card>
       </a-tab-pane>
 
     </a-tabs>
