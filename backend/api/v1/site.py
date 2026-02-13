@@ -37,18 +37,60 @@ def create_site(
             detail="The site with this domain already exists in the system.",
         )
     
-    # Check if shared database exists
-    shared_db = db.query(SharedDatabaseModel).filter(SharedDatabaseModel.id == site_in.shared_db_id).first()
-    if not shared_db:
-        raise HTTPException(
-            status_code=404,
-            detail="Shared database not found.",
-        )
+    # Logic based on PRD:
+    # 1. Root path default to /www/wwwroot/{domain} if not provided
+    root_path = site_in.root_path or f"/www/wwwroot/{site_in.domain}"
+    
+    # 2. Shared Database: Default to the first active shared database if not provided
+    shared_db_id = site_in.shared_db_id
+    if not shared_db_id:
+        shared_db = db.query(SharedDatabaseModel).filter(SharedDatabaseModel.status == "active").first()
+        if not shared_db:
+            # Create a default shared database if none exists (mock/bootstrap)
+            shared_db = SharedDatabaseModel(
+                name="Default MariaDB",
+                db_host="localhost",
+                db_port=3306,
+                db_name="sanguo_shared",
+                db_user="sanguo_user",
+                db_password="sanguo_password",
+                status="active"
+            )
+            db.add(shared_db)
+            db.commit()
+            db.refresh(shared_db)
+        shared_db_id = shared_db.id
+    
+    # 3. Table Prefix: Default to wp_{next_id}_ (simplified here as we don't have next_id yet)
+    # For now, use domain-based prefix or let model handle it if it were auto-incrementing site_id
+    # PRD says wp_{site_id}_, but site_id is generated after creation. 
+    # We'll use a placeholder and update it or use a random string for now.
+    table_prefix = site_in.table_prefix or "wp_tmp_"
 
-    site = SiteModel(**site_in.dict())
+    site_data = site_in.dict()
+    site_data.update({
+        "root_path": root_path,
+        "shared_db_id": shared_db_id,
+        "table_prefix": table_prefix,
+        "status": "active"
+    })
+    
+    # Remove fields not in model
+    if "performance_preset" not in site_data:
+        site_data["performance_preset"] = "balanced"
+
+    site = SiteModel(**site_data)
     db.add(site)
     db.commit()
     db.refresh(site)
+    
+    # After creation, update table_prefix with actual ID if it was the placeholder
+    if site.table_prefix == "wp_tmp_":
+        site.table_prefix = f"wp_{site.id}_"
+        db.add(site)
+        db.commit()
+        db.refresh(site)
+
     return site
 
 @router.get("/{id}", response_model=Site)

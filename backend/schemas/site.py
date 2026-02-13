@@ -11,8 +11,15 @@ class SiteBase(BaseModel):
     table_prefix: str
     notes: Optional[str] = None
 
-class SiteCreate(SiteBase):
-    pass
+class SiteCreate(BaseModel):
+    domain: str
+    aliases: Optional[List[str]] = []
+    root_path: Optional[str] = None
+    php_version: str = "8.2"
+    shared_db_id: Optional[int] = None
+    table_prefix: Optional[str] = None
+    performance_preset: str = "balanced"
+    notes: Optional[str] = None
 
 class SiteUpdate(BaseModel):
     aliases: Optional[List[str]] = None
