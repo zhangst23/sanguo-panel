@@ -30,6 +30,9 @@ app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
     lifespan=lifespan,
+    docs_url="/api-docs",
+    openapi_url="/api-docs/openapi.json",
+    redoc_url=None,
 )
 
 # Set all CORS enabled origins

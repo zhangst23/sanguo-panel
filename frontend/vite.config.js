@@ -16,6 +16,11 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
+      '/api-docs': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        rewrite: (path) => path.startsWith('/api-docs/openapi.json') ? path : path
+      },
       '/phpmyadmin': {
         target: 'http://localhost:8000',
         changeOrigin: true,

@@ -48,6 +48,7 @@
           <a-menu-item key="PHP">PHP</a-menu-item>
           <a-menu-item key="LiteSpeed">OpenLiteSpeed</a-menu-item>
           <a-menu-item key="Linux">Linux</a-menu-item>
+          <a-menu-item key="ApiDocs">API 接口文档</a-menu-item>
           <a-menu-item key="SystemSettings">系统设置</a-menu-item>
         </a-sub-menu>
       </a-menu>
@@ -111,6 +112,10 @@ const onCollapse = (val) => {
 }
 
 const handleMenuClick = (key) => {
+  if (key === 'ApiDocs') {
+    window.open('/api-docs', '_blank')
+    return
+  }
   console.log('Menu click:', key)
   router.push({ name: key })
 }
