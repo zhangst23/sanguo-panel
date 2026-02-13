@@ -60,3 +60,25 @@
 [2026-02-13 07:56:47] Verification successful for user: sanguo_user
 [2026-02-13 07:56:47] Setting target database to: sanguo_shared
 [2026-02-13 07:56:47] Token verified during inclusion. Continuing without redirect.
+[2026-02-13 08:14:54] --- SSO SCRIPT START ---
+[2026-02-13 08:14:54] Request URI: /index.php?pma_token=bdfae3e2-2ee6-49c1-a3f9-36fdf62389a7&db=sanguo_shared
+[2026-02-13 08:14:54] PHP Self: /index.php
+[2026-02-13 08:14:54] Included files: 278
+[2026-02-13 08:14:54] Included by phpMyAdmin. PHPMYADMIN constant is defined.
+[2026-02-13 08:14:54] Session ID: p16c3velo6e3opbs3ia0o33ehk
+[2026-02-13 08:14:54] Cookies: {"pma_lang":"en","__next_hmr_refresh_hash__":"987","PMA_SSO":"r2omfvu8386bj55cbpdhl7dbqi","phpMyAdmin":"p16c3velo6e3opbs3ia0o33ehk"}
+[2026-02-13 08:14:54] Received token: bdfae3e2-2ee6-49c1-a3f9-36fdf62389a7
+[2026-02-13 08:14:54] Verification successful for user: sanguo_user
+[2026-02-13 08:14:54] Setting target database to: sanguo_shared
+[2026-02-13 08:14:54] Token verified during inclusion. Continuing without redirect.
+[2026-02-13 08:15:15] --- SSO SCRIPT START ---
+[2026-02-13 08:15:15] Request URI: /index.php?pma_token=91a19058-29a4-4109-b868-92d05a726513&db=sanguo_shared
+[2026-02-13 08:15:15] PHP Self: /index.php
+[2026-02-13 08:15:15] Included files: 278
+[2026-02-13 08:15:15] Included by phpMyAdmin. PHPMYADMIN constant is defined.
+[2026-02-13 08:15:15] Session ID: p16c3velo6e3opbs3ia0o33ehk
+[2026-02-13 08:15:15] Cookies: {"pma_lang":"en","__next_hmr_refresh_hash__":"987","PMA_SSO":"r2omfvu8386bj55cbpdhl7dbqi","phpMyAdmin":"p16c3velo6e3opbs3ia0o33ehk"}
+[2026-02-13 08:15:15] Received token: 91a19058-29a4-4109-b868-92d05a726513
+[2026-02-13 08:15:15] Verification successful for user: sanguo_user
+[2026-02-13 08:15:15] Setting target database to: sanguo_shared
+[2026-02-13 08:15:15] Token verified during inclusion. Continuing without redirect.

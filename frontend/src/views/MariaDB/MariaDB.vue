@@ -23,6 +23,26 @@
                     重启服务
                   </a-button>
                   <a-button @click="fetchServiceStatus">刷新状态</a-button>
+                  
+                  <!-- 管理员凭据展示 -->
+                  <a-popover title="管理员数据库凭据">
+                    <a-button type="outline" size="small" style="margin-left: 10px">
+                      <template #icon><icon-safe /></template>
+                      查看管理凭据
+                    </a-button>
+                    <template #content>
+                      <div class="admin-creds">
+                        <p><b>库名:</b> {{ adminCreds.db_name }}</p>
+                        <p><b>用户:</b> {{ adminCreds.db_user }}</p>
+                        <p>
+                          <b>密码:</b> {{ showAdminPass ? adminCreds.db_password : '******' }}
+                          <a-button type="text" size="mini" @click="showAdminPass = !showAdminPass">
+                            <icon-eye v-if="!showAdminPass" /><icon-eye-invisible v-else />
+                          </a-button>
+                        </p>
+                      </div>
+                    </template>
+                  </a-popover>
                 </a-space>
               </a-space>
             </a-card>
@@ -60,6 +80,16 @@
                         <a-popconfirm content="确定要重置该数据库的密码吗？" @ok="handleChangePassword(record)">
                           <a-link>改密</a-link>
                         </a-popconfirm>
+                        <a-dropdown @select="(val) => handleSetPermission(record, val)">
+                          <a-link>
+                            权限: {{ record.db_permission === 'all_dbs' ? '所有人' : '仅自己' }}
+                            <icon-down />
+                          </a-link>
+                          <template #content>
+                            <a-doption value="site_only">仅自己站点数据库</a-doption>
+                            <a-doption value="all_dbs">访问所有人数据库</a-doption>
+                          </template>
+                        </a-dropdown>
                         <a-popconfirm content="确定要清理该数据库的碎片吗？" @ok="handleOptimize(record)">
                           <a-link>优化</a-link>
                         </a-popconfirm>
@@ -114,7 +144,9 @@ import {
   IconRefresh, 
   IconEye, 
   IconEyeInvisible, 
-  IconCopy 
+  IconCopy,
+  IconSafe,
+  IconDown
 } from '@arco-design/web-vue/es/icon'
 
 const serviceStatus = ref('running')
@@ -125,6 +157,17 @@ const connections = ref(0)
 const showPassword = reactive({})
 const slowQueries = ref([])
 const slowQueryEnabled = ref(true)
+const adminCreds = ref({ db_name: '', db_user: '', db_password: '' })
+const showAdminPass = ref(false)
+
+const fetchAdminCreds = async () => {
+  try {
+    const res = await request.get('/database/admin-credentials')
+    adminCreds.value = res
+  } catch (error) {
+    console.error('获取管理凭据失败:', error)
+  }
+}
 
 const fetchServiceStatus = async () => {
   try {
@@ -211,6 +254,16 @@ const handleOptimize = async (record) => {
   }
 }
 
+const handleSetPermission = async (record, val) => {
+  try {
+    await request.post(`/database/set-permission/${record.site_id}`, null, { params: { permission: val } })
+    Message.success('权限更新成功')
+    fetchDbList()
+  } catch (error) {
+    Message.error('更新权限失败')
+  }
+}
+
 const handleDelete = async (record) => {
   try {
     await request.delete(`/database/${record.site_id}`)
@@ -235,6 +288,7 @@ onMounted(() => {
   fetchServiceStatus()
   fetchDbList()
   fetchSlowQueries()
+  fetchAdminCreds()
 })
 </script>
 

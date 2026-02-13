@@ -219,7 +219,7 @@
       </a-tab-pane>
 
       <!-- 高级设置 -->
-      <a-tab-pane key="advanced" title="高级设置">
+      <a-tab-pane key="advanced" title="wp-config.php 设置">
         <a-collapse :bordered="false" default-active-key="wp">
           <a-collapse-item header="wp-config.php 配置管理" key="wp">
             <a-typography-text type="secondary">在此修改 WordPress 核心配置文件，修改前请确保了解各参数含义</a-typography-text>

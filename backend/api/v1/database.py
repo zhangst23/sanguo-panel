@@ -22,19 +22,71 @@ def list_databases(
     for site in sites:
         shared_db = db.query(SharedDatabaseModel).filter(SharedDatabaseModel.id == site.shared_db_id).first()
         if shared_db:
-            # Determine the actual database name used
-            actual_db_name = site.db_name if site.db_name else shared_db.db_name
+            # Determine the actual database name, user, and password used for this site
+            # Prioritize site-specific credentials if they exist
+            db_name = site.db_name if site.db_name else shared_db.db_name
+            db_user = site.db_user if site.db_user else shared_db.db_user
+            db_pass = site.db_password if site.db_password else shared_db.db_password
             
             results.append({
                 "site_id": site.id,
                 "domain": site.domain,
-                "db_name": actual_db_name,
-                "db_user": shared_db.db_user,
-                "db_password": shared_db.db_password,
+                "db_name": db_name,
+                "db_user": db_user,
+                "db_password": db_pass,
+                "db_permission": site.db_permission or "site_only",
                 "created_at": site.created_at.strftime("%Y-%m-%d %H:%M:%S") if hasattr(site, 'created_at') and site.created_at else "N/A",
                 "table_prefix": site.table_prefix
             })
     return results
+
+@router.get("/admin-credentials")
+def get_admin_db_credentials(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """
+    Get the master/admin database credentials (the first active shared database).
+    """
+    shared_db = db.query(SharedDatabaseModel).filter(SharedDatabaseModel.status == "active").first()
+    if not shared_db:
+        raise HTTPException(status_code=404, detail="No active shared database found")
+    
+    return {
+        "db_name": shared_db.db_name,
+        "db_user": shared_db.db_user,
+        "db_password": shared_db.db_password
+    }
+
+@router.post("/set-permission/{site_id}")
+def set_db_permission(
+    site_id: int,
+    permission: str, # site_only or all_dbs
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """
+    Update database permission for a site.
+    In a real system, this would modify MySQL GRANTs.
+    """
+    site = db.query(SiteModel).filter(SiteModel.id == site_id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    
+    if permission not in ["site_only", "all_dbs"]:
+        raise HTTPException(status_code=400, detail="Invalid permission type")
+    
+    site.db_permission = permission
+    db.commit()
+    
+    # Mock behavior: In a real system we would run:
+    # if permission == "all_dbs":
+    #    cursor.execute(f"GRANT ALL PRIVILEGES ON *.* TO '{site.db_user}'@'localhost'")
+    # else:
+    #    cursor.execute(f"REVOKE ALL PRIVILEGES ON *.* FROM '{site.db_user}'@'localhost'")
+    #    cursor.execute(f"GRANT ALL PRIVILEGES ON `{site.db_name}`.* TO '{site.db_user}'@'localhost'")
+    
+    return {"success": True, "permission": permission}
 
 @router.post("/change-password/{site_id}")
 def change_db_password(

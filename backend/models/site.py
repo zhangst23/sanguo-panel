@@ -35,6 +35,9 @@ class Site(Base):
     
     shared_db_id = Column(Integer, ForeignKey("shared_databases.id"), nullable=False)
     db_name = Column(String(64)) # The actual database name created for this site
+    db_user = Column(String(64)) # Custom database user for this site
+    db_password = Column(String(255)) # Custom database password for this site
+    db_permission = Column(String(20), default="site_only") # site_only, all_dbs
     table_prefix = Column(String(64), nullable=False)
     
     ssl_status = Column(Integer, default=0) # 0: off, 1: on, 2: force https

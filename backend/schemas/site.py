@@ -10,6 +10,9 @@ class SiteBase(BaseModel):
     php_version: str = "8.2"
     shared_db_id: int
     db_name: Optional[str] = None
+    db_user: Optional[str] = None
+    db_password: Optional[str] = None
+    db_permission: str = "site_only"
     table_prefix: str
     notes: Optional[str] = None
 

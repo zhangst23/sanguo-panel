@@ -39,8 +39,10 @@ def create_site(
         )
     
     # Logic based on PRD:
-    # 1. Root path default to /www/wwwroot/{domain} if not provided
-    root_path = site_in.root_path or f"/www/wwwroot/{site_in.domain}"
+    # 1. Root path default to project_root/wordpress/{domain} if not provided
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    default_root = os.path.join(project_root, "wordpress", site_in.domain)
+    root_path = site_in.root_path or default_root
     
     # 2. Shared Database: Default to the first active shared database if not provided
     shared_db_id = site_in.shared_db_id
@@ -85,15 +87,23 @@ def create_site(
     db.commit()
     db.refresh(site)
     
-    # --- MariaDB/MySQL Database Creation Logic ---
+    # 3. Update table_prefix with actual site ID
+    site.table_prefix = f"wp_{site.id}_"
+    db.add(site)
+    db.commit()
+
+    # --- MariaDB/MySQL Database & WordPress Installation Logic ---
     try:
         shared_db = db.query(SharedDatabaseModel).filter(SharedDatabaseModel.id == site.shared_db_id).first()
         if shared_db:
             import mysql.connector
-            from mysql.connector import errorcode
+            import string
+            import random
+            import requests
+            import zipfile
+            import shutil
             
-            # Connect to the MySQL/MariaDB server using the shared database credentials
-            # In a real system, this should use a root or administrative account
+            # 1. Database Creation
             conn = mysql.connector.connect(
                 host=shared_db.db_host,
                 port=shared_db.db_port,
@@ -102,38 +112,76 @@ def create_site(
             )
             cursor = conn.cursor()
             
-            # Create a dedicated database for this site if it doesn't exist
-            # We use the domain as the base for the database name (sanitized)
+            # Generate DB name, user, password
             safe_domain = site.domain.replace('.', '_').replace('-', '_')
             db_name = f"db_{safe_domain}"
+            db_user = f"u_{safe_domain}"[:16] # MySQL user max 16 chars in older versions
+            db_pass = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
             
-            # 1. Create database
+            # Create DB
             cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{db_name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
             
-            # 2. Update site record with this specific database info
+            # Create User and Grant Permissions
+            try:
+                cursor.execute(f"CREATE USER '{db_user}'@'localhost' IDENTIFIED BY '{db_pass}'")
+            except:
+                cursor.execute(f"ALTER USER '{db_user}'@'localhost' IDENTIFIED BY '{db_pass}'")
+            
+            # Default to site_only permission
+            cursor.execute(f"GRANT ALL PRIVILEGES ON `{db_name}`.* TO '{db_user}'@'localhost'")
+            cursor.execute("FLUSH PRIVILEGES")
+            
+            # Update site record
             site.db_name = db_name
-            site.notes = f"Database created: {db_name}"
+            site.db_user = db_user
+            site.db_password = db_pass
+            site.db_permission = "site_only"
+            site.notes = f"WordPress installed. DB: {db_name}"
             db.add(site)
             db.commit()
             
             cursor.close()
             conn.close()
+
+            # 2. WordPress Files Installation
+            # Ensure root path exists
+            if not os.path.exists(site.root_path):
+                os.makedirs(site.root_path, exist_ok=True)
+            
+            # Download WordPress if not already present in a cache directory
+            wp_zip_path = os.path.join(os.path.dirname(site.root_path), "wordpress-latest.zip")
+            if not os.path.exists(wp_zip_path):
+                print(f"Downloading WordPress...")
+                response = requests.get("https://wordpress.org/latest.zip", timeout=60)
+                with open(wp_zip_path, "wb") as f:
+                    f.write(response.content)
+            
+            # Extract to root path
+            print(f"Extracting WordPress to {site.root_path}...")
+            with zipfile.ZipFile(wp_zip_path, 'r') as zip_ref:
+                # WordPress zip contains a 'wordpress' folder, we want its contents
+                extract_tmp = os.path.join(os.path.dirname(site.root_path), f"wp_tmp_{site.id}")
+                zip_ref.extractall(extract_tmp)
+                
+                # Move contents from extract_tmp/wordpress to site.root_path
+                wp_src = os.path.join(extract_tmp, "wordpress")
+                for item in os.listdir(wp_src):
+                    s = os.path.join(wp_src, item)
+                    d = os.path.join(site.root_path, item)
+                    if os.path.isdir(s):
+                        if os.path.exists(d): shutil.rmtree(d)
+                        shutil.copytree(s, d)
+                    else:
+                        shutil.copy2(s, d)
+                
+                # Cleanup tmp
+                shutil.rmtree(extract_tmp)
+
     except Exception as e:
-        print(f"Error creating MariaDB database for site: {e}")
-        print(f"Please check if the Shared Database settings are correct in the panel.")
-        # We don't raise an exception here to allow the site to be created even if DB creation fails
-        # (The user can manually fix it later)
-        site.notes = f"Database creation failed: {e}. Please create it manually."
+        print(f"Error during WordPress installation: {e}")
+        site.notes = f"Installation failed: {e}. Please check logs."
         db.add(site)
         db.commit()
-    # ----------------------------------------------
-    
-    # After creation, update table_prefix with actual ID if it was the placeholder
-    if site.table_prefix == "wp_tmp_":
-        site.table_prefix = f"wp_{site.id}_"
-        db.add(site)
-        db.commit()
-        db.refresh(site)
 
     return site
 

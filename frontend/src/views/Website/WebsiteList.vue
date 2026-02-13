@@ -4,7 +4,7 @@
       <a-typography-title :heading="2">网站管理</a-typography-title>
       <a-button type="primary" @click="showCreateModal = true">
         <template #icon><icon-plus /></template>
-        创建站点
+        创建 WordPress 站点
       </a-button>
     </div>
 
@@ -14,7 +14,12 @@
           <a-table-column title="域名">
             <template #cell="{ record }">
               <div class="domain-info">
-                <div class="primary-domain">{{ record.domain }}</div>
+                <div class="primary-domain">
+                  {{ record.domain }}
+                  <a :href="'http://' + record.domain" target="_blank" class="visit-link">
+                    <icon-launch />
+                  </a>
+                </div>
                 <div class="aliases" v-if="record.aliases?.length">
                   <a-tag v-for="alias in record.aliases" :key="alias" size="mini">{{ alias }}</a-tag>
                 </div>
@@ -88,15 +93,39 @@
     <!-- Create Site Modal -->
     <a-modal 
       v-model:visible="showCreateModal" 
-      title="创建新站点" 
+      title="创建 WordPress 站点" 
       :width="550"
       @ok="handleCreate"
       @cancel="resetForm"
       :confirm-loading="confirmLoading"
       ok-text="立即创建"
       cancel-text="取消"
+      :mask-closable="false"
     >
-      <a-form :model="form" ref="formRef" layout="vertical" class="create-form">
+      <div v-if="confirmLoading" class="install-loading">
+        <a-spin :size="32">
+          <template #icon>
+            <icon-loading />
+          </template>
+        </a-spin>
+        <div class="loading-steps">
+          <div class="step-item active">
+            <icon-check-circle-fill v-if="installStep > 1" class="done-icon" />
+            <icon-loading v-else class="spin-icon" />
+            WordPress 文件下载中...
+          </div>
+          <div class="step-item" :class="{ active: installStep >= 2 }">
+            <icon-check-circle-fill v-if="installStep > 2" class="done-icon" />
+            <icon-loading v-else-if="installStep === 2" class="spin-icon" />
+            MariaDB 数据库安装中...
+          </div>
+          <div class="step-item" :class="{ active: installStep >= 3 }">
+            <icon-loading v-if="installStep === 3" class="spin-icon" />
+            配置优化中...
+          </div>
+        </div>
+      </div>
+      <a-form v-else :model="form" ref="formRef" layout="vertical" class="create-form">
         <!-- Basic Info Section -->
         <div class="form-section">
           <div class="section-title">基本信息</div>
@@ -123,7 +152,7 @@
             <a-input placeholder="默认MariaDB" disabled />
           </a-form-item>
           <a-form-item field="root_path" label="根目录">
-            <a-input v-model="form.root_path" placeholder="默认: /www/wwwroot/域名" />
+            <a-input v-model="form.root_path" placeholder="默认: wordpress/域名" />
           </a-form-item>
         </div>
 
@@ -189,13 +218,21 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import request from '@/utils/request'
 import { Message, Modal } from '@arco-design/web-vue'
-import { IconPlus, IconMore, IconInfoCircle, IconCheckCircleFill } from '@arco-design/web-vue/es/icon'
+import { 
+  IconPlus, 
+  IconMore, 
+  IconInfoCircle, 
+  IconCheckCircleFill,
+  IconLaunch,
+  IconLoading
+} from '@arco-design/web-vue/es/icon'
 
 const router = useRouter()
 const loading = ref(false)
 const sites = ref([])
 const showCreateModal = ref(false)
 const confirmLoading = ref(false)
+const installStep = ref(1)
 const formRef = ref(null)
 
 // 备份管理相关状态
@@ -220,7 +257,8 @@ const getScoreColor = (score) => {
 
 const handleDomainInput = () => {
   if (form.domain) {
-    form.root_path = `/www/wwwroot/${form.domain}`
+    // 模拟项目路径显示，实际创建时由后端计算 project_root/wordpress/domain
+    form.root_path = `wordpress/${form.domain}`
   } else {
     form.root_path = ''
   }
@@ -245,16 +283,29 @@ const handleCreate = async () => {
   }
   
   confirmLoading.value = true
+  installStep.value = 1
+  
+  // 模拟进度显示
+  const timer1 = setTimeout(() => installStep.value = 2, 2000)
+  const timer2 = setTimeout(() => installStep.value = 3, 5000)
+
   try {
     await request.post('/sites/', form)
-    Message.success('站点创建成功，正在后台部署中...')
+    clearTimeout(timer1)
+    clearTimeout(timer2)
+    installStep.value = 4
+    Message.success('WordPress 站点创建成功！')
     showCreateModal.value = false
     resetForm()
     fetchSites()
   } catch (error) {
+    clearTimeout(timer1)
+    clearTimeout(timer2)
     console.error(error)
+    Message.error('创建失败: ' + (error.response?.data?.detail || error.message))
   } finally {
     confirmLoading.value = false
+    installStep.value = 1
   }
 }
 
@@ -411,6 +462,48 @@ onMounted(() => {
 .primary-domain {
   font-weight: 500;
   color: var(--color-text-1);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.visit-link {
+  color: var(--color-text-3);
+  font-size: 14px;
+  display: inline-flex;
+  transition: color 0.2s;
+}
+.visit-link:hover {
+  color: var(--color-primary);
+}
+.install-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 0;
+}
+.loading-steps {
+  margin-top: 24px;
+  width: 100%;
+  max-width: 300px;
+}
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  color: var(--color-text-3);
+  font-size: 14px;
+}
+.step-item.active {
+  color: var(--color-text-1);
+  font-weight: 500;
+}
+.spin-icon {
+  animation: arco-loading-circle 1s linear infinite;
+  color: var(--color-primary);
+}
+.done-icon {
+  color: #00b42a;
 }
 .aliases {
   margin-top: 4px;
