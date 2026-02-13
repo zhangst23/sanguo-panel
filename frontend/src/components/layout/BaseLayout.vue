@@ -31,6 +31,7 @@
         <a-sub-menu key="System">
           <template #icon><icon-settings /></template>
           <template #title>System</template>
+          <a-menu-item key="Redis">Redis</a-menu-item>
           <a-menu-item key="PHP">PHP</a-menu-item>
           <a-menu-item key="LiteSpeed">LiteSpeed</a-menu-item>
         </a-sub-menu>

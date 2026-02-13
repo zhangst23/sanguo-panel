@@ -277,6 +277,16 @@ def update_site(
     db.add(site)
     db.commit()
     db.refresh(site)
+    
+    # If redis_enabled was toggled, update wp-config.php
+    if "redis_enabled" in update_data:
+        try:
+            from backend.utils.site_utils import update_wp_config_redis
+            update_wp_config_redis(site)
+        except Exception as e:
+            # Don't fail the whole update if this fails, but log it
+            print(f"Error updating Redis config for {site.domain}: {str(e)}")
+            
     return site
 
 @router.delete("/{id}", response_model=Site)
