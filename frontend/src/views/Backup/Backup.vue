@@ -133,7 +133,7 @@ const fetchData = async () => {
     const schedule = await request.get('/security/backups/schedule')
     Object.assign(scheduleForm, schedule)
     
-    const sites = await request.get('/sites')
+    const sites = await request.get('/sites/')
     items.value = sites.map(s => ({ id: s.id, name: s.domain }))
   } catch (error) {
     console.error(error)

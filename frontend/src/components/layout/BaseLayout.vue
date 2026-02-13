@@ -28,6 +28,10 @@
           <template #icon><icon-storage /></template>
           数据库管理
         </a-menu-item>
+        <a-menu-item key="OneClickTools">
+          <template #icon><icon-thunderbolt /></template>
+          一键工具
+        </a-menu-item>
         <a-menu-item key="Security">
           <template #icon><icon-safe /></template>
           安全中心
@@ -82,6 +86,18 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import {
+  IconDashboard,
+  IconCommon,
+  IconStorage,
+  IconThunderbolt,
+  IconSafe,
+  IconCloudDownload,
+  IconSettings,
+  IconMenuFold,
+  IconMenuUnfold,
+  IconNotification
+} from '@arco-design/web-vue/es/icon'
 
 const router = useRouter()
 const route = useRoute()
@@ -94,6 +110,7 @@ const onCollapse = (val) => {
 }
 
 const handleMenuClick = (key) => {
+  console.log('Menu click:', key)
   router.push({ name: key })
 }
 

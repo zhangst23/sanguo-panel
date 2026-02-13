@@ -130,7 +130,7 @@
 
     <!-- 隐藏后台路径弹窗 -->
     <a-modal v-model:visible="showHideLoginModal" title="配置隐藏后台路径" @ok="handleHideLogin(hideLoginPath)">
-      <a-form layout="vertical">
+      <a-form :model="{ path: hideLoginPath }" layout="vertical">
         <a-form-item label="自定义登录路径" help="例如: my-login。设置后，原 /wp-admin 将无法直接访问。">
           <a-input v-model="hideLoginPath" placeholder="请输入自定义路径字符串" />
         </a-form-item>
@@ -188,7 +188,7 @@ const fetchData = async () => {
     const f2b = await request.get('/security/fail2ban/status')
     Object.assign(fail2ban, f2b)
 
-    const sitesRes = await request.get('/sites')
+    const sitesRes = await request.get('/sites/')
     sites.value = sitesRes
     if (sitesRes.length > 0 && !selectedSiteId.value) {
       selectedSiteId.value = sitesRes[0].id

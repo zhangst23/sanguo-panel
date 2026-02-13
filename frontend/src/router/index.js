@@ -106,6 +106,12 @@ const routes = [
         meta: { requiresAuth: true },
       },
       {
+        path: 'tools',
+        name: 'OneClickTools',
+        component: () => import('@/views/Tools/OneClickTools.vue'),
+        meta: { requiresAuth: true },
+      },
+      {
         path: 'backup',
         name: 'Backup',
         component: () => import('@/views/Backup/Backup.vue'),
