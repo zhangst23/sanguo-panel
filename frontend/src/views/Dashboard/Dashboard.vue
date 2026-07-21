@@ -12,7 +12,7 @@
             </template>
           </a-statistic>
           <div class="stat-footer">
-            <a-tag color="blue">{{ metrics.cpu.count }} 核心</a-tag>
+            <a-tag class="stat-footer">{{ metrics.cpu.count }} 核心</a-tag>
           </div>
         </a-card>
       </a-col>

@@ -8,7 +8,7 @@
       @collapse="onCollapse"
     >
       <div class="logo">
-        <span v-if="!collapsed">三国WP面板</span>
+        <span v-if="!collapsed">SanGuo WP面板</span>
         <span v-else>SG</span>
       </div>
       <div class="sider-content">
@@ -23,7 +23,7 @@
           </a-menu-item>
           <a-menu-item key="Website">
             <template #icon><icon-common /></template>
-            站点管理
+            网站管理
           </a-menu-item>
           <a-menu-item key="MariaDB">
             <template #icon><icon-storage /></template>
