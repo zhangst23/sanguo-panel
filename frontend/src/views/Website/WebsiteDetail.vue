@@ -227,7 +227,7 @@
               <a-textarea 
                 v-model="wpConfigContent" 
                 :auto-size="{ minRows: 10, maxRows: 20 }" 
-                style="font-family: monospace; background-color: #f8f9fa"
+                style="font-family: monospace; background-color: var(--arco-color-fill-1)"
                 placeholder="正在加载 wp-config.php 内容..."
               />
               <div style="margin-top: 16px">
@@ -388,7 +388,7 @@ onMounted(() => {
   margin-bottom: 24px;
 }
 .detail-tabs {
-  background: #fff;
+  background: var(--arco-color-bg-2);
   padding: 16px;
   border-radius: 8px;
 }
@@ -478,7 +478,7 @@ onMounted(() => {
 }
 
 .ssl-form-inline {
-  background: #fff;
+  background: var(--arco-color-bg-1);
   padding: 12px;
   border-radius: 4px;
   border: 1px dashed var(--color-fill-3);

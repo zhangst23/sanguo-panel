@@ -300,7 +300,7 @@ onMounted(() => {
   margin-bottom: 24px;
 }
 .mariadb-tabs {
-  background: #fff;
+  background: var(--arco-color-bg-2);
   padding: 16px;
   border-radius: 4px;
 }
@@ -310,7 +310,7 @@ onMounted(() => {
 }
 .sql-code {
   font-family: monospace;
-  background: #f5f5f5;
+  background: var(--arco-color-fill-2);
   padding: 2px 4px;
   border-radius: 2px;
   color: #d91d1d;

@@ -30,14 +30,45 @@
 }
 
 body {
-  background-color: var(--arco-gray-2);
-  color: var(--arco-gray-8);
+  background-color: var(--arco-color-bg-1);
+  color: var(--arco-color-text-1);
   font-family: var(--font-family);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   margin: 0;
+  transition: background-color 0.3s, color 0.3s;
 }
 
+// Ensure app container fills screen
 #app {
   height: 100vh;
+  background-color: var(--arco-color-bg-1);
+}
+
+// Global layout overrides for dark mode
+[arco-theme='dark'] {
+  body {
+    background-color: #000000;
+  }
+  
+  .layout-container {
+    background-color: #000000 !important;
+  }
+  
+  .header {
+    background-color: #17171a !important;
+    border-bottom: 1px solid #333;
+  }
+  
+  .content {
+    background-color: #000000 !important;
+  }
+  
+  .arco-layout-sider {
+    background-color: #17171a !important;
+  }
+  
+  .arco-card {
+    background-color: #17171a !important;
+  }
 }
