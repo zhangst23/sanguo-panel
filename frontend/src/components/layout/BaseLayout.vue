@@ -8,7 +8,7 @@
       @collapse="onCollapse"
     >
       <div class="logo">
-        <span v-if="!collapsed">SanGuoWP面板</span>
+        <span v-if="!collapsed">三国WP面板</span>
         <span v-else>SG</span>
       </div>
       <div class="sider-content">
@@ -58,16 +58,16 @@
           </a-sub-menu>
         </a-menu>
       </div>
-      <div class="sider-footer">
-        <a-space direction="vertical" fill size="medium" align="center">
-          <a-space :size="collapsed ? 0 : 'medium'" class="footer-actions">
-            <a-button type="text" @click="toggleTheme" size="small">
+      <template #trigger>
+        <div class="trigger-wrapper" :class="{ 'is-collapsed': collapsed }">
+          <a-space v-if="!collapsed" size="medium" class="footer-actions">
+            <a-button type="text" @click.stop="toggleTheme" size="small">
               <template #icon>
                 <icon-moon-fill v-if="theme === 'light'" />
                 <icon-sun-fill v-else />
               </template>
             </a-button>
-            <a-badge :count="3" v-if="!collapsed">
+            <a-badge :count="3">
               <a-button type="text" size="small"><icon-notification /></a-button>
             </a-badge>
             <a-dropdown @select="handleUserAction">
@@ -80,12 +80,25 @@
               </template>
             </a-dropdown>
           </a-space>
-          <a-button type="text" @click="onCollapse(!collapsed)" class="collapse-btn">
-            <icon-menu-fold v-if="!collapsed" />
-            <icon-menu-unfold v-else />
-          </a-button>
-        </a-space>
-      </div>
+          
+          <!-- 折叠状态下只显示头像 -->
+          <div v-else class="collapsed-avatar">
+            <a-dropdown @select="handleUserAction">
+              <a-avatar :size="24" style="cursor: pointer; background-color: var(--arco-blue-6)">
+                A
+              </a-avatar>
+              <template #content>
+                <a-doption value="profile">Profile</a-doption>
+                <a-doption value="logout">Logout</a-doption>
+              </template>
+            </a-dropdown>
+          </div>
+
+          <div v-if="!collapsed" class="collapse-icon">
+            <icon-menu-fold />
+          </div>
+        </div>
+      </template>
     </a-layout-sider>
     <a-layout>
       <a-layout-content class="content">
@@ -184,23 +197,38 @@ const handleUserAction = (val) => {
   overflow-y: auto;
 }
 
-.sider-footer {
-  padding: 16px 0;
-  border-top: 1px solid var(--arco-color-border-1);
+.trigger-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 100%;
+  padding: 0 16px;
+  box-sizing: border-box;
   background: var(--arco-color-bg-2);
+  border-top: 1px solid var(--arco-color-border-1);
+  &.is-collapsed {
+    justify-content: center;
+    padding: 0;
+  }
+}
+
+.collapsed-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .footer-actions {
-  margin-bottom: 8px;
-  width: 100%;
   display: flex;
-  justify-content: center;
+  align-items: center;
 }
 
-.collapse-btn {
-  width: 100%;
+.collapse-icon {
   display: flex;
-  justify-content: center;
+  align-items: center;
+  font-size: 16px;
+  color: var(--arco-color-text-2);
 }
 
 .logo {
