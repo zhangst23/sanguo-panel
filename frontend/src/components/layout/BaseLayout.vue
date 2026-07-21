@@ -67,6 +67,12 @@
         </div>
         <div class="header-right">
           <a-space size="large">
+            <a-button type="text" @click="toggleTheme">
+              <template #icon>
+                <icon-moon-fill v-if="theme === 'light'" />
+                <icon-sun-fill v-else />
+              </template>
+            </a-button>
             <a-badge :count="3">
               <a-button type="text"><icon-notification /></a-button>
             </a-badge>
@@ -103,18 +109,41 @@ import {
   IconMenuFold,
   IconMenuUnfold,
   IconNotification,
-  IconList
+  IconList,
+  IconMoonFill,
+  IconSunFill
 } from '@arco-design/web-vue/es/icon'
+import { onMounted } from 'vue'
 
 const router = useRouter()
 const route = useRoute()
 const collapsed = ref(false)
+const theme = ref(localStorage.getItem('theme') || 'light')
 
 const selectedKey = computed(() => route.name)
 
 const onCollapse = (val) => {
   collapsed.value = val
 }
+
+const toggleTheme = () => {
+  const newTheme = theme.value === 'light' ? 'dark' : 'light'
+  theme.value = newTheme
+  applyTheme(newTheme)
+}
+
+const applyTheme = (val) => {
+  if (val === 'dark') {
+    document.body.setAttribute('arco-theme', 'dark')
+  } else {
+    document.body.removeAttribute('arco-theme')
+  }
+  localStorage.setItem('theme', val)
+}
+
+onMounted(() => {
+  applyTheme(theme.value)
+})
 
 const handleMenuClick = (key) => {
   if (key === 'ApiDocs') {
@@ -146,7 +175,8 @@ const handleUserAction = (val) => {
   color: #fff;
   font-size: 18px;
   font-weight: bold;
-  background: #001529;
+  background: var(--arco-color-menu-light-bg);
+  border-bottom: 1px solid var(--arco-color-border-1);
   img {
     width: 32px;
     margin-right: 10px;
@@ -155,12 +185,12 @@ const handleUserAction = (val) => {
 
 .header {
   height: 64px;
-  background: #fff;
+  background: var(--arco-color-bg-2);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 20px;
-  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  box-shadow: 0 1px 4px var(--arco-color-border-1);
   z-index: 100;
 }
 

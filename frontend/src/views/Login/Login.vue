@@ -37,11 +37,11 @@ const handleSubmit = async () => {
   
   loading.value = true
   try {
-    const formData = new FormData()
-    formData.append('username', form.username)
-    formData.append('password', form.password)
+    const params = new URLSearchParams()
+    params.append('username', form.username)
+    params.append('password', form.password)
     
-    const res = await request.post('/login/access-token', formData)
+    const res = await request.post('/login/access-token', params)
     localStorage.setItem('token', res.access_token)
     Message.success('Login success')
     router.push('/dashboard')
