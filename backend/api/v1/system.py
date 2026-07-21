@@ -4,6 +4,8 @@ import psutil
 from sqlalchemy.orm import Session
 from backend.api import deps
 from backend.models.user import User
+from backend.models.site import Site
+from backend.models.backup import Backup
 from backend.core import security
 from pydantic import BaseModel
 from typing import Optional
@@ -26,13 +28,20 @@ async def get_status():
     }
 
 @router.get("/metrics")
-async def get_metrics(current_user: User = Depends(deps.get_current_active_user)):
+async def get_metrics(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user)
+):
     """
-    Get real-time system metrics: CPU, Memory, Disk, Network
+    Get real-time system metrics: CPU, Memory, Disk, Network, and resource counts
     """
     cpu_percent = psutil.cpu_percent(interval=1)
     memory = psutil.virtual_memory()
     disk = psutil.disk_usage('/')
+    
+    # 获取资源数量
+    site_count = db.query(Site).count()
+    backup_count = db.query(Backup).count()
     
     return {
         "cpu": {
@@ -51,6 +60,8 @@ async def get_metrics(current_user: User = Depends(deps.get_current_active_user)
             "free": disk.free,
             "percent": disk.percent
         },
+        "site_count": site_count,
+        "backup_count": backup_count,
         "timestamp": datetime.now()
     }
 

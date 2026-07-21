@@ -4,7 +4,7 @@
     
     <!-- 实时指标卡片 -->
     <a-row :gutter="20" class="stat-cards">
-      <a-col :span="8">
+      <a-col :span="4.8" style="width: 20%">
         <a-card title="CPU 使用率" hoverable class="stat-card">
           <a-statistic :value="metrics.cpu.percent" :precision="1">
             <template #suffix>
@@ -16,7 +16,7 @@
           </div>
         </a-card>
       </a-col>
-      <a-col :span="8">
+      <a-col :span="4.8" style="width: 20%">
         <a-card title="内存使用率" hoverable class="stat-card">
           <a-statistic :value="metrics.memory.percent" :precision="1">
             <template #suffix>
@@ -29,7 +29,7 @@
           </div>
         </a-card>
       </a-col>
-      <a-col :span="8">
+      <a-col :span="4.8" style="width: 20%">
         <a-card title="磁盘使用率" hoverable class="stat-card">
           <a-statistic :value="metrics.disk.percent" :precision="1">
             <template #suffix>
@@ -39,6 +39,22 @@
           <div class="stat-footer">
             已用: {{ (metrics.disk.used / 1024 / 1024 / 1024).toFixed(2) }} GB / 
             总量: {{ (metrics.disk.total / 1024 / 1024 / 1024).toFixed(2) }} GB
+          </div>
+        </a-card>
+      </a-col>
+      <a-col :span="4.8" style="width: 20%">
+        <a-card title="网站数量" hoverable class="stat-card clickable" @click="router.push({ name: 'Website' })">
+          <a-statistic :value="metrics.site_count" />
+          <div class="stat-footer">
+            <a-link>管理站点 <icon-arrow-right /></a-link>
+          </div>
+        </a-card>
+      </a-col>
+      <a-col :span="4.8" style="width: 20%">
+        <a-card title="备份数量" hoverable class="stat-card clickable" @click="router.push({ name: 'Backup' })">
+          <a-statistic :value="metrics.backup_count" />
+          <div class="stat-footer">
+            <a-link>管理备份 <icon-arrow-right /></a-link>
           </div>
         </a-card>
       </a-col>
@@ -64,13 +80,18 @@
 
 <script setup>
 import { reactive, onMounted, onUnmounted, ref, nextTick, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import request from '@/utils/request'
 import * as echarts from 'echarts'
+import { IconArrowRight } from '@arco-design/web-vue/es/icon'
 
+const router = useRouter()
 const metrics = reactive({
   cpu: { percent: 0, count: 0 },
   memory: { total: 0, used: 0, percent: 0 },
-  disk: { total: 0, used: 0, percent: 0 }
+  disk: { total: 0, used: 0, percent: 0 },
+  site_count: 0,
+  backup_count: 0
 })
 
 const timeRange = ref('24h')
@@ -233,6 +254,14 @@ onUnmounted(() => {
 }
 .stat-card {
   height: 100%;
+}
+.stat-card.clickable {
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.stat-card.clickable:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }
 .stat-footer {
   margin-top: auto;
