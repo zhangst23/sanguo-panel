@@ -100,11 +100,9 @@
         </div>
       </template>
     </a-layout-sider>
-    <a-layout>
-      <a-layout-content class="content">
-        <router-view />
-      </a-layout-content>
-    </a-layout>
+    <a-layout-content class="content">
+      <router-view />
+    </a-layout-content>
   </a-layout>
 </template>
 
@@ -248,8 +246,13 @@ const handleUserAction = (val) => {
 }
 
 .content {
-  padding: 20px;
+  padding: 16px 20px;
   overflow-y: auto;
   background-color: var(--arco-color-bg-1);
+}
+
+// 移除页面标题顶部的默认间距，使其紧贴上方
+.content :deep(.arco-typography) {
+  margin-top: 0;
 }
 </style>

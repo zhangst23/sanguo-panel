@@ -294,7 +294,7 @@ onMounted(() => {
 
 <style scoped>
 .mariadb-container {
-  padding: 20px;
+  padding: 0;
 }
 .section-header {
   margin-bottom: 24px;

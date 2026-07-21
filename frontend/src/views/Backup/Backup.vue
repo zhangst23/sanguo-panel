@@ -462,6 +462,6 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .backup-container {
-  padding: 0 0 20px 0;
+  padding: 0;
 }
 </style>

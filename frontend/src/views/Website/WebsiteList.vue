@@ -475,7 +475,7 @@ onMounted(() => {
 
 <style scoped>
 .website-list {
-  padding: 20px;
+  padding: 0;
 }
 .section-header {
   display: flex;
