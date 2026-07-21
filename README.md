@@ -18,9 +18,16 @@ Sanguo Panel 是一款专为 WordPress 优化设计的轻量级托管面板，�
 ```bash
 # 进入项目根目录
 cd sanguo-panel
+# 进入后端目录
+cd E:\2-github\sanguo-panel\backend
+# 创建虚拟环境
+python -m venv venv
+# 激活虚拟环境 (PowerShell)
+.\venv\Scripts\Activate.ps1
 
 # 安装依赖
-pip install -r backend/requirements.txt
+pip install -r requirements.txt
+
 
 # 初始化数据库 (首次运行)
 # Windows PowerShell
