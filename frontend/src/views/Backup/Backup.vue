@@ -385,12 +385,18 @@ const handleSaveSchedule = async () => {
 
 const handleManualBackup = async () => {
   try {
-    await request.post(`/security/backups/create?target=${manualForm.target}&item_id=${manualForm.id || ''}`)
-    Message.info('备份任务已在后台启动')
+    const params = {
+      target: manualForm.target,
+      include_db: true,
+      include_files: true
+    }
+    if (manualForm.id) params.item_id = manualForm.id
+    await request.post('/security/backups/create', null, { params })
+    Message.success('备份任务已在后台启动')
     showManualModal.value = false
     fetchTasks()
   } catch (error) {
-    Message.error('创建备份失败')
+    Message.error('创建备份失败: ' + (error.response?.data?.detail || error.message))
   }
 }
 

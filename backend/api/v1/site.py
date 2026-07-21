@@ -136,6 +136,19 @@ def install_wordpress_task(site_id: int, db: Session):
                 ]
                 subprocess.run(cmd_install, check=True, capture_output=True)
                 
+                # Get WordPress version after install
+                try:
+                    cmd_version = [
+                        php_path, wp_cli_path, "core", "version",
+                        f"--path={site.root_path}",
+                        "--allow-root"
+                    ]
+                    result = subprocess.run(cmd_version, capture_output=True, text=True, timeout=10)
+                    if result.returncode == 0 and result.stdout.strip():
+                        site.wp_version = result.stdout.strip()
+                except Exception:
+                    site.wp_version = "已安装"
+                
                 site.notes = f"completed: WordPress 站点创建完成。管理员: {admin_user} 密码: {admin_pass}"
             else:
                 site.notes = "completed: 文件已安装(数据库配置需手动)"
@@ -167,7 +180,37 @@ def read_sites(
     Retrieve sites.
     """
     sites = db.query(SiteModel).offset(skip).limit(limit).all()
+    # 尝试为缺少 wp_version 的站点自动探测
+    for site in sites:
+        if not site.wp_version or site.wp_version == "未安装":
+            detected = _detect_wp_version(site)
+            if detected:
+                site.wp_version = detected
+                db.add(site)
+    db.commit()
     return sites
+
+
+def _detect_wp_version(site) -> Optional[str]:
+    """尝试通过 WP-CLI 探测站点 WordPress 版本"""
+    try:
+        if not site.root_path or not os.path.exists(site.root_path):
+            return None
+        php_path = get_php_path()
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        wp_cli_path = os.path.join(project_root, "backend", "bin", "wp-cli.phar")
+        if not os.path.exists(wp_cli_path):
+            return None
+        import subprocess
+        result = subprocess.run(
+            [php_path, wp_cli_path, "core", "version", f"--path={site.root_path}", "--allow-root"],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    except Exception:
+        return None
+    return None
 
 @router.post("/", response_model=Site)
 def create_site(

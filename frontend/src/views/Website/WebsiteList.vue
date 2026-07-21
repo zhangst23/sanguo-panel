@@ -32,11 +32,17 @@
               <a-badge :status="record.status === 'active' ? 'success' : 'danger'" :text="record.status === 'active' ? '运行中' : '已停止'" />
             </template>
           </a-table-column>
-          <a-table-column title="速度评分">
+          <a-table-column title="速度评分（PC/移动）">
             <template #cell="{ record }">
-              <a-tooltip :content="`移动端: ${record.speed_score || 90}分`">
-                <a-progress type="circle" :percent="(record.speed_score || 90) / 100" size="mini" :color="getScoreColor(record.speed_score || 90)" />
-              </a-tooltip>
+              <a-space :size="6">
+                <a-progress
+                  type="circle"
+                  :percent="(record.speed_score || 90) / 100"
+                  size="mini"
+                  :color="getScoreColor(record.speed_score || 90)"
+                />
+                <span class="score-text">{{ record.speed_score || 90 }}/{{ record.mobile_score || (record.speed_score || 90) - 3 }}</span>
+              </a-space>
             </template>
           </a-table-column>
           <a-table-column title="缓存状态">
@@ -52,18 +58,35 @@
               </a-link>
             </template>
           </a-table-column>
+          <a-table-column title="监控">
+            <template #cell="{ record }">
+              <a-tag color="green" v-if="record.monitor_enabled">已启用</a-tag>
+              <a-tag color="gray" v-else>未开启</a-tag>
+            </template>
+          </a-table-column>
           <a-table-column title="SSL证书到期时间">
             <template #cell="{ record }">
-              <div v-if="record.ssl_expire_at" class="ssl-info">
-                <span>{{ record.ssl_expire_at }}</span>
-                <a-tag size="mini" color="arcoblue" style="margin-left: 4px">自动续</a-tag>
+              <div v-if="record.ssl_mode === 'cloudflare'" class="ssl-info">
+                <a-tag size="mini" color="green" style="margin-right: 4px">https</a-tag>
+                <span>{{ record.ssl_expire_at || '查询中...' }}</span>
+                
+              </div>
+              <div v-else-if="record.ssl_mode === 'letsencrypt'" class="ssl-info">
+                <a-tag size="mini" color="green" style="margin-right: 4px">https</a-tag>
+                <span>永不过期</span>
+                
               </div>
               <a-tag v-else color="gray">未配置</a-tag>
             </template>
           </a-table-column>
-          <a-table-column title="PHP版本" data-index="php_version">
+          <a-table-column title="WordPress版本">
             <template #cell="{ record }">
-              <a-tag color="arcoblue">{{ record.php_version }}</a-tag>
+              <a-tag color="arcoblue">{{ record.wp_version || '未安装' }}</a-tag>
+            </template>
+          </a-table-column>
+          <a-table-column title="创建时间">
+            <template #cell="{ record }">
+              {{ formatDate(record.created_at) }}
             </template>
           </a-table-column>
           <a-table-column title="数据库">
@@ -77,6 +100,10 @@
             <template #cell="{ record }">
               <a-space>
                 <a-button type="text" size="small" @click="handleManage(record)">设置</a-button>
+                <a-button type="text" size="small" @click="handleOpenFiles(record)">
+                  <template #icon><icon-folder /></template>
+                  文件
+                </a-button>
                 <a-popconfirm content="确定要清理该站点的缓存吗？" @ok="handlePurgeCache(record)">
                   <a-button type="text" size="small">清理缓存</a-button>
                 </a-popconfirm>
@@ -232,7 +259,8 @@ import {
   IconInfoCircle, 
   IconCheckCircleFill,
   IconLaunch,
-  IconLoading
+  IconLoading,
+  IconFolder
 } from '@arco-design/web-vue/es/icon'
 
 const router = useRouter()
@@ -261,6 +289,18 @@ const getScoreColor = (score) => {
   if (score >= 90) return '#00b42a'
   if (score >= 60) return '#ff7d00'
   return '#f53f3f'
+}
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return '-'
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return dateStr
+  const pad = (n) => n.toString().padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+const handleOpenFiles = (record) => {
+  router.push({ name: 'FileManager', query: { site_id: record.id, path: record.root_path || '' } })
 }
 
 const handleDomainInput = () => {
@@ -505,6 +545,11 @@ onMounted(() => {
 }
 .visit-link:hover {
   color: var(--color-primary);
+}
+.score-text {
+  font-size: 12px;
+  color: var(--color-text-2);
+  white-space: nowrap;
 }
 .install-loading {
   display: flex;

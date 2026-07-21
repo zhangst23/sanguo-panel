@@ -29,6 +29,10 @@
             <template #icon><icon-storage /></template>
             数据库管理
           </a-menu-item>
+          <a-menu-item key="FileManager">
+            <template #icon><icon-folder /></template>
+            文件管理
+          </a-menu-item>
           <a-menu-item key="OneClickTools">
             <template #icon><icon-thunderbolt /></template>
             一键工具
@@ -113,6 +117,7 @@ import {
   IconDashboard,
   IconCommon,
   IconStorage,
+  IconFolder,
   IconThunderbolt,
   IconSafe,
   IconCloudDownload,

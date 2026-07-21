@@ -72,6 +72,8 @@ class Site(SiteBase):
     ssl_email: Optional[str] = None
     ssl_auto_renew: bool = True
     https_force: bool = True
+    wp_version: str = "未安装"
+    monitor_enabled: bool = False
     created_at: datetime
     updated_at: datetime
 

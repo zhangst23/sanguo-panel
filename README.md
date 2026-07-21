@@ -93,7 +93,7 @@ $env:PYTHONPATH="."
 python backend/init_db.py
 
 # 启动后端服务
-python -m uvicorn backend.main:app --reload --reload-exclude "*.db" --port 8000
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload --reload-exclude "*.db"
 ```
 
 **Linux/macOS:**

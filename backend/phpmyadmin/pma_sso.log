@@ -680,3 +680,27 @@
 [2026-02-13 10:50:05] Session ID: 6p9o76m316jddra8lbvkocd05i
 [2026-02-13 10:50:05] Session data: {"redirect_count":0}
 [2026-02-13 10:50:05] No session and no token. Access denied.
+[2026-07-21 09:09:38] --- SSO SCRIPT START ---
+[2026-07-21 09:09:38] Request URI: /index.php?pma_token=f68da7b0-ba58-4616-8a9a-9640c3733a1a&db=db_y1unyingx_com
+[2026-07-21 09:09:38] Cookies received by PHP: []
+[2026-07-21 09:09:38] Session ID: dmgfv3qpbomaj5darjffk0g061
+[2026-07-21 09:09:38] Session data: {" PMA_token ":"6066666b36507465343e5b6d565f7d2d"," HMAC_secret ":"|96:,Oy#'TdG9y)X"}
+[2026-07-21 09:09:38] sso.php included by phpMyAdmin.
+[2026-07-21 09:09:38] No session during PMA inclusion. Session ID: dmgfv3qpbomaj5darjffk0g061
+[2026-07-21 09:09:38] Received token: f68da7b0-ba58-4616-8a9a-9640c3733a1a
+[2026-07-21 09:09:38] Verification successful for user: root
+[2026-07-21 09:09:38] Setting target database to: db_y1unyingx_com
+[2026-07-21 09:09:38] Redirecting to index.php after token verification. Redirect URL: index.php?db=db_y1unyingx_com
+[2026-07-21 09:09:39] --- SSO SCRIPT START ---
+[2026-07-21 09:09:39] Request URI: /index.php?db=db_y1unyingx_com
+[2026-07-21 09:09:39] Cookies received by PHP: {"phpMyAdmin":"dmgfv3qpbomaj5darjffk0g061","pma_lang":"en"}
+[2026-07-21 09:09:39] Session ID: dmgfv3qpbomaj5darjffk0g061
+[2026-07-21 09:09:39] Session data: {" PMA_token ":"6066666b36507465343e5b6d565f7d2d"," HMAC_secret ":"|96:,Oy#'TdG9y)X","redirect_count":1,"PMA_single_signon_user":"root","PMA_single_signon_password":"","PMA_single_signon_host":"localhost","PMA_single_signon_port":3306,"PMA_single_signon_error":"","PMA_single_signon_db":"db_y1unyingx_com"}
+[2026-07-21 09:09:39] sso.php included by phpMyAdmin.
+[2026-07-21 09:09:39] Session valid for user: root
+[2026-07-21 09:09:39] --- SSO SCRIPT START ---
+[2026-07-21 09:09:39] Request URI: /sso.php
+[2026-07-21 09:09:39] Cookies received by PHP: {"phpMyAdmin":"dmgfv3qpbomaj5darjffk0g061","pma_lang":"en"}
+[2026-07-21 09:09:39] Session ID: 8egsfe33gb92k4nh9gmb3hv2fh
+[2026-07-21 09:09:39] Session data: []
+[2026-07-21 09:09:39] No session and no token. Access denied.

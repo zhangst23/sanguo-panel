@@ -1,6 +1,7 @@
-from sqlalchemy import Column, String, Integer, JSON, Enum, ForeignKey, Boolean
+from sqlalchemy import Column, String, Integer, JSON, Enum, ForeignKey, Boolean, DateTime
 from sqlalchemy.orm import relationship
 import enum
+from datetime import datetime
 from backend.models.base import Base
 
 class StatusEnum(str, enum.Enum):
@@ -60,6 +61,11 @@ class Site(Base):
     
     ssl_expire_at = Column(String(32)) # YYYY-MM-DD
     backup_count = Column(Integer, default=0)
+    
+    # 新增字段
+    wp_version = Column(String(20), default="未安装")  # WordPress 版本
+    monitor_enabled = Column(Boolean, default=False)   # 监控状态
+    created_at = Column(DateTime, default=datetime.utcnow)  # 创建时间
     
     # SSL Extended Config
     ssl_mode = Column(String(20), default="none") # none, cloudflare, letsencrypt
