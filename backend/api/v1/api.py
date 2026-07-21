@@ -2,7 +2,8 @@ from fastapi import APIRouter
 from backend.api.v1 import (
     auth, system, site, service, cache, ssl, 
     image, database, assets, cdn, ultimate, tasks,
-    litespeed, php, linux, security, monitor, tools
+    litespeed, php, linux, security, monitor, tools,
+    files
 )
 
 api_router = APIRouter()
@@ -24,3 +25,4 @@ api_router.include_router(assets.router, prefix="/assets", tags=["assets"])
 api_router.include_router(cdn.router, prefix="/cdn", tags=["cdn"])
 api_router.include_router(ultimate.router, prefix="/ultimate", tags=["ultimate"])
 api_router.include_router(tasks.router, prefix="/tasks", tags=["tasks"])
+api_router.include_router(files.router, prefix="/files", tags=["files"])

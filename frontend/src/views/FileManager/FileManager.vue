@@ -5,7 +5,23 @@
     <a-row :gutter="16">
       <!-- 左侧：站点列表 -->
       <a-col :span="6">
-        <a-card title="站点列表" hoverable class="site-list-card">
+        <a-card class="site-list-card">
+          <template #title>
+            <span>站点列表</span>
+          </template>
+          <template #extra>
+            <a-tooltip content="一键计算所有站点占用空间">
+              <a-button 
+                size="mini" 
+                type="primary" 
+                :loading="loadingSizes"
+                @click="calcAllSizes"
+              >
+                <template #icon><icon-storage /></template>
+                一键计算大小
+              </a-button>
+            </a-tooltip>
+          </template>
           <a-list :data="sites" :loading="loadingSites">
             <template #item="{ item }">
               <a-list-item
@@ -18,6 +34,9 @@
                     <a-typography-text type="secondary" style="font-size: 12px">
                       {{ item.root_path }}
                     </a-typography-text>
+                    <div v-if="item.size_human" style="font-size: 12px; color: var(--color-primary); margin-top: 2px">
+                      <icon-storage /> {{ item.size_human }} ({{ item.file_count }} 个文件)
+                    </div>
                   </template>
                 </a-list-item-meta>
               </a-list-item>
@@ -40,6 +59,10 @@
                   {{ seg }}
                 </a-breadcrumb-item>
               </a-breadcrumb>
+              <span v-if="currentPath" class="path-display">{{ currentPath }}</span>
+              <a-tag v-if="currentPathSize" color="arcoblue" size="small">
+                ({{ currentPathSize }})
+              </a-tag>
             </a-space>
           </template>
           <template #extra>
@@ -48,6 +71,15 @@
                 <template #icon><icon-refresh /></template>
                 刷新
               </a-button>
+              <a-popconfirm
+                content="确定要将当前目录及所有子文件权限放开为 777 (可读写) 吗？"
+                @ok="handleChmod777"
+              >
+                <a-button size="small" type="outline" :loading="chmodLoading">
+                  <template #icon><icon-unlock /></template>
+                  放开权限
+                </a-button>
+              </a-popconfirm>
               <a-button size="small" type="primary" @click="showUpload = true">
                 <template #icon><icon-upload /></template>
                 上传
@@ -163,15 +195,20 @@ import {
   IconRefresh,
   IconUpload,
   IconArrowUp,
-  IconFolderAdd
+  IconFolderAdd,
+  IconStorage,
+  IconUnlock
 } from '@arco-design/web-vue/es/icon'
 
 const route = useRoute()
 
 const sites = ref([])
 const loadingSites = ref(false)
+const loadingSizes = ref(false)
+const chmodLoading = ref(false)
 const currentSiteId = ref(null)
 const currentPath = ref('')
+const currentPathSize = ref('')
 const files = ref([])
 const loadingFiles = ref(false)
 
@@ -227,11 +264,70 @@ const fetchFiles = async () => {
       }
     })
     files.value = res.items || []
+    currentPathSize.value = ''  // 清空，下次可手动计算
   } catch (e) {
     console.error(e)
     Message.error('获取文件列表失败')
   } finally {
     loadingFiles.value = false
+  }
+}
+
+const calcAllSizes = async () => {
+  if (sites.value.length === 0) {
+    Message.warning('没有可计算的站点')
+    return
+  }
+  loadingSizes.value = true
+  try {
+    for (const site of sites.value) {
+      try {
+        const res = await request.get('/files/size', {
+          params: { site_id: site.id, path: site.root_path }
+        })
+        site.size_human = res.size_human
+        site.file_count = res.file_count
+      } catch (e) {
+        site.size_human = '计算失败'
+      }
+    }
+    Message.success('大小计算完成')
+  } finally {
+    loadingSizes.value = false
+  }
+}
+
+const calcCurrentPathSize = async () => {
+  if (!currentSiteId.value || !currentPath.value) return
+  try {
+    const res = await request.get('/files/size', {
+      params: { site_id: currentSiteId.value, path: currentPath.value }
+    })
+    currentPathSize.value = res.size_human
+  } catch (e) {
+    Message.error('计算大小失败')
+  }
+}
+
+const handleChmod777 = async () => {
+  if (!currentSiteId.value || !currentPath.value) {
+    Message.warning('请先选择目录')
+    return
+  }
+  chmodLoading.value = true
+  try {
+    const res = await request.post('/files/chmod', {
+      site_id: currentSiteId.value,
+      path: currentPath.value,
+      mode: 0o777,
+      recursive: true
+    })
+    Message.success(`已放开权限，影响 ${res.changed} 个文件/文件夹`)
+    fetchFiles()
+  } catch (e) {
+    Message.error('操作失败: ' + (e.response?.data?.detail || e.message))
+  } finally {
+    chmodLoading.value = false
   }
 }
 
@@ -434,5 +530,14 @@ onMounted(() => {
   justify-content: center;
   padding: 80px 0;
   color: var(--color-text-3);
+}
+.path-display {
+  font-size: 12px;
+  color: var(--color-text-3);
+  font-family: 'Consolas', 'Monaco', monospace;
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>
