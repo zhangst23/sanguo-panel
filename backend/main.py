@@ -15,10 +15,11 @@ async def lifespan(app: FastAPI):
     # Startup logic
     print(f"--- {settings.PROJECT_NAME} is starting up ---")
     
-    # Start PMA PHP Server
+    # Start PMA PHP Server in a separate thread to avoid blocking lifespan
+    import threading
     pma = get_pma_manager()
     if pma:
-        pma.start()
+        threading.Thread(target=pma.start, daemon=True).start()
         
     yield
     # Shutdown logic

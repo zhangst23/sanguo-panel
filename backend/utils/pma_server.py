@@ -56,11 +56,21 @@ class PMAServer:
             "-d", f"session.save_path=\"{sessions_dir}\""
         ]
         
+        # Create logs directory if it doesn't exist
+        backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        project_root = os.path.dirname(backend_dir)
+        log_dir = os.path.join(project_root, "logs")
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir, exist_ok=True)
+        
+        pma_log_path = os.path.join(log_dir, "pma.log")
+        pma_log = open(pma_log_path, "w", encoding="utf-8")
+
         try:
             self.process = subprocess.Popen(
                 cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stdout=pma_log,
+                stderr=pma_log,
                 cwd=self.pma_dir,
                 # Use shell=True on Windows to avoid issues with some PHP installs
                 shell=(os.name == 'nt')
@@ -69,13 +79,7 @@ class PMAServer:
             # Wait a moment to see if it crashed immediately
             time.sleep(1)
             if self.process.poll() is not None:
-                _, stderr = self.process.communicate()
-                try:
-                    # On Windows, try GBK first if UTF-8 fails
-                    error_msg = stderr.decode('utf-8')
-                except UnicodeDecodeError:
-                    error_msg = stderr.decode('gbk', errors='replace')
-                self.last_error = f"PHP Server failed to start: {error_msg}"
+                self.last_error = "PHP Server failed to start immediately. Check if PHP is installed and port 8001 is free."
                 print(f"--- PMA PHP Server Error: {self.last_error} ---")
                 return False
             
