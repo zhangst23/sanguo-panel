@@ -27,7 +27,7 @@ sanguo-panel/
 在项目根目录执行：
 
 ```bash
-python start-all.py
+python3 start-all.py
 ```
 
 脚本会自动完成以下操作：
