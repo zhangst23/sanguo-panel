@@ -66,7 +66,7 @@ const routes = [
       {
         path: 'cdn',
         name: 'CDN',
-        component: () => import('@/views/CDN/CDN.vue'),
+        component: () => import('@/views/Cdn/CDN.vue'),
         meta: { requiresAuth: true },
       },
       {

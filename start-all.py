@@ -93,6 +93,44 @@ def check_virtual_env(project_root: Path) -> bool:
     return True
 
 
+def install_nodejs() -> bool:
+    """自动安装 Node.js"""
+    print(f"{Colors.YELLOW}[安装] 未检测到 Node.js，正在自动安装...{Colors.RESET}")
+    try:
+        system = platform.system().lower()
+        if system == "linux":
+            curl_result = subprocess.run(
+                ["curl", "-fsSL", "https://deb.nodesource.com/setup_20.x", "-o", "/tmp/nodesource_setup.sh"],
+                capture_output=True, text=True, timeout=30
+            )
+            if curl_result.returncode == 0:
+                bash_result = subprocess.run(
+                    ["bash", "/tmp/nodesource_setup.sh"],
+                    capture_output=True, text=True, timeout=60
+                )
+                if bash_result.returncode == 0:
+                    install_result = subprocess.run(
+                        ["apt-get", "install", "-y", "nodejs"],
+                        capture_output=True, text=True, timeout=120
+                    )
+                    if install_result.returncode == 0:
+                        print(f"{Colors.GREEN}[安装] Node.js 安装成功{Colors.RESET}")
+                        return True
+        elif system == "darwin":
+            result = subprocess.run(
+                ["brew", "install", "node"],
+                capture_output=True, text=True, timeout=120
+            )
+            if result.returncode == 0:
+                print(f"{Colors.GREEN}[安装] Node.js 安装成功{Colors.RESET}")
+                return True
+        print(f"{Colors.RED}[错误] Node.js 自动安装失败，请手动安装{Colors.RESET}")
+        return False
+    except Exception as e:
+        print(f"{Colors.RED}[错误] Node.js 安装异常: {e}{Colors.RESET}")
+        return False
+
+
 def check_nodejs() -> bool:
     """检查 Node.js 是否安装"""
     try:
@@ -108,7 +146,17 @@ def check_nodejs() -> bool:
     except (subprocess.TimeoutExpired, FileNotFoundError):
         pass
 
-    print(f"{Colors.RED}[错误] 未检测到 Node.js，请先安装 Node.js{Colors.RESET}")
+    print(f"{Colors.RED}[提示] 未检测到 Node.js，尝试自动安装...{Colors.RESET}")
+    if install_nodejs():
+        print(f"{Colors.GREEN}[检查] Node.js 安装验证...{Colors.RESET}")
+        try:
+            result = subprocess.run(["node", "--version"], capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                print(f"{Colors.GREEN}[检查] Node.js 环境... OK ({result.stdout.strip()}){Colors.RESET}")
+                return True
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+        print(f"{Colors.RED}[错误] Node.js 安装后仍无法使用{Colors.RESET}")
     return False
 
 
