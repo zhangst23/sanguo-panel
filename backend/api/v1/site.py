@@ -22,12 +22,15 @@ def install_wordpress_task(site_id: int, db: Session):
     site = db.query(SiteModel).filter(SiteModel.id == site_id).first()
     if not site:
         return
+    ols_note = ""
 
     try:
         shared_db = db.query(SharedDatabaseModel).filter(SharedDatabaseModel.id == site.shared_db_id).first()
         
         # 1. WordPress Files Installation using WP-CLI
-        php_path = get_php_path()
+        # Prefer OpenLiteSpeed bundled PHP (LSAPI SAPI) so WP-CLI runs on the
+        # same PHP build that serves the site via LSAPI.
+        php_path = OLS_PHP if os.path.exists(OLS_PHP) else get_php_path()
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         bin_dir = os.path.join(project_root, "backend", "bin")
         os.makedirs(bin_dir, exist_ok=True)
@@ -42,8 +45,16 @@ def install_wordpress_task(site_id: int, db: Session):
         if not os.path.exists(site.root_path):
             os.makedirs(site.root_path, exist_ok=True)
 
+        # 1.5 Register OpenLiteSpeed virtual host (served via LSAPI)
+        ols_res = create_ols_vhost(site.domain, site.root_path)
+        ols_note = (
+            f"✅ OLS 虚拟主机已创建 (LSAPI 托管): {site.domain}"
+            if ols_res.get("success")
+            else f"⚠️ OLS 虚拟主机创建失败: {ols_res.get('msg')}"
+        )
+
         # Step 1: Download Core
-        site.notes = "step1: WordPress 文件下载中..."
+        site.notes = f"step1: WordPress 文件下载中...\n{ols_note}"
         db.add(site)
         db.commit()
 
@@ -159,7 +170,7 @@ def install_wordpress_task(site_id: int, db: Session):
         except subprocess.CalledProcessError as e:
             err_msg = e.stderr.decode(errors='ignore') if e.stderr else str(e)
             print(f"WP-CLI Error: {err_msg}")
-            site.notes = f"failed: WP-CLI 执行失败 - {err_msg}"
+            site.notes = f"failed: WP-CLI 执行失败 - {err_msg}\n{ols_note}"
             db.add(site)
             db.commit()
 
@@ -347,7 +358,16 @@ def delete_site(
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
     
-    # Logic to delete site files, database tables, OLS config would go here
+    # Remove site files
+    if site.root_path and os.path.exists(site.root_path):
+        shutil.rmtree(site.root_path, ignore_errors=True)
+
+    # Remove the OpenLiteSpeed virtual host (LSAPI) for this domain
+    try:
+        remove_ols_vhost(site.domain)
+    except Exception as e:
+        print(f"Error removing OLS vhost for {site.domain}: {e}")
+
     if delete_db:
         # Implementation for deleting specific site tables from shared database
         pass

@@ -48,7 +48,7 @@
 import { ref, onMounted } from 'vue'
 import request from '@/utils/request'
 import { Message } from '@arco-design/web-vue'
-import { IconThunderboltFill, IconCheckCircleFill } from '@arco-design/web-vue/es/icon'
+import { IconCheckCircleFill } from '@arco-design/web-vue/es/icon'
 
 const sites = ref([])
 const selectedSiteId = ref(null)

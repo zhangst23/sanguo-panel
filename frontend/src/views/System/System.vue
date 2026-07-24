@@ -57,7 +57,7 @@
           </a-result>
         </a-card>
       </a-tab-pane>
-    </tabs>
+    </a-tabs>
   </div>
 </template>
 
