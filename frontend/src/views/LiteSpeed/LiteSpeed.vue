@@ -71,6 +71,33 @@
             </a-card>
           </a-col>
         </a-row>
+        <a-row :gutter="20" style="margin-top: 20px;">
+          <a-col :span="24">
+            <a-card title="OLS 管理后台" hoverable>
+              <template #extra>
+                <a-link href="http://217.69.2.217:7080" target="_blank" :hoverable="false">
+                  <icon-export /> 打开管理后台
+                </a-link>
+              </template>
+              <a-space direction="vertical" size="medium">
+                <div class="status-item">
+                  <span>管理员地址:</span>
+                  <a-link href="http://217.69.2.217:7080" target="_blank">
+                    http://217.69.2.217:7080 <icon-export />
+                  </a-link>
+                </div>
+                <div class="status-item">
+                  <span>用户名:</span>
+                  <a-tag color="arcoblue">admin</a-tag>
+                </div>
+                <div class="status-item">
+                  <span>密&emsp;&emsp;码:</span>
+                  <a-tag>admin123</a-tag>
+                </div>
+              </a-space>
+            </a-card>
+          </a-col>
+        </a-row>
       </a-tab-pane>
 
       <a-tab-pane key="2" title="虚拟主机">
