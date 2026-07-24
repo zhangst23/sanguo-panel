@@ -527,17 +527,42 @@ def configure_ssl(
     db: Session = Depends(deps.get_db),
     id: int,
     action: str = "apply", # apply, renew, disable
+    email: str = None,
+    force_https: bool = False,
     current_user: Any = Depends(deps.get_current_active_user),
 ) -> Any:
     """
-    Configure SSL (Let's Encrypt).
+    Configure SSL via Let's Encrypt + OpenLiteSpeed (443 SNI).
     """
     site = db.query(SiteModel).filter(SiteModel.id == id).first()
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
 
-    # Integration with Certbot/acme.sh and OLS config update
-    return {"success": True, "message": f"SSL {action} successful for {site.domain}"}
+    from backend.utils import ols_ssl_utils
+
+    if action == "apply":
+        issue = ols_ssl_utils.issue_ssl(site.domain, email, site.root_path)
+        if not issue["success"]:
+            raise HTTPException(status_code=500, detail=f"证书签发失败: {(issue.get('stderr') or '')[-300:]}")
+        deploy = ols_ssl_utils.deploy_ssl_to_ols(site.domain, force_https=force_https)
+        site.ssl_status = 2 if force_https else 1
+        site.ssl_mode = "letsencrypt"
+        site.https_force = force_https
+        if email:
+            site.ssl_email = email
+        db.commit()
+        return {"success": deploy["success"], "message": deploy["msg"]}
+    elif action == "disable":
+        res = ols_ssl_utils.disable_ssl_ols(site.domain)
+        site.ssl_status = 0
+        site.ssl_mode = "none"
+        site.https_force = False
+        db.commit()
+        return {"success": res["success"], "message": res["msg"]}
+    elif action == "renew":
+        res = ols_ssl_utils.renew_ssl(site.domain)
+        return {"success": res["success"], "message": f"续期 ({site.domain})"}
+    raise HTTPException(status_code=400, detail="Invalid action")
 
 @router.post("/{id}/backup")
 def backup_site(

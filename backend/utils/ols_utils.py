@@ -179,6 +179,22 @@ def create_ols_vhost(domain: str, root_path: str, php_version: str = None) -> di
     os.makedirs(vhost_dir, exist_ok=True)
     vhconf_path = os.path.join(vhost_dir, "vhconf.conf")
     content, php_used = _vhconf_content(php_version)
+    # Preserve an already-deployed SSL block + force_https rule so that
+    # regenerating the vhost (e.g. switching PHP version) doesn't wipe SSL.
+    if os.path.exists(vhconf_path):
+        try:
+            old = open(vhconf_path).read()
+            m = re.search(r"ssl \{.*?\n\}\n?", old, re.DOTALL)
+            if m:
+                content = content.rstrip() + "\n\n" + m.group(0)
+            fh = re.search(
+                r"# Force HTTPS\nRewriteCond %\{HTTPS\} off\nRewriteRule .*?\[R=301,L\]\n",
+                old, re.DOTALL,
+            )
+            if fh and "<<<END_rules\n" in content:
+                content = content.replace("<<<END_rules\n", "<<<END_rules\n" + fh.group(0), 1)
+        except Exception:
+            pass
     with open(vhconf_path, "w") as f:
         f.write(content)
 
