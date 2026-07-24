@@ -29,6 +29,7 @@ OLS_ADMIN_PORT=7080
 OLS_HTTP_PORT=8088
 OLS_ADMIN_USER="${OLS_ADMIN_USER:-admin}"
 OLS_ADMIN_PASS="${OLS_ADMIN_PASS:-$(openssl rand -base64 12 | tr -dc 'a-zA-Z0-9' | head -12)}"
+MARIADB_ROOT_PASS="${MARIADB_ROOT_PASS:-$(openssl rand -base64 16 | tr -dc 'a-zA-Z0-9' | head -16)}"
 
 detect_os() {
     if [ -f /etc/os-release ]; then
@@ -86,12 +87,16 @@ install_openlitespeed() {
     /usr/local/lsws/bin/lswsctrl start 2>/dev/null || true
     sleep 2
 
-    echo "admin:$(echo -n "$OLS_ADMIN_PASS" | /usr/local/lsws/admin/fcgi-bin/admin_php* -q /usr/local/lsws/admin/misc/htpasswd.php 2>/dev/null || true)" > /usr/local/lsws/admin/conf/htpasswd
-    if grep -qs "admin" /usr/local/lsws/adminpasswd 2>/dev/null; then
-        sed -i "s/.*/WebAdmin user\/password is admin\/$OLS_ADMIN_PASS/" /usr/local/lsws/adminpasswd
-    else
-        echo "WebAdmin user/password is admin/$OLS_ADMIN_PASS" > /usr/local/lsws/adminpasswd
-    fi
+    sleep 2
+
+    python3 -c "
+import bcrypt
+pw = '$OLS_ADMIN_PASS'
+hashed = bcrypt.hashpw(pw.encode(), bcrypt.gensalt(rounds=10, prefix=b'2a'))
+print(f'$OLS_ADMIN_USER:{hashed.decode()}')
+" > /usr/local/lsws/admin/conf/htpasswd 2>/dev/null
+
+    echo "WebAdmin user/password is $OLS_ADMIN_USER/$OLS_ADMIN_PASS" > /usr/local/lsws/adminpasswd
 
     log_info "OpenLiteSpeed admin: http://<IP>:$OLS_ADMIN_PORT  user: $OLS_ADMIN_USER  pass: $OLS_ADMIN_PASS"
 }
@@ -124,23 +129,25 @@ install_php() {
 setup_project() {
     log_step "Setting up Sanguo Panel project..."
 
-    if [ -d "$PROJECT_ROOT" ] && [ -f "$PROJECT_ROOT/start-all.py" ]; then
-        log_info "Project already exists at $PROJECT_ROOT, updating..."
+    if [ -d "$PROJECT_ROOT" ] && [ -n "$(ls -A "$PROJECT_ROOT" 2>/dev/null)" ]; then
+        log_info "Project already exists at $PROJECT_ROOT."
         cd "$PROJECT_ROOT"
-        git pull origin "$BRANCH" 2>/dev/null || log_warn "git pull failed, using existing code."
-    else
-        log_info "Cloning project to $PROJECT_ROOT..."
-        mkdir -p "$PROJECT_ROOT"
-        if [ -d "$(dirname "$PROJECT_ROOT")/.git" ]; then
-            cp -r "$(dirname "$PROJECT_ROOT")"/* "$PROJECT_ROOT"/ 2>/dev/null || true
-            cd "$PROJECT_ROOT"
-        else
-            git clone -b "$BRANCH" "$REPO_URL" "$PROJECT_ROOT" 2>/dev/null || {
-                log_warn "Git clone failed. Ensure the project files are in place manually."
-                mkdir -p "$PROJECT_ROOT"
-            }
-            cd "$PROJECT_ROOT"
+        if [ -d ".git" ]; then
+            git pull origin "$BRANCH" 2>/dev/null || log_warn "git pull failed."
         fi
+    else
+        mkdir -p "$PROJECT_ROOT"
+        if [ -d "$(dirname "$PROJECT_ROOT")/.git" ] && [ "$(dirname "$PROJECT_ROOT")" != "$PROJECT_ROOT" ]; then
+            log_info "Copying project files from parent..."
+            cp -r "$(dirname "$PROJECT_ROOT")"/* "$PROJECT_ROOT"/ 2>/dev/null || true
+        else
+            log_info "Cloning project to $PROJECT_ROOT..."
+            git clone -b "$BRANCH" "$REPO_URL" "$PROJECT_ROOT" 2>/dev/null || {
+                log_error "Git clone failed. Please place project files in $PROJECT_ROOT manually."
+                exit 1
+            }
+        fi
+        cd "$PROJECT_ROOT"
     fi
 }
 
@@ -248,7 +255,7 @@ Restart=always
 WantedBy=multi-user.target
 EOF
         systemctl daemon-reload
-        systemctl enable openlitespeed
+        systemctl enable openlitespeed 2>/dev/null || log_info "openlitespeed service already enabled."
     fi
 
     systemctl daemon-reload
@@ -263,14 +270,23 @@ configure_mariadb() {
     systemctl enable mariadb 2>/dev/null || true
     systemctl start mariadb 2>/dev/null || true
 
-    if ! mysql -u root -e "SELECT 1" &>/dev/null; then
+    if mysql -u root -e "SELECT 1" &>/dev/null; then
         mysql -u root << EOF
-ALTER USER 'root'@'localhost' IDENTIFIED BY '';
+ALTER USER 'root'@'localhost' IDENTIFIED BY '$MARIADB_ROOT_PASS';
 FLUSH PRIVILEGES;
 EOF
+        log_info "MariaDB root password set."
+    else
+        mysql -u root -p"$MARIADB_ROOT_PASS" -e "SELECT 1" &>/dev/null && log_info "MariaDB root password already configured."
     fi
 
-    log_info "MariaDB configured."
+    cat > /root/.my.cnf << EOF
+[client]
+user=root
+password=$MARIADB_ROOT_PASS
+EOF
+    chmod 600 /root/.my.cnf
+    log_info "MariaDB configured (root password saved to /root/.my.cnf)."
 }
 
 configure_redis() {
@@ -339,8 +355,8 @@ show_summary() {
     echo -e "    用户名: $OLS_ADMIN_USER"
     echo -e "    密  码: $OLS_ADMIN_PASS"
     echo ""
-    echo -e "  ${COLOR_YELLOW}MariaDB:${COLOR_RESET}  root@localhost (无密码)"
-    echo -e "  ${COLOR_YELLOW}Redis:${COLOR_RESET}    127.0.0.1:6379"
+    echo -e "  ${COLOR_YELLOW}MariaDB:${COLOR_RESET}  root@localhost 密码: $MARIADB_ROOT_PASS (已保存至 /root/.my.cnf)"
+    echo -e "  ${COLOR_YELLOW}Redis:${COLOR_RESET}    127.0.0.1:6379 (无密码)"
     echo ""
     echo -e "  ${COLOR_YELLOW}服务管理:${COLOR_RESET}"
     echo -e "    systemctl {start|stop|restart} sanguo-backend"
