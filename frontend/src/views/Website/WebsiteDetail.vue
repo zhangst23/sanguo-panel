@@ -16,10 +16,32 @@
     </div>
 
     <a-tabs default-active-key="overview" class="detail-tabs">
-      <!-- 概览页 -->
       <a-tab-pane key="overview" title="概览">
-        <a-row :gutter="16">
-          <a-col :span="6">
+        <a-row :gutter="24">
+          <a-col :span="7">
+            <a-card title="站点信息" :bordered="false" class="site-info-card">
+              <a-descriptions :column="1" layout="horizontal" size="small">
+                <a-descriptions-item label="WordPress 版本">
+                  {{ site.wp_version || '未安装' }}
+                </a-descriptions-item>
+                <a-descriptions-item label="PHP 版本">
+                  {{ site.php_version || '-' }}
+                </a-descriptions-item>
+                <a-descriptions-item label="根目录">
+                  {{ site.root_path || '-' }}
+                  <a class="action-link" @click="router.push(`/website/${siteId}/files`)">文件管理</a>
+                </a-descriptions-item>
+                <a-descriptions-item label="数据库">
+                  {{ site.db_name || '-' }}
+                  <a class="action-link" @click="openPhpMyAdmin">数据库管理</a>
+                </a-descriptions-item>
+                <a-descriptions-item label="创建时间">
+                  {{ site.created_at ? new Date(site.created_at).toLocaleString('zh-CN') : '-' }}
+                </a-descriptions-item>
+              </a-descriptions>
+            </a-card>
+          </a-col>
+          <a-col :span="4">
             <a-card title="速度评分" :bordered="false">
               <div class="score-display">
                 <a-progress type="circle" :percent="site.speed_score / 100" :color="getScoreColor(site.speed_score)" />
@@ -27,7 +49,7 @@
               </div>
             </a-card>
           </a-col>
-          <a-col :span="6">
+          <a-col :span="4">
             <a-card title="缓存命中率" :bordered="false">
               <div class="score-display">
                 <a-progress type="circle" :percent="0.98" color="#00b42a" />
@@ -35,15 +57,33 @@
               </div>
             </a-card>
           </a-col>
-          <a-col :span="12">
-            <a-card title="站点信息" :bordered="false">
-              <a-descriptions :data="siteInfo" :column="1" />
+          <a-col :span="9">
+            <a-card title="备份" :bordered="false">
+              <a-space direction="vertical" fill size="medium">
+                <a-empty v-if="!latestBackup" description="暂无备份记录" />
+                <a-descriptions v-else :column="1" layout="horizontal" size="small">
+                  <a-descriptions-item label="最近备份时间">
+                    {{ new Date(latestBackup.created_at).toLocaleString('zh-CN') }}
+                  </a-descriptions-item>
+                  <a-descriptions-item label="文件名">
+                    {{ latestBackup.file_path.split('/').pop() || latestBackup.file_path }}
+                  </a-descriptions-item>
+                  <a-descriptions-item label="状态">
+                    <a-tag :color="backupStatusColor(latestBackup.status)" size="small">
+                      {{ backupStatusText(latestBackup.status) }}
+                    </a-tag>
+                  </a-descriptions-item>
+                </a-descriptions>
+                <a-button type="outline" size="small" long :loading="backupLoading" @click="handleCreateBackup">
+                  <template #icon><icon-refresh /></template>
+                  创建新备份
+                </a-button>
+              </a-space>
             </a-card>
           </a-col>
         </a-row>
       </a-tab-pane>
 
-      <!-- 域名与 SSL -->
       <a-tab-pane key="ssl" title="域名与 SSL">
         <a-card :bordered="false">
           <div class="setting-row">
@@ -79,7 +119,6 @@
           </div>
 
           <a-radio-group v-model="site.ssl_mode" direction="vertical" style="width: 100%" @change="handleUpdateSite({ ssl_mode: $event })">
-            <!-- 选项 1: Cloudflare -->
             <a-radio value="cloudflare" class="ssl-radio-item">
               <div class="ssl-option-content">
                 <div class="ssl-option-title">不设置，去 Cloudflare 设置 SSL</div>
@@ -87,12 +126,11 @@
               </div>
             </a-radio>
 
-            <!-- 选项 2: Let's Encrypt -->
             <a-radio value="letsencrypt" class="ssl-radio-item">
               <div class="ssl-option-content">
                 <div class="ssl-option-title">一键申请 Let's Encrypt 证书</div>
                 <div class="ssl-option-desc">免费、自动化的证书申请服务，由本面板自动管理。</div>
-                
+
                 <div v-if="site.ssl_mode === 'letsencrypt'" class="ssl-form-inline" @click.stop>
                   <a-space direction="vertical" size="medium" style="width: 100%; margin-top: 12px;">
                     <a-input v-model="site.ssl_email" placeholder="请输入通知邮箱 (用于接收证书到期提醒)" style="width: 320px">
@@ -109,7 +147,6 @@
               </div>
             </a-radio>
 
-            <!-- 选项 3: 关闭 -->
             <a-radio value="none" class="ssl-radio-item">
               <div class="ssl-option-content">
                 <div class="ssl-option-title">暂不配置 SSL</div>
@@ -126,7 +163,6 @@
         </a-card>
       </a-tab-pane>
 
-      <!-- 性能优化 (原缓存设置) -->
       <a-tab-pane key="cache" title="性能优化">
         <a-card :bordered="false">
           <div class="optimization-card">
@@ -135,12 +171,12 @@
               <span class="opt-title">性能加速引擎已就绪</span>
             </div>
             <p class="opt-desc">
-              系统已根据“极致性能”预设为您配置了以下优化项。您可以根据需求手动微调。
+              系统已根据"极致性能"预设为您配置了以下优化项。您可以根据需求手动微调。
             </p>
           </div>
-          
+
           <a-divider />
-          
+
           <div class="performance-grid">
             <div class="perf-item">
               <div class="perf-info">
@@ -208,7 +244,7 @@
           </div>
 
           <a-divider />
-          
+
           <div style="text-align: center;">
             <a-button type="primary" status="success" size="large" @click="handlePurgeCache">
               <template #icon><icon-empty /></template>
@@ -218,29 +254,26 @@
         </a-card>
       </a-tab-pane>
 
-      <!-- 高级设置 -->
       <a-tab-pane key="advanced" title="wp-config.php 设置">
-        <a-collapse :bordered="false" default-active-key="wp">
-          <a-collapse-item header="wp-config.php 配置管理" key="wp">
-            <a-typography-text type="secondary">在此修改 WordPress 核心配置文件，修改前请确保了解各参数含义</a-typography-text>
-            <div style="margin-top: 16px">
-              <a-textarea 
-                v-model="wpConfigContent" 
-                :auto-size="{ minRows: 10, maxRows: 20 }" 
-                style="font-family: monospace; background-color: var(--arco-color-fill-1)"
-                placeholder="正在加载 wp-config.php 内容..."
-              />
-              <div style="margin-top: 16px">
-                <a-button type="primary" @click="saveWpConfig" :loading="wpConfigLoading">
-                  保存 wp-config 配置
-                </a-button>
-                <a-button type="outline" style="margin-left: 12px" @click="fetchWpConfig">
-                  重置/刷新
-                </a-button>
-              </div>
+        <a-card :bordered="false">
+          <a-typography-text type="secondary">在此修改 WordPress 核心配置文件，修改前请确保了解各参数含义</a-typography-text>
+          <div style="margin-top: 16px">
+            <a-textarea
+              v-model="wpConfigContent"
+              :auto-size="{ minRows: 12, maxRows: 24 }"
+              style="font-family: monospace; background-color: var(--arco-color-fill-1)"
+              placeholder="正在加载 wp-config.php 内容..."
+            />
+            <div style="margin-top: 16px; display: flex; gap: 12px;">
+              <a-button type="primary" @click="saveWpConfig" :loading="wpConfigLoading">
+                保存 wp-config 配置
+              </a-button>
+              <a-button @click="fetchWpConfig">
+                重置/刷新
+              </a-button>
             </div>
-          </a-collapse-item>
-        </a-collapse>
+          </div>
+        </a-card>
       </a-tab-pane>
     </a-tabs>
   </div>
@@ -275,17 +308,15 @@ const site = ref({
   assets_optimization: true,
   php_version: '8.2',
   root_path: '',
-  ssl_expire_at: ''
+  wp_version: '未安装',
+  db_name: '',
+  db_user: '',
+  db_password: '',
+  ssl_expire_at: '',
+  created_at: ''
 })
 
 const sslLoading = ref(false)
-
-const siteInfo = computed(() => [
-  { label: 'PHP 版本', value: site.value.php_version || '-' },
-  { label: '根目录', value: site.value.root_path || '-' },
-  { label: '创建时间', value: site.value.created_at ? new Date(site.value.created_at).toLocaleDateString() : '-' },
-  { label: '数据库', value: '默认 MariaDB' }
-])
 
 const domainList = computed(() => [
   { domain: site.value.domain, type: '主域名' },
@@ -294,6 +325,16 @@ const domainList = computed(() => [
 
 const wpConfigContent = ref('')
 const wpConfigLoading = ref(false)
+const backupList = ref([])
+const backupLoading = ref(false)
+
+// 仅取最近一次备份（按创建时间倒序）
+const latestBackup = computed(() => {
+  if (!backupList.value.length) return null
+  return [...backupList.value].sort(
+    (a, b) => new Date(b.created_at) - new Date(a.created_at)
+  )[0]
+})
 
 const getScoreColor = (score) => {
   if (score >= 90) return '#00b42a'
@@ -310,13 +351,34 @@ const fetchSiteDetail = async () => {
   }
 }
 
+const fetchBackupList = async () => {
+  try {
+    const res = await request.get('/security/backups', { params: { site_id: siteId } })
+    backupList.value = res
+  } catch (error) {
+    console.error('获取备份列表失败:', error)
+  }
+}
+
+const handleCreateBackup = async () => {
+  backupLoading.value = true
+  try {
+    await request.post('/security/backups/create', null, { params: { target: 'site', item_id: siteId } })
+    Message.success('备份任务已启动')
+    setTimeout(fetchBackupList, 2000)
+  } catch (error) {
+    Message.error('备份失败: ' + (error.response?.data?.detail || error.message))
+  } finally {
+    backupLoading.value = false
+  }
+}
+
 const fetchWpConfig = async () => {
   wpConfigLoading.value = true
   try {
     const res = await request.get(`/sites/${siteId}/wp-config`)
     wpConfigContent.value = res.content
   } catch (error) {
-    // 如果不是 WordPress 站点，可能会报错，静默处理或提示
     console.error('获取 wp-config.php 失败:', error)
   } finally {
     wpConfigLoading.value = false
@@ -349,7 +411,7 @@ const handleApplySSL = async () => {
     Message.error('请先输入通知邮箱')
     return
   }
-  
+
   sslLoading.value = true
   try {
     await request.post(`/sites/${siteId}/ssl`, {
@@ -365,6 +427,22 @@ const handleApplySSL = async () => {
   }
 }
 
+const openPhpMyAdmin = () => {
+  window.open('/phpmyadmin', '_blank')
+}
+
+const backupStatusText = (status) => {
+  if (status === 'success') return '成功'
+  if (status === 'failed') return '失败'
+  return '进行中'
+}
+
+const backupStatusColor = (status) => {
+  if (status === 'success') return 'green'
+  if (status === 'failed') return 'red'
+  return 'blue'
+}
+
 const handlePurgeCache = async () => {
   try {
     await request.post(`/sites/${siteId}/purge-cache`)
@@ -377,6 +455,7 @@ const handlePurgeCache = async () => {
 onMounted(() => {
   fetchSiteDetail()
   fetchWpConfig()
+  fetchBackupList()
 })
 </script>
 
@@ -429,11 +508,6 @@ onMounted(() => {
   font-size: 13px;
   line-height: 1.6;
 }
-.form-help {
-  font-size: 12px;
-  color: var(--color-text-3);
-  margin-top: 8px;
-}
 .config-preview {
   background: var(--color-fill-2);
   padding: 12px;
@@ -441,6 +515,15 @@ onMounted(() => {
   font-family: monospace;
   font-size: 13px;
   color: var(--color-text-2);
+}
+
+.action-link {
+  color: #165dff;
+  cursor: pointer;
+  margin-left: 8px;
+}
+.action-link:hover {
+  text-decoration: underline;
 }
 
 .ssl-radio-item {
