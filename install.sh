@@ -86,8 +86,10 @@ install_openlitespeed() {
 
     /usr/local/lsws/bin/lswsctrl start 2>/dev/null || true
     sleep 2
+}
 
-    sleep 2
+set_ols_password() {
+    log_step "Setting OpenLiteSpeed admin password..."
 
     python3 -c "
 import bcrypt
@@ -97,6 +99,9 @@ print(f'$OLS_ADMIN_USER:{hashed.decode()}')
 " > /usr/local/lsws/admin/conf/htpasswd 2>/dev/null
 
     echo "WebAdmin user/password is $OLS_ADMIN_USER/$OLS_ADMIN_PASS" > /usr/local/lsws/adminpasswd
+
+    /usr/local/lsws/bin/lswsctrl restart 2>/dev/null || true
+    sleep 1
 
     log_info "OpenLiteSpeed admin: http://<IP>:$OLS_ADMIN_PORT  user: $OLS_ADMIN_USER  pass: $OLS_ADMIN_PASS"
 }
@@ -411,6 +416,7 @@ main() {
 
     install_system_deps
     install_openlitespeed
+    set_ols_password
     install_nodejs
     install_php
     setup_project
