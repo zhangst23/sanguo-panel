@@ -38,6 +38,12 @@
                 <a-descriptions-item label="创建时间">
                   {{ site.created_at ? new Date(site.created_at).toLocaleString('zh-CN') : '-' }}
                 </a-descriptions-item>
+                <a-descriptions-item v-if="site.wc_key" label="WooCommerce Key">
+                  <a-tag color="arcoblue" copyable>{{ site.wc_key }}</a-tag>
+                </a-descriptions-item>
+                <a-descriptions-item v-if="site.wc_secret" label="WooCommerce Secret">
+                  <a-tag copyable>{{ site.wc_secret }}</a-tag>
+                </a-descriptions-item>
               </a-descriptions>
             </a-card>
           </a-col>

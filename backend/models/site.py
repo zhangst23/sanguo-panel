@@ -72,5 +72,9 @@ class Site(Base):
     ssl_email = Column(String(255))
     ssl_auto_renew = Column(Boolean, default=True)
     https_force = Column(Boolean, default=True)
-    
+
+    # WooCommerce API
+    wc_key = Column(String(255))
+    wc_secret = Column(String(255))
+
     shared_db = relationship("SharedDatabase", back_populates="sites")

@@ -3,8 +3,10 @@ from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from backend.api import deps
 from backend.models.site import Site as SiteModel, SharedDatabase as SharedDatabaseModel
-from backend.schemas.site import Site, SiteCreate, SiteUpdate, SharedDatabase, SharedDatabaseCreate, WpConfigUpdate
+from backend.schemas.site import Site, SiteCreate, SiteUpdate, SharedDatabase, SharedDatabaseCreate, WpConfigUpdate, \
+    ChangeDomainRequest, MigrateRequest, BatchCreateRequest, PluginAction
 import os
+import re
 import subprocess
 import shutil
 import string
@@ -618,3 +620,369 @@ def create_shared_database(
     db.commit()
     db.refresh(database)
     return database
+
+
+# ----------------------------------------------------
+# Change Domain
+# ----------------------------------------------------
+@router.put("/{id}/change-domain", response_model=Site)
+def change_site_domain(
+    *,
+    db: Session = Depends(deps.get_db),
+    id: int,
+    req: ChangeDomainRequest,
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    site = db.query(SiteModel).filter(SiteModel.id == id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    existing = db.query(SiteModel).filter(SiteModel.domain == req.new_domain).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Domain already exists")
+    old_domain = site.domain
+    site.domain = req.new_domain
+    # Update OLS vhost
+    try:
+        remove_ols_vhost(old_domain)
+        create_ols_vhost(req.new_domain, site.root_path, site.php_version)
+    except Exception as e:
+        print(f"OLS domain change error: {e}")
+    db.add(site)
+    db.commit()
+    db.refresh(site)
+    return site
+
+
+# ----------------------------------------------------
+# WooCommerce API Keys
+# ----------------------------------------------------
+@router.post("/{id}/woocommerce/keys")
+def generate_woocommerce_keys(
+    *,
+    db: Session = Depends(deps.get_db),
+    id: int,
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    site = db.query(SiteModel).filter(SiteModel.id == id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    import secrets
+    import string
+    ck = "ck_" + ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32))
+    cs = "cs_" + ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(40))
+    site.wc_key = ck
+    site.wc_secret = cs
+    db.add(site)
+    db.commit()
+    return {"key": ck, "secret": cs}
+
+
+# ----------------------------------------------------
+# Migrate Site
+# ----------------------------------------------------
+@router.post("/migrate")
+def migrate_site(
+    *,
+    db: Session = Depends(deps.get_db),
+    background_tasks: BackgroundTasks,
+    req: MigrateRequest,
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    existing = db.query(SiteModel).filter(SiteModel.domain == req.domain).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Domain already exists")
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    root_path = os.path.join(project_root, "wordpress", req.domain)
+    default_db = db.query(SharedDatabaseModel).filter(SharedDatabaseModel.status == "active").first()
+    if not default_db:
+        raise HTTPException(status_code=400, detail="No active shared database")
+
+    site = SiteModel(
+        domain=req.domain,
+        root_path=root_path,
+        php_version=req.php_version,
+        shared_db_id=default_db.id,
+        table_prefix=f"wp_mig_",
+        status="active",
+        notes="pending: 迁移中...",
+    )
+    db.add(site)
+    db.commit()
+    db.refresh(site)
+    site.table_prefix = f"wp_{site.id}_"
+    db.add(site)
+    db.commit()
+    site_id = site.id
+
+    background_tasks.add_task(_migrate_task, site_id, req)
+    return site
+
+
+def _migrate_task(site_id: int, req: MigrateRequest):
+    from backend.core.database import SessionLocal
+    db = SessionLocal()
+    site = db.query(SiteModel).filter(SiteModel.id == site_id).first()
+    if not site:
+        db.close()
+        return
+    try:
+        os.makedirs(site.root_path, exist_ok=True)
+        if req.source_host:
+            # SSH-based migration
+            import paramiko
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect(req.source_host, port=req.source_port, username=req.source_user,
+                       password=req.source_password, timeout=30)
+            # rsync files
+            ssh.exec_command(f"mkdir -p {site.root_path}")
+            sftp = ssh.open_sftp()
+            try:
+                _sftp_walk(sftp, req.source_path, site.root_path)
+            finally:
+                sftp.close()
+            # dump and import DB
+            stdin, stdout, stderr = ssh.exec_command(
+                f"mysqldump -h {req.source_db_host} -P {req.source_db_port} -u {req.source_db_user} "
+                f"-p'{req.source_db_password}' {req.source_db_name} --single-transaction --quick"
+            )
+            dump = stdout.read()
+            ssh.close()
+            # Import locally
+            sd = db.query(SharedDatabaseModel).filter(SharedDatabaseModel.id == site.shared_db_id).first()
+            if sd and dump:
+                import mysql.connector
+                conn = mysql.connector.connect(host=sd.db_host, port=sd.db_port, user=sd.db_user,
+                                               password=sd.db_password, connect_timeout=5)
+                safe_domain = site.domain.replace('.', '_').replace('-', '_')
+                db_name = f"db_{safe_domain}"
+                db_user = f"u_{safe_domain}"[:16]
+                db_pass = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
+                cursor = conn.cursor()
+                cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{db_name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
+                try:
+                    cursor.execute(f"CREATE USER '{db_user}'@'localhost' IDENTIFIED BY '{db_pass}'")
+                except:
+                    cursor.execute(f"ALTER USER '{db_user}'@'localhost' IDENTIFIED BY '{db_pass}'")
+                cursor.execute(f"GRANT ALL PRIVILEGES ON `{db_name}`.* TO '{db_user}'@'localhost'")
+                cursor.execute("FLUSH PRIVILEGES")
+                site.db_name = db_name
+                site.db_user = db_user
+                site.db_password = db_pass
+                db.add(site)
+                db.commit()
+                # Import dump into new DB
+                import tempfile
+                with tempfile.NamedTemporaryFile(suffix='.sql', delete=False) as tf:
+                    tf.write(dump)
+                    dump_path = tf.name
+                subprocess.run(
+                    f"mysql -h {sd.db_host} -P {sd.db_port} -u {sd.db_user} -p'{sd.db_password}' {db_name} < {dump_path}",
+                    shell=True, check=True
+                )
+                os.unlink(dump_path)
+                cursor.close()
+                conn.close()
+            # Update wp-config
+            config_path = os.path.join(site.root_path, "wp-config.php")
+            if os.path.exists(config_path):
+                with open(config_path, "r") as f:
+                    cfg = f.read()
+                cfg = re.sub(r"define\(\s*'DB_NAME',\s*'[^']*'\s*\)", f"define('DB_NAME', '{db_name}')", cfg)
+                cfg = re.sub(r"define\(\s*'DB_USER',\s*'[^']*'\s*\)", f"define('DB_USER', '{db_user}')", cfg)
+                cfg = re.sub(r"define\(\s*'DB_PASSWORD',\s*'[^']*'\s*\)", f"define('DB_PASSWORD', '{db_pass}')", cfg)
+                with open(config_path, "w") as f:
+                    f.write(cfg)
+            site.notes = "completed: 站点迁移完成 (SSH)"
+        else:
+            site.notes = "completed: 站点目录已创建，请手动导入文件与数据库"
+        db.add(site)
+        db.commit()
+        create_ols_vhost(site.domain, site.root_path, site.php_version)
+    except Exception as e:
+        site.notes = f"failed: 迁移失败 - {str(e)}"
+        db.add(site)
+        db.commit()
+    finally:
+        db.close()
+
+
+def _sftp_walk(sftp, remote_dir, local_dir):
+    os.makedirs(local_dir, exist_ok=True)
+    for item in sftp.listdir_attr(remote_dir):
+        rp = remote_dir + "/" + item.filename
+        lp = os.path.join(local_dir, item.filename)
+        import stat
+        if stat.S_ISDIR(item.st_mode):
+            _sftp_walk(sftp, rp, lp)
+        else:
+            sftp.get(rp, lp)
+
+
+# ----------------------------------------------------
+# Batch Create Sites
+# ----------------------------------------------------
+@router.post("/batch", response_model=List[Site])
+def batch_create_sites(
+    *,
+    db: Session = Depends(deps.get_db),
+    background_tasks: BackgroundTasks,
+    req: BatchCreateRequest,
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    created = []
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    for item in req.sites:
+        existing = db.query(SiteModel).filter(SiteModel.domain == item.domain).first()
+        if existing:
+            continue
+        default_db = db.query(SharedDatabaseModel).filter(SharedDatabaseModel.status == "active").first()
+        if not default_db:
+            continue
+        root_path = os.path.join(project_root, "wordpress", item.domain)
+        site = SiteModel(
+            domain=item.domain,
+            root_path=root_path,
+            php_version=item.php_version,
+            shared_db_id=default_db.id,
+            table_prefix=f"wp_tmp_",
+            status="active",
+            notes="pending: 准备安装中...",
+        )
+        db.add(site)
+        db.commit()
+        db.refresh(site)
+        site.table_prefix = f"wp_{site.id}_"
+        db.add(site)
+        db.commit()
+        background_tasks.add_task(install_wordpress_task, site.id)
+        created.append(site)
+    return created
+
+
+# ----------------------------------------------------
+# WordPress Update / Plugin management
+# ----------------------------------------------------
+def _get_wp_cli(site):
+    php_path = get_php_path()
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    wp_cli_path = os.path.join(project_root, "backend", "bin", "wp-cli.phar")
+    if not os.path.exists(wp_cli_path):
+        raise HTTPException(status_code=500, detail="WP-CLI not found")
+    return php_path, wp_cli_path
+
+
+@router.post("/{id}/wp/update")
+def update_wordpress(
+    *,
+    db: Session = Depends(deps.get_db),
+    id: int,
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    site = db.query(SiteModel).filter(SiteModel.id == id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    php_path, wp_cli_path = _get_wp_cli(site)
+    cmd = [php_path, wp_cli_path, "core", "update", f"--path={site.root_path}", "--allow-root", "--force"]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    if result.returncode != 0:
+        raise HTTPException(status_code=500, detail=result.stderr)
+    cmd_v = [php_path, wp_cli_path, "core", "version", f"--path={site.root_path}", "--allow-root"]
+    rv = subprocess.run(cmd_v, capture_output=True, text=True, timeout=10)
+    if rv.returncode == 0:
+        site.wp_version = rv.stdout.strip()
+        db.add(site)
+        db.commit()
+    return {"success": True, "output": result.stdout, "version": site.wp_version}
+
+
+@router.post("/{id}/wp/plugins/install")
+def install_plugin(
+    *,
+    db: Session = Depends(deps.get_db),
+    id: int,
+    req: PluginAction,
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    site = db.query(SiteModel).filter(SiteModel.id == id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    php_path, wp_cli_path = _get_wp_cli(site)
+    cmd = [php_path, wp_cli_path, "plugin", "install", req.slug, f"--path={site.root_path}", "--activate", "--allow-root"]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    if result.returncode != 0:
+        raise HTTPException(status_code=500, detail=result.stderr)
+    return {"success": True, "output": result.stdout}
+
+
+@router.delete("/{id}/wp/plugins/{slug}")
+def delete_plugin(
+    *,
+    db: Session = Depends(deps.get_db),
+    id: int,
+    slug: str,
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    site = db.query(SiteModel).filter(SiteModel.id == id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    php_path, wp_cli_path = _get_wp_cli(site)
+    cmd = [php_path, wp_cli_path, "plugin", "delete", slug, f"--path={site.root_path}", "--allow-root"]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    return {"success": True, "output": result.stdout}
+
+
+@router.get("/{id}/nginx-cloudflare")
+def get_nginx_cloudflare_config(
+    *,
+    db: Session = Depends(deps.get_db),
+    id: int,
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    site = db.query(SiteModel).filter(SiteModel.id == id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    config = rf"""# Cloudflare CDN Reverse Proxy for {site.domain}
+server {{
+    listen 80;
+    server_name {site.domain};
+    root {site.root_path};
+    index index.php index.html;
+
+    # Cloudflare IP restore
+    set_real_ip_from 173.245.48.0/20;
+    set_real_ip_from 103.21.244.0/22;
+    set_real_ip_from 103.22.200.0/22;
+    set_real_ip_from 103.31.4.0/22;
+    set_real_ip_from 141.101.64.0/18;
+    set_real_ip_from 108.162.192.0/18;
+    set_real_ip_from 190.93.240.0/20;
+    set_real_ip_from 188.114.96.0/20;
+    set_real_ip_from 197.234.240.0/22;
+    set_real_ip_from 198.41.128.0/17;
+    set_real_ip_from 162.158.0.0/15;
+    set_real_ip_from 104.16.0.0/13;
+    set_real_ip_from 104.24.0.0/14;
+    set_real_ip_from 172.64.0.0/13;
+    set_real_ip_from 131.0.72.0/22;
+    real_ip_header CF-Connecting-IP;
+
+    # WordPress
+    location / {{
+        try_files $uri $uri/ /index.php?$args;
+    }}
+
+    location ~ \.php$ {{
+        fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+    }}
+
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff2?|ttf|eot)$ {{
+        expires max;
+        log_not_found off;
+        add_header Cache-Control "public, immutable";
+    }}
+}}"""
+    return {"config": config}

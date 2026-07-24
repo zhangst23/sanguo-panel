@@ -52,6 +52,42 @@ class SiteUpdate(BaseModel):
     ssl_email: Optional[str] = None
     ssl_auto_renew: Optional[bool] = None
     https_force: Optional[bool] = None
+    domain: Optional[str] = None
+
+class ChangeDomainRequest(BaseModel):
+    new_domain: str
+
+    @field_validator('new_domain')
+    @classmethod
+    def validate_domain(cls, v: str) -> str:
+        domain_regex = r'^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$'
+        if not re.match(domain_regex, v.lower()):
+            raise ValueError('域名格式不正确')
+        return v.lower()
+
+class MigrateRequest(BaseModel):
+    domain: str
+    source_host: Optional[str] = None
+    source_port: int = 22
+    source_user: Optional[str] = None
+    source_password: Optional[str] = None
+    source_path: Optional[str] = None
+    source_db_host: Optional[str] = None
+    source_db_port: int = 3306
+    source_db_user: Optional[str] = None
+    source_db_password: Optional[str] = None
+    source_db_name: Optional[str] = None
+    php_version: str = "8.2"
+
+class BatchCreateItem(BaseModel):
+    domain: str
+    php_version: str = "8.2"
+
+class BatchCreateRequest(BaseModel):
+    sites: List[BatchCreateItem]
+
+class PluginAction(BaseModel):
+    slug: str
 
 class Site(SiteBase):
     id: int
@@ -74,6 +110,8 @@ class Site(SiteBase):
     https_force: bool = True
     wp_version: str = "未安装"
     monitor_enabled: bool = False
+    wc_key: Optional[str] = None
+    wc_secret: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
