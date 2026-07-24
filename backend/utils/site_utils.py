@@ -1,5 +1,6 @@
 import os
 import re
+import subprocess
 import shutil
 
 def update_wp_config_redis(site, password=None):
@@ -196,7 +197,6 @@ def fix_site_permissions(site):
         if not os.path.exists(root):
             return False
             
-        import subprocess
         # Faster to use find commands on Linux
         subprocess.run(f"find {root} -type d -exec chmod 755 {{}} \\;", shell=True)
         subprocess.run(f"find {root} -type f -exec chmod 644 {{}} \\;", shell=True)
@@ -241,11 +241,10 @@ add_filter('xmlrpc_enabled', '__return_false');
 # WP-CLI helpers (run on the OLS-bundled PHP / LSAPI build)
 # --------------------------------------------------------------------------- #
 def get_wp_cli_paths():
-    """Return (php_path, wp_cli_path) using the OLS-bundled PHP (LSAPI build)."""
-    from backend.utils.ols_utils import OLS_PHP
+    """Return (php_path, wp_cli_path) using the system CLI PHP."""
     from backend.utils.php_utils import get_php_path
-    php_path = OLS_PHP if os.path.exists(OLS_PHP) else get_php_path()
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    php_path = get_php_path()
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     wp_cli_path = os.path.join(project_root, "backend", "bin", "wp-cli.phar")
     return php_path, wp_cli_path
 

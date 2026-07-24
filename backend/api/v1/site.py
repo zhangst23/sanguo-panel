@@ -18,32 +18,35 @@ from backend.utils.ols_utils import (
     chown_site_root,
     get_installed_php_versions,
     get_default_php_version,
-    OLS_PHP,
 )
 from backend.utils.site_utils import set_lscache_plugin, purge_site_lscache
 
 router = APIRouter()
 
-def install_wordpress_task(site_id: int, db: Session):
+def install_wordpress_task(site_id: int):
     """
     Background task to install WordPress on the OpenLiteSpeed stack:
     WP-CLI runs on the OLS-bundled PHP (LSAPI build), an OLS virtual host
     (per-vhost LSAPI handler, multi-PHP) is registered, files are chowned to
     the LSAPI worker, and LSCache is enabled when requested.
     """
-    site = db.query(SiteModel).filter(SiteModel.id == site_id).first()
-    if not site:
-        return
-    ols_note = ""
-
+    from backend.core.database import SessionLocal
+    db = SessionLocal()
     try:
+        site = db.query(SiteModel).filter(SiteModel.id == site_id).first()
+        if not site:
+            return
+        ols_note = ""
+
         shared_db = db.query(SharedDatabaseModel).filter(SharedDatabaseModel.id == site.shared_db_id).first()
 
         # 1. WordPress Files Installation using WP-CLI
-        # Prefer OpenLiteSpeed bundled PHP (LSAPI SAPI) so WP-CLI runs on the
-        # same PHP build that serves the site via LSAPI.
-        php_path = OLS_PHP if os.path.exists(OLS_PHP) else get_php_path()
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        # WP-CLI requires PHP CLI SAPI; OLS lsphp is LSAPI-only and cannot run CLI.
+        php_path = get_php_path()
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        if site.root_path and not os.path.isabs(site.root_path):
+            site.root_path = os.path.join(project_root, site.root_path)
+            db.add(site); db.commit()
         bin_dir = os.path.join(project_root, "backend", "bin")
         os.makedirs(bin_dir, exist_ok=True)
         wp_cli_path = os.path.join(bin_dir, "wp-cli.phar")
@@ -217,6 +220,8 @@ def install_wordpress_task(site_id: int, db: Session):
         site.notes = f"failed: 安装失败 - {str(e)}\n{ols_note}"
         db.add(site)
         db.commit()
+    finally:
+        db.close()
 
 @router.get("/", response_model=List[Site])
 def read_sites(
@@ -245,8 +250,8 @@ def _detect_wp_version(site) -> Optional[str]:
     try:
         if not site.root_path or not os.path.exists(site.root_path):
             return None
-        php_path = OLS_PHP if os.path.exists(OLS_PHP) else get_php_path()
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        php_path = get_php_path()
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
         wp_cli_path = os.path.join(project_root, "backend", "bin", "wp-cli.phar")
         if not os.path.exists(wp_cli_path):
             return None
@@ -280,9 +285,11 @@ def create_site(
         )
 
     # 1. Root path default to project_root/wordpress/{domain} if not provided
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     default_root = os.path.join(project_root, "wordpress", site_in.domain)
     root_path = site_in.root_path or default_root
+    if not os.path.isabs(root_path):
+        root_path = os.path.join(project_root, root_path)
 
     # 2. Shared Database: Default to the first active shared database if not provided
     shared_db_id = site_in.shared_db_id
@@ -328,7 +335,7 @@ def create_site(
     db.commit()
 
     # Start installation in background
-    background_tasks.add_task(install_wordpress_task, site.id, db)
+    background_tasks.add_task(install_wordpress_task, site.id)
 
     return site
 

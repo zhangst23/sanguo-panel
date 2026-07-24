@@ -224,6 +224,14 @@ def create_ols_vhost(domain: str, root_path: str, php_version: str = None) -> di
             )
         else:
             conf += "\n" + vhost_block
+    else:
+        # vhost already exists: update its vhRoot (path correction / move)
+        conf = re.sub(
+            r"(virtualHost " + re.escape(domain) + r"\{\n    vhRoot\s+)\S+",
+            r"\g<1>" + root_path,
+            conf,
+            count=1,
+        )
 
     # 2) listener map (inside the Panel80 block)
     map_line = f"    map                      {domain} {domain}\n"
