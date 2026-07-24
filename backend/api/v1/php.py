@@ -51,18 +51,16 @@ def list_php_versions(
                 {"version": "None", "status": "not_installed", "is_default": False},
             ]
     
-    # On Linux, check for lsphpXX directories
-    lsws_path = "/usr/local/lsws"
+    # On Linux, detect installed lsphp builds and the global default version
+    from backend.utils.ols_utils import get_installed_php_versions, get_default_php_version
+    default_ver = get_default_php_version()
     versions = []
-    # Check common versions
-    for v in ["74", "80", "81", "82", "83", "84"]:
-        path = os.path.join(lsws_path, f"lsphp{v}")
-        if os.path.exists(path):
-            versions.append({
-                "version": f"{v[0]}.{v[1]}",
-                "status": "installed",
-                "is_default": v == "82" # Mock default
-            })
+    for v in get_installed_php_versions():
+        versions.append({
+            "version": v["version"],
+            "status": "installed",
+            "is_default": v["version"] == default_ver,
+        })
     return versions
 
 @router.get("/{version}/extensions")

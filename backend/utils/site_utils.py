@@ -235,3 +235,77 @@ add_filter('xmlrpc_enabled', '__return_false');
     except Exception as e:
         print(f"Failed to update XML-RPC for {site.domain}: {str(e)}")
         return False
+
+
+# --------------------------------------------------------------------------- #
+# WP-CLI helpers (run on the OLS-bundled PHP / LSAPI build)
+# --------------------------------------------------------------------------- #
+def get_wp_cli_paths():
+    """Return (php_path, wp_cli_path) using the OLS-bundled PHP (LSAPI build)."""
+    from backend.utils.ols_utils import OLS_PHP
+    from backend.utils.php_utils import get_php_path
+    php_path = OLS_PHP if os.path.exists(OLS_PHP) else get_php_path()
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    wp_cli_path = os.path.join(project_root, "backend", "bin", "wp-cli.phar")
+    return php_path, wp_cli_path
+
+
+def _wp(php_path, wp_cli_path, site, *args):
+    """Run a WP-CLI command for a site, returning the CompletedProcess."""
+    return subprocess.run(
+        [php_path, wp_cli_path, *args, f"--path={site.root_path}", "--allow-root"],
+        capture_output=True, text=True, timeout=120,
+    )
+
+
+def set_lscache_plugin(site, enabled: bool):
+    """Enable/disable the LiteSpeed Cache WP plugin (OLS LSCache) for a site.
+
+    Returns (success: bool, message: str). Requires WP-CLI + an installed site.
+    """
+    php_path, wp_cli_path = get_wp_cli_paths()
+    if not php_path or not os.path.exists(wp_cli_path):
+        return False, "WP-CLI 不可用"
+    if not site.root_path or not os.path.exists(os.path.join(site.root_path, "wp-load.php")):
+        return False, "站点尚未安装 WordPress"
+
+    try:
+        if enabled:
+            # install if missing (ignore error if already installed)
+            _wp(php_path, wp_cli_path, site, "plugin", "install", "litespeed-cache")
+            r = _wp(php_path, wp_cli_path, site, "plugin", "activate", "litespeed-cache")
+            # ensure WP_CACHE is on
+            _wp(php_path, wp_cli_path, site, "config", "set", "WP_CACHE", "true", "--raw")
+            return r.returncode == 0, (r.stdout.strip() or "litespeed-cache 已启用")
+        else:
+            r = _wp(php_path, wp_cli_path, site, "plugin", "deactivate", "litespeed-cache")
+            return r.returncode == 0, (r.stdout.strip() or "litespeed-cache 已停用")
+    except Exception as e:
+        return False, str(e)
+
+
+def purge_site_lscache(site):
+    """Purge a site's LSCache: OLS on-disk cache + WP object cache flush."""
+    from backend.utils.ols_utils import purge_ols_lscache
+    res = purge_ols_lscache(site.domain)
+    php_path, wp_cli_path = get_wp_cli_paths()
+    if php_path and os.path.exists(wp_cli_path) and os.path.exists(os.path.join(site.root_path, "wp-load.php")):
+        try:
+            _wp(php_path, wp_cli_path, site, "cache", "flush")
+        except Exception:
+            pass
+    return res
+
+
+def reset_site_opcache(site):
+    """Best-effort OPcache reset for the site's PHP via WP-CLI eval."""
+    php_path, wp_cli_path = get_wp_cli_paths()
+    if not php_path or not os.path.exists(wp_cli_path):
+        return False, "WP-CLI 不可用"
+    if not os.path.exists(os.path.join(site.root_path, "wp-load.php")):
+        return False, "站点尚未安装 WordPress"
+    try:
+        r = _wp(php_path, wp_cli_path, site, "eval", "if(function_exists('opcache_reset')){opcache_reset();}")
+        return r.returncode == 0, "OPcache 已重置"
+    except Exception as e:
+        return False, str(e)

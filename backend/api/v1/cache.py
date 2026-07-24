@@ -341,4 +341,12 @@ def apply_performance_preset(
     site.performance_preset = preset
     db.commit()
     db.refresh(site)
+
+    # Apply the preset to the OLS / WordPress stack (not just the DB record)
+    try:
+        set_lscache_plugin(site, site.lscache_enabled)
+        update_wp_config_redis(site)
+    except Exception as e:
+        print(f"Error applying performance preset to {site.domain}: {str(e)}")
+
     return site

@@ -12,12 +12,24 @@ import random
 import requests
 import mysql.connector
 from backend.utils.php_utils import get_php_path
+from backend.utils.ols_utils import (
+    create_ols_vhost,
+    remove_ols_vhost,
+    chown_site_root,
+    get_installed_php_versions,
+    get_default_php_version,
+    OLS_PHP,
+)
+from backend.utils.site_utils import set_lscache_plugin, purge_site_lscache
 
 router = APIRouter()
 
 def install_wordpress_task(site_id: int, db: Session):
     """
-    Background task to install WordPress.
+    Background task to install WordPress on the OpenLiteSpeed stack:
+    WP-CLI runs on the OLS-bundled PHP (LSAPI build), an OLS virtual host
+    (per-vhost LSAPI handler, multi-PHP) is registered, files are chowned to
+    the LSAPI worker, and LSCache is enabled when requested.
     """
     site = db.query(SiteModel).filter(SiteModel.id == site_id).first()
     if not site:
@@ -26,7 +38,7 @@ def install_wordpress_task(site_id: int, db: Session):
 
     try:
         shared_db = db.query(SharedDatabaseModel).filter(SharedDatabaseModel.id == site.shared_db_id).first()
-        
+
         # 1. WordPress Files Installation using WP-CLI
         # Prefer OpenLiteSpeed bundled PHP (LSAPI SAPI) so WP-CLI runs on the
         # same PHP build that serves the site via LSAPI.
@@ -35,7 +47,7 @@ def install_wordpress_task(site_id: int, db: Session):
         bin_dir = os.path.join(project_root, "backend", "bin")
         os.makedirs(bin_dir, exist_ok=True)
         wp_cli_path = os.path.join(bin_dir, "wp-cli.phar")
-        
+
         if not os.path.exists(wp_cli_path):
             print("Downloading WP-CLI...")
             r = requests.get("https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar")
@@ -45,13 +57,26 @@ def install_wordpress_task(site_id: int, db: Session):
         if not os.path.exists(site.root_path):
             os.makedirs(site.root_path, exist_ok=True)
 
-        # 1.5 Register OpenLiteSpeed virtual host (served via LSAPI)
-        ols_res = create_ols_vhost(site.domain, site.root_path)
+        # 1.5 Resolve requested PHP version against installed lsphp builds
+        installed = {v["version"] for v in get_installed_php_versions()}
+        if site.php_version not in installed:
+            resolved = get_default_php_version()
+            php_note = f"⚠️ PHP {site.php_version} 未安装，回退到默认 {resolved}"
+            site.php_version = resolved
+        else:
+            php_note = f"PHP {site.php_version}"
+
+        # 1.6 Register OpenLiteSpeed virtual host (LSAPI, per-vhost PHP version)
+        ols_res = create_ols_vhost(site.domain, site.root_path, site.php_version)
+        if ols_res.get("success") and ols_res.get("php_used"):
+            site.php_version = ols_res["php_used"]
         ols_note = (
-            f"✅ OLS 虚拟主机已创建 (LSAPI 托管): {site.domain}"
+            f"✅ OLS 虚拟主机已创建 (LSAPI · {php_note}): {site.domain}"
             if ols_res.get("success")
             else f"⚠️ OLS 虚拟主机创建失败: {ols_res.get('msg')}"
         )
+        db.add(site)
+        db.commit()
 
         # Step 1: Download Core
         site.notes = f"step1: WordPress 文件下载中...\n{ols_note}"
@@ -62,7 +87,7 @@ def install_wordpress_task(site_id: int, db: Session):
             # Download Core
             cmd = [php_path, wp_cli_path, "core", "download", f"--path={site.root_path}", "--locale=zh_CN", "--allow-root", "--force"]
             subprocess.run(cmd, check=True, capture_output=True)
-            
+
             # 2. Database Creation
             db_name = None
             db_user = None
@@ -78,21 +103,21 @@ def install_wordpress_task(site_id: int, db: Session):
                         connect_timeout=5
                     )
                     cursor = conn.cursor()
-                    
+
                     safe_domain = site.domain.replace('.', '_').replace('-', '_')
                     db_name = f"db_{safe_domain}"
-                    db_user = f"u_{safe_domain}"[:16] 
+                    db_user = f"u_{safe_domain}"[:16]
                     db_pass = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
-                    
+
                     cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{db_name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
                     try:
                         cursor.execute(f"CREATE USER '{db_user}'@'localhost' IDENTIFIED BY '{db_pass}'")
                     except:
                         cursor.execute(f"ALTER USER '{db_user}'@'localhost' IDENTIFIED BY '{db_pass}'")
-                    
+
                     cursor.execute(f"GRANT ALL PRIVILEGES ON `{db_name}`.* TO '{db_user}'@'localhost'")
                     cursor.execute("FLUSH PRIVILEGES")
-                    
+
                     site.db_name = db_name
                     site.db_user = db_user
                     site.db_password = db_pass
@@ -100,7 +125,7 @@ def install_wordpress_task(site_id: int, db: Session):
                     site.notes = "step2: MariaDB 数据库安装完成"
                     db.add(site)
                     db.commit()
-                    
+
                     cursor.close()
                     conn.close()
                 except Exception as db_err:
@@ -117,11 +142,11 @@ def install_wordpress_task(site_id: int, db: Session):
 
                 # Generate wp-config.php
                 cmd_config = [
-                    php_path, wp_cli_path, "config", "create", 
-                    f"--path={site.root_path}", 
-                    f"--dbname={db_name}", 
-                    f"--dbuser={db_user}", 
-                    f"--dbpass={db_pass}", 
+                    php_path, wp_cli_path, "config", "create",
+                    f"--path={site.root_path}",
+                    f"--dbname={db_name}",
+                    f"--dbuser={db_user}",
+                    f"--dbpass={db_pass}",
                     f"--dbhost={shared_db.db_host}",
                     f"--dbprefix={site.table_prefix}",
                     "--locale=zh_CN",
@@ -134,7 +159,7 @@ def install_wordpress_task(site_id: int, db: Session):
                 admin_user = "admin"
                 admin_pass = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
                 admin_email = f"admin@{site.domain}"
-                
+
                 cmd_install = [
                     php_path, wp_cli_path, "core", "install",
                     f"--path={site.root_path}",
@@ -146,7 +171,7 @@ def install_wordpress_task(site_id: int, db: Session):
                     "--allow-root"
                 ]
                 subprocess.run(cmd_install, check=True, capture_output=True)
-                
+
                 # Get WordPress version after install
                 try:
                     cmd_version = [
@@ -159,11 +184,24 @@ def install_wordpress_task(site_id: int, db: Session):
                         site.wp_version = result.stdout.strip()
                 except Exception:
                     site.wp_version = "已安装"
-                
-                site.notes = f"completed: WordPress 站点创建完成。管理员: {admin_user} 密码: {admin_pass}"
+
+                # Hand the files to the LSAPI worker (nobody) for uploads/writes
+                chown_site_root(site.root_path)
+
+                # Enable OLS LSCache (LiteSpeed Cache WP plugin) when requested
+                cache_note = ""
+                if site.lscache_enabled:
+                    ok, msg = set_lscache_plugin(site, True)
+                    cache_note = "\n✅ LSCache 已启用 (litespeed-cache)" if ok else f"\n⚠️ LSCache 启用失败: {msg}"
+
+                site.notes = (
+                    f"completed: WordPress 站点创建完成。管理员: {admin_user} 密码: {admin_pass}"
+                    f"\n{ols_note}{cache_note}"
+                )
             else:
-                site.notes = "completed: 文件已安装(数据库配置需手动)"
-            
+                chown_site_root(site.root_path)
+                site.notes = f"completed: 文件已安装(数据库配置需手动)\n{ols_note}"
+
             db.add(site)
             db.commit()
 
@@ -176,7 +214,7 @@ def install_wordpress_task(site_id: int, db: Session):
 
     except Exception as e:
         print(f"Error during WordPress installation: {e}")
-        site.notes = f"failed: 安装失败 - {str(e)}"
+        site.notes = f"failed: 安装失败 - {str(e)}\n{ols_note}"
         db.add(site)
         db.commit()
 
@@ -207,7 +245,7 @@ def _detect_wp_version(site) -> Optional[str]:
     try:
         if not site.root_path or not os.path.exists(site.root_path):
             return None
-        php_path = get_php_path()
+        php_path = OLS_PHP if os.path.exists(OLS_PHP) else get_php_path()
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         wp_cli_path = os.path.join(project_root, "backend", "bin", "wp-cli.phar")
         if not os.path.exists(wp_cli_path):
@@ -240,12 +278,12 @@ def create_site(
             status_code=400,
             detail="The site with this domain already exists in the system.",
         )
-    
+
     # 1. Root path default to project_root/wordpress/{domain} if not provided
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     default_root = os.path.join(project_root, "wordpress", site_in.domain)
     root_path = site_in.root_path or default_root
-    
+
     # 2. Shared Database: Default to the first active shared database if not provided
     shared_db_id = site_in.shared_db_id
     if not shared_db_id:
@@ -264,7 +302,7 @@ def create_site(
             db.commit()
             db.refresh(shared_db)
         shared_db_id = shared_db.id
-    
+
     table_prefix = site_in.table_prefix or "wp_tmp_"
 
     site_data = site_in.dict()
@@ -275,7 +313,7 @@ def create_site(
         "status": "active",
         "notes": "pending: 准备安装中..."
     })
-    
+
     if "performance_preset" not in site_data:
         site_data["performance_preset"] = "balanced"
 
@@ -283,7 +321,7 @@ def create_site(
     db.add(site)
     db.commit()
     db.refresh(site)
-    
+
     # Update table_prefix with actual site ID
     site.table_prefix = f"wp_{site.id}_"
     db.add(site)
@@ -318,20 +356,37 @@ def update_site(
     current_user: Any = Depends(deps.get_current_active_user),
 ) -> Any:
     """
-    Update a site.
+    Update a site. OLS-workflow side effects:
+    - php_version change   -> re-register the vhost with the new per-vhost LSAPI handler
+    - lscache_enabled change -> install/activate or deactivate the LiteSpeed Cache plugin
+    - redis_enabled change  -> update wp-config.php Redis constants
     """
     site = db.query(SiteModel).filter(SiteModel.id == id).first()
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
-    
+
     update_data = site_in.dict(exclude_unset=True)
     for field in update_data:
         setattr(site, field, update_data[field])
-    
+
     db.add(site)
     db.commit()
     db.refresh(site)
-    
+
+    # PHP version change: regenerate the OLS vhost with the requested LSAPI handler
+    if "php_version" in update_data:
+        try:
+            create_ols_vhost(site.domain, site.root_path, site.php_version)
+        except Exception as e:
+            print(f"Error switching PHP version for {site.domain}: {str(e)}")
+
+    # LSCache toggle: install/activate or deactivate the LiteSpeed Cache plugin
+    if "lscache_enabled" in update_data:
+        try:
+            set_lscache_plugin(site, site.lscache_enabled)
+        except Exception as e:
+            print(f"Error toggling LSCache for {site.domain}: {str(e)}")
+
     # If redis_enabled was toggled, update wp-config.php
     if "redis_enabled" in update_data:
         try:
@@ -340,7 +395,7 @@ def update_site(
         except Exception as e:
             # Don't fail the whole update if this fails, but log it
             print(f"Error updating Redis config for {site.domain}: {str(e)}")
-            
+
     return site
 
 @router.delete("/{id}", response_model=Site)
@@ -352,12 +407,13 @@ def delete_site(
     current_user: Any = Depends(deps.get_current_active_user),
 ) -> Any:
     """
-    Delete a site.
+    Delete a site: remove files, drop the OLS LSAPI virtual host, and
+    optionally drop the MariaDB database/user.
     """
     site = db.query(SiteModel).filter(SiteModel.id == id).first()
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
-    
+
     # Remove site files
     if site.root_path and os.path.exists(site.root_path):
         shutil.rmtree(site.root_path, ignore_errors=True)
@@ -368,9 +424,27 @@ def delete_site(
     except Exception as e:
         print(f"Error removing OLS vhost for {site.domain}: {e}")
 
-    if delete_db:
-        # Implementation for deleting specific site tables from shared database
-        pass
+    # Drop the site database + user when requested
+    if delete_db and site.db_name:
+        try:
+            shared_db = db.query(SharedDatabaseModel).filter(SharedDatabaseModel.id == site.shared_db_id).first()
+            if shared_db:
+                conn = mysql.connector.connect(
+                    host=shared_db.db_host, port=shared_db.db_port,
+                    user=shared_db.db_user, password=shared_db.db_password, connect_timeout=5,
+                )
+                cur = conn.cursor()
+                cur.execute(f"DROP DATABASE IF EXISTS `{site.db_name}`")
+                if site.db_user:
+                    try:
+                        cur.execute(f"DROP USER IF EXISTS '{site.db_user}'@'localhost'")
+                    except Exception:
+                        pass
+                cur.execute("FLUSH PRIVILEGES")
+                cur.close()
+                conn.close()
+        except Exception as e:
+            print(f"Error dropping database for {site.domain}: {e}")
 
     db.delete(site)
     db.commit()
@@ -384,14 +458,14 @@ def purge_site_cache(
     current_user: Any = Depends(deps.get_current_active_user),
 ) -> Any:
     """
-    Purge LSCache for the site.
+    Purge LSCache for the site (OLS on-disk cache + WP object cache flush).
     """
     site = db.query(SiteModel).filter(SiteModel.id == id).first()
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
-    
-    # Logic to purge OLS LSCache: usually deleting files in lscache directory or calling API
-    return {"success": True, "message": f"Cache purged for {site.domain}"}
+
+    res = purge_site_lscache(site)
+    return {"success": True, "message": f"Cache purged for {site.domain}", "details": res}
 
 @router.get("/{id}/wp-config")
 def read_wp_config(
@@ -406,12 +480,12 @@ def read_wp_config(
     site = db.query(SiteModel).filter(SiteModel.id == id).first()
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
-    
+
     config_path = os.path.join(site.root_path, "wp-config.php")
     if not os.path.exists(config_path):
         # Return empty or standard template if not found
         return {"content": "/* wp-config.php not found */"}
-    
+
     try:
         with open(config_path, "r", encoding="utf-8") as f:
             content = f.read()
@@ -433,13 +507,13 @@ def update_wp_config(
     site = db.query(SiteModel).filter(SiteModel.id == id).first()
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
-    
+
     config_path = os.path.join(site.root_path, "wp-config.php")
-    
+
     # Ensure directory exists (though it should)
     if not os.path.exists(site.root_path):
         os.makedirs(site.root_path, exist_ok=True)
-    
+
     try:
         with open(config_path, "w", encoding="utf-8") as f:
             f.write(config_in.content)
@@ -461,7 +535,7 @@ def configure_ssl(
     site = db.query(SiteModel).filter(SiteModel.id == id).first()
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
-    
+
     # Integration with Certbot/acme.sh and OLS config update
     return {"success": True, "message": f"SSL {action} successful for {site.domain}"}
 
@@ -478,7 +552,7 @@ def backup_site(
     site = db.query(SiteModel).filter(SiteModel.id == id).first()
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
-    
+
     # Logic to archive files and export database tables
     return {"success": True, "message": f"Backup created for {site.domain}"}
 
