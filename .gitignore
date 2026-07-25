@@ -16,13 +16,21 @@ __pycache__/
 /frontend/*.local
 /frontend/.cache
 /frontend/coverage
+/frontend/lerna-debug.log*
+/frontend/*.suo
+/frontend/*.ntvs*
+/frontend/*.njsproj
+/frontend/*.sln
+/frontend/*.sw?
 
-# IDE
+# Editor / IDE
 .idea/
 .vscode/
 *.swp
 *.swo
 *~
+# Keep recommended editor settings tracked
+!.vscode/extensions.json
 
 # OS
 .DS_Store

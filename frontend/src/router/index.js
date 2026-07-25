@@ -4,6 +4,7 @@ const routes = [
   {
     path: '/',
     redirect: '/dashboard',
+    meta: { title: '仪表盘' },
   },
   {
     path: '/login',
@@ -170,16 +171,15 @@ const router = createRouter({
 
 // Set page title
 function setPageTitle(title) {
-  document.title = title ? `${title} - 三国面板` : '三国面板'
+  const newTitle = title ? `${title} - 三国面板` : '三国面板'
+  console.log('Setting page title:', newTitle)
+  document.title = newTitle
+  console.log('Document.title after setting:', document.title)
 }
 
 // Navigation guard
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token')
-  
-  // Set page title
-  setPageTitle(to.meta.title)
-  
   if (to.meta.requiresAuth && !token) {
     // For now, allow navigation if no token during development
     // next({ name: 'Login' })
@@ -187,6 +187,12 @@ router.beforeEach((to, from, next) => {
   } else {
     next()
   }
+})
+
+// Set page title after navigation completes
+router.afterEach((to) => {
+  console.log('Navigation to:', to.path, 'meta.title:', to.meta.title)
+  setPageTitle(to.meta.title)
 })
 
 export default router

@@ -111,7 +111,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
   IconDashboard,
@@ -129,7 +129,7 @@ import {
   IconMoonFill,
   IconSunFill
 } from '@arco-design/web-vue/es/icon'
-import { onMounted } from 'vue'
+import { onMounted, onUnmounted } from 'vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -137,6 +137,37 @@ const collapsed = ref(false)
 const theme = ref(localStorage.getItem('theme') || 'dark')
 
 const selectedKey = computed(() => route.name)
+
+// Expected title for restoration
+let expectedTitle = ''
+
+// Set page title based on route
+const setPageTitle = (route) => {
+  const title = route.meta?.title || '三国面板'
+  const fullTitle = title ? `${title} - 三国面板` : '三国面板'
+  expectedTitle = fullTitle
+  console.log('Setting page title:', fullTitle)
+  document.title = fullTitle
+  console.log('Document.title:', document.title)
+}
+
+// Watch route changes and update title
+watch(route, (newRoute) => {
+  console.log('Route changed:', newRoute.name, 'meta.title:', newRoute.meta?.title)
+  setPageTitle(newRoute)
+}, { immediate: true })
+
+// Continuously check and restore title (in case extensions override it)
+const restoreTitle = () => {
+  if (document.title !== expectedTitle && expectedTitle) {
+    console.log('Restoring title from', document.title, 'to', expectedTitle)
+    document.title = expectedTitle
+  }
+}
+
+// Check every 500ms
+const titleInterval = setInterval(restoreTitle, 500)
+window.__titleInterval = titleInterval
 
 const onCollapse = (val) => {
   collapsed.value = val
@@ -164,6 +195,14 @@ const applyTheme = (val) => {
 
 onMounted(() => {
   applyTheme(theme.value)
+})
+
+onUnmounted(() => {
+  // Cleanup interval
+  const titleInterval = window.__titleInterval
+  if (titleInterval) {
+    clearInterval(titleInterval)
+  }
 })
 
 const handleMenuClick = (key) => {

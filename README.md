@@ -60,7 +60,12 @@ sanguo-panel/
 - **前端**: Vue 3, Vite, Arco Design, Pinia, Axios, ECharts
 
 
-
+当修改前端代码后静态资源构建生效：  
+```bash
+   cd /sanguo-panel/frontend
+   npm run build
+   /usr/local/lsws/bin/lswsctrl restart
+```                                  
 
 ## 文档参考
 

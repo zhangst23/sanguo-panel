@@ -8,6 +8,9 @@ import '@/assets/styles/global.scss'
 import App from './App.vue'
 import router from './router'
 
+// Set default title
+document.title = '三国面板'
+
 const app = createApp(App)
 const pinia = createPinia()
 
