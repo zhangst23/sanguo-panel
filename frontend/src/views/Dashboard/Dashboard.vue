@@ -1,9 +1,9 @@
 <template>
   <div class="dashboard-container">
     <!-- 标题栏：左侧标题 + 右侧操作按钮 -->
-    <div class="dashboard-header">
-      <a-typography-title :heading="2" class="dashboard-title">仪表盘</a-typography-title>
-      <a-space :size="12">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+      <a-typography-title :heading="2" :style="{ margin: 0 }">仪表盘</a-typography-title>
+      <div style="display: flex; align-items: center; gap: 12px;">
         <a-button
           v-if="updateInfo.available"
           type="primary"
@@ -12,7 +12,6 @@
         >
           <template #icon><icon-download /></template>
           更新面板
-          <a-badge :dot :count="1" :offset="[2, -2]" style="margin-left: 4px" />
         </a-button>
         <a-button
           :disabled="operating"
@@ -21,7 +20,7 @@
           <template #icon><icon-refresh /></template>
           重启面板
         </a-button>
-      </a-space>
+      </div>
     </div>
 
     <!-- 重启确认弹窗 -->
@@ -432,16 +431,8 @@ onUnmounted(() => {
 .dashboard-container {
   padding: 0;
 }
-.dashboard-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  margin-bottom: 16px;
-}
-.dashboard-title {
-  margin: 0 !important;
-  text-align: left;
+.dashboard-container :deep(.arco-typography) {
+  text-align: left !important;
 }
 .stat-cards :deep(.arco-card-body) {
   display: flex;
