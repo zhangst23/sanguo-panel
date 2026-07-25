@@ -52,10 +52,10 @@ sanguo-panel/
 - ❌ 不安装任何依赖、不初始化数据库，纯启动 / 检查
 
 启动成功后访问：
-- **前端界面（外网，推荐，走 80 端口 OpenLiteSpeed 反向代理，可绕过仅放行 80/443 的网络）**: http://<服务器IP>/
+- **前端界面（外网）**: http://217.69.2.217:5173
 - **前端界面（本机开发）**: http://localhost:5173
 - **后端 API**: http://localhost:8000
-- **API 文档**: http://<服务器IP>/api-docs
+- **API 文档**: http://217.69.2.217:8000/api-docs
 
 > 若需重新安装依赖、初始化数据库或配置 OpenLiteSpeed / MariaDB，请重新运行 `install.sh`。
 

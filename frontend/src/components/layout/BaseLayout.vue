@@ -296,7 +296,6 @@ const handleMenuClick = (key) => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  position: relative;
 }
 
 .arco-layout-sider :deep(.arco-layout-sider-trigger) {

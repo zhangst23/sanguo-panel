@@ -76,9 +76,9 @@ do_status() {
 
   echo
   PUBLIC_IP=$(curl -s --max-time 3 https://api.ipify.org 2>/dev/null || echo "localhost")
+  echo -e "  面板入口: http://217.69.2.217:$FRONTEND_PORT"
   echo -e "  本机开发访问: http://localhost:$FRONTEND_PORT"
-  echo -e "  外网访问(推荐, 走80端口反向代理): http://$PUBLIC_IP/"
-  echo -e "  API 文档: http://$PUBLIC_IP/api-docs"
+  echo -e "  API 文档: http://localhost:$PANEL_PORT/api-docs"
 }
 
 # ---------- 等待就绪 ----------

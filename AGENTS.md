@@ -10,7 +10,7 @@ python start-all.py
 ```
 
 Access URLs after startup:
-- Frontend: http://localhost:5173
+- Frontend: http://217.69.2.217:5173
 - Backend API: http://localhost:8000
 - API Docs: http://localhost:8000/api-docs
 
