@@ -45,10 +45,8 @@ def install_wordpress_task(site_id: int):
         # 1. WordPress Files Installation using WP-CLI
         # WP-CLI requires PHP CLI SAPI; OLS lsphp is LSAPI-only and cannot run CLI.
         php_path = get_php_path()
+        # project_root is still needed for wp-cli.phar location
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-        if site.root_path and not os.path.isabs(site.root_path):
-            site.root_path = os.path.join(project_root, site.root_path)
-            db.add(site); db.commit()
         bin_dir = os.path.join(project_root, "backend", "bin")
         os.makedirs(bin_dir, exist_ok=True)
         wp_cli_path = os.path.join(bin_dir, "wp-cli.phar")
@@ -286,9 +284,8 @@ def create_site(
             detail="The site with this domain already exists in the system.",
         )
 
-    # 1. Root path default to project_root/wordpress/{domain} if not provided
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-    default_root = os.path.join(project_root, "wordpress", site_in.domain)
+    # 1. Root path default to /var/www/html/{domain} if not provided
+    default_root = os.path.join("/var/www/html", site_in.domain)
     root_path = site_in.root_path or default_root
     if not os.path.isabs(root_path):
         root_path = os.path.join(project_root, root_path)
@@ -691,8 +688,7 @@ def migrate_site(
     existing = db.query(SiteModel).filter(SiteModel.domain == req.domain).first()
     if existing:
         raise HTTPException(status_code=400, detail="Domain already exists")
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-    root_path = os.path.join(project_root, "wordpress", req.domain)
+    root_path = os.path.join("/var/www/html", req.domain)
     default_db = db.query(SharedDatabaseModel).filter(SharedDatabaseModel.status == "active").first()
     if not default_db:
         raise HTTPException(status_code=400, detail="No active shared database")
@@ -831,7 +827,6 @@ def batch_create_sites(
     current_user: Any = Depends(deps.get_current_active_user),
 ) -> Any:
     created = []
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     for item in req.sites:
         existing = db.query(SiteModel).filter(SiteModel.domain == item.domain).first()
         if existing:
@@ -839,7 +834,7 @@ def batch_create_sites(
         default_db = db.query(SharedDatabaseModel).filter(SharedDatabaseModel.status == "active").first()
         if not default_db:
             continue
-        root_path = os.path.join(project_root, "wordpress", item.domain)
+        root_path = os.path.join("/var/www/html", item.domain)
         site = SiteModel(
             domain=item.domain,
             root_path=root_path,

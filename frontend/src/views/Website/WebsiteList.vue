@@ -300,7 +300,7 @@
               </a-col>
             </a-row>
             <a-form-item label="WordPress 文件路径">
-              <a-input v-model="migrateForm.source_path" placeholder="/var/www/wordpress" />
+              <a-input v-model="migrateForm.source_path" placeholder="/var/www/html/wordpress" />
             </a-form-item>
             <a-divider>源站数据库</a-divider>
             <a-row :gutter="12">
@@ -435,7 +435,7 @@ const migrateForm = reactive({
   source_port: 22,
   source_user: 'root',
   source_password: '',
-  source_path: '/var/www/wordpress',
+  source_path: '/var/www/html/wordpress',
   source_db_host: 'localhost',
   source_db_port: 3306,
   source_db_user: '',
