@@ -1,8 +1,8 @@
 <template>
   <div class="dashboard-container">
     <!-- 标题栏：左侧标题 + 右侧操作按钮 -->
-    <a-flex justify="space-between" align="center" class="dashboard-header">
-      <a-typography-title :heading="2" style="margin: 0">仪表盘</a-typography-title>
+    <div class="dashboard-header">
+      <a-typography-title :heading="2" class="dashboard-title">仪表盘</a-typography-title>
       <a-space :size="12">
         <a-button
           v-if="updateInfo.available"
@@ -22,7 +22,7 @@
           重启面板
         </a-button>
       </a-space>
-    </a-flex>
+    </div>
 
     <!-- 重启确认弹窗 -->
     <a-modal
@@ -433,7 +433,15 @@ onUnmounted(() => {
   padding: 0;
 }
 .dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
   margin-bottom: 16px;
+}
+.dashboard-title {
+  margin: 0 !important;
+  text-align: left;
 }
 .stat-cards :deep(.arco-card-body) {
   display: flex;
