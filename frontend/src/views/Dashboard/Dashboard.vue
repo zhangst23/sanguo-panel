@@ -1,7 +1,72 @@
 <template>
   <div class="dashboard-container">
-    <a-typography-title :heading="2">仪表盘</a-typography-title>
-    
+    <!-- 标题栏：左侧标题 + 右侧操作按钮 -->
+    <a-flex justify="space-between" align="center" class="dashboard-header">
+      <a-typography-title :heading="2" style="margin: 0">仪表盘</a-typography-title>
+      <a-space :size="12">
+        <a-button
+          v-if="updateInfo.available"
+          type="primary"
+          :disabled="operating"
+          @click="showUpdateModal"
+        >
+          <template #icon><icon-download /></template>
+          更新面板
+          <a-badge :dot :count="1" :offset="[2, -2]" style="margin-left: 4px" />
+        </a-button>
+        <a-button
+          :disabled="operating"
+          @click="showRestartModal"
+        >
+          <template #icon><icon-refresh /></template>
+          重启面板
+        </a-button>
+      </a-space>
+    </a-flex>
+
+    <!-- 重启确认弹窗 -->
+    <a-modal
+      v-model:visible="restartModalVisible"
+      title="重启面板"
+      @ok="handleRestartConfirm"
+      :ok-loading="restartLoading"
+      ok-text="确认重启"
+    >
+      <p>重启后页面将短暂不可用，面板恢复后刷新页面即可。</p>
+      <p v-if="restartStatus" style="margin-top:8px;color:var(--arco-color-text-3);font-size:13px">
+        状态：{{ restartStatus }}
+      </p>
+    </a-modal>
+
+    <!-- 更新确认弹窗 -->
+    <a-modal
+      v-model:visible="updateModalVisible"
+      title="更新面板"
+      @ok="handleUpdateConfirm"
+      :ok-loading="updateLoading"
+      ok-text="更新并重启"
+    >
+      <p>将执行 <code>git pull --ff-only</code> 拉取最新代码并重启面板，预计需要 30 秒。</p>
+      <a-descriptions
+        v-if="updateInfo.available"
+        :column="1"
+        size="small"
+        style="margin-top:12px"
+        bordered
+      >
+        <a-descriptions-item label="当前版本">{{ updateInfo.current_commit }}</a-descriptions-item>
+        <a-descriptions-item label="最新版本">{{ updateInfo.latest_commit }}</a-descriptions-item>
+        <a-descriptions-item v-if="updateInfo.commit_message" label="更新说明">
+          {{ updateInfo.commit_message }}
+        </a-descriptions-item>
+      </a-descriptions>
+      <p v-if="updateStatus" style="margin-top:8px;color:var(--arco-color-text-3);font-size:13px">
+        状态：{{ updateStatus }}
+      </p>
+    </a-modal>
+
+    <!-- 全屏 loading 遮罩 -->
+    <a-spin :loading="operating" tip="操作进行中，请稍候…" style="width:100%">
     <!-- 实时指标卡片 -->
     <a-row :gutter="20" class="stat-cards">
       <a-col :span="4.8" style="width: 20%">
@@ -75,15 +140,21 @@
         </a-card>
       </a-col>
     </a-row>
+    </a-spin>
   </div>
 </template>
 
 <script setup>
 import { reactive, onMounted, onUnmounted, ref, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { Message } from '@arco-design/web-vue'
 import request from '@/utils/request'
 import * as echarts from 'echarts'
-import { IconArrowRight } from '@arco-design/web-vue/es/icon'
+import {
+  IconArrowRight,
+  IconRefresh,
+  IconDownload,
+} from '@arco-design/web-vue/es/icon'
 
 const router = useRouter()
 const metrics = reactive({
@@ -98,6 +169,118 @@ const timeRange = ref('24h')
 const chartRef = ref(null)
 let chartInstance = null
 let timer = null
+
+// ─── 更新 & 重启相关 ───
+const updateInfo = ref({
+  available: false,
+  current_commit: '',
+  latest_commit: '',
+  commit_message: '',
+})
+const restartModalVisible = ref(false)
+const updateModalVisible = ref(false)
+const restartLoading = ref(false)
+const updateLoading = ref(false)
+const operating = ref(false)
+const restartStatus = ref('')
+const updateStatus = ref('')
+let pollTimer = null
+const POLL_INTERVAL = 2000
+const POLL_TIMEOUT = 60000
+
+const showRestartModal = () => { restartModalVisible.value = true }
+const showUpdateModal = () => { updateModalVisible.value = true }
+
+const fetchUpdateStatus = async () => {
+  try {
+    const res = await request.get('/system/update-check')
+    updateInfo.value = res
+  } catch {
+    // 静默失败，不显示按钮
+  }
+}
+
+const startPolling = (taskUuid, statusRef, onDone) => {
+  const start = Date.now()
+  statusRef.value = 'pending'
+  pollTimer = setInterval(async () => {
+    try {
+      const task = await request.get(`/system/task/${taskUuid}`)
+      statusRef.value = task.status
+      if (task.status === 'running') {
+        statusRef.value = task.message || 'running'
+      }
+      if (['completed', 'success'].includes(task.status)) {
+        clearPolling()
+        operating.value = false
+        onDone?.(true, task.message || '操作完成')
+      } else if (task.status === 'failed') {
+        clearPolling()
+        operating.value = false
+        onDone?.(false, task.error || task.message || '操作失败')
+      } else if (Date.now() - start > POLL_TIMEOUT) {
+        clearPolling()
+        operating.value = false
+        onDone?.(false, '操作超时，请手动刷新页面查看状态')
+      }
+    } catch {
+      // 后端可能已重启导致请求失败：继续轮询到超时
+      statusRef.value = '面板正在重启中…'
+      if (Date.now() - start > POLL_TIMEOUT) {
+        clearPolling()
+        operating.value = false
+        onDone?.(false, '未收到面板响应，请手动刷新页面')
+      }
+    }
+  }, POLL_INTERVAL)
+}
+
+const clearPolling = () => {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
+const handleRestartConfirm = async () => {
+  restartLoading.value = true
+  operating.value = true
+  restartModalVisible.value = false
+  try {
+    const res = await request.post('/system/restart')
+    restartLoading.value = false
+    startPolling(res.task_uuid, restartStatus, (ok, msg) => {
+      if (ok) {
+        Message.success(msg)
+      } else {
+        Message.warning(msg)
+      }
+    })
+  } catch {
+    restartLoading.value = false
+    operating.value = false
+  }
+}
+
+const handleUpdateConfirm = async () => {
+  updateLoading.value = true
+  operating.value = true
+  updateModalVisible.value = false
+  try {
+    const res = await request.post('/system/update')
+    updateLoading.value = false
+    startPolling(res.task_uuid, updateStatus, (ok, msg) => {
+      if (ok) {
+        Message.success(msg)
+      } else {
+        Message.warning(msg)
+      }
+    })
+  } catch {
+    updateLoading.value = false
+    operating.value = false
+  }
+}
 
 const handleTimeRangeChange = () => {
   fetchHistoryData()
@@ -229,6 +412,7 @@ const handleResize = () => {
 
 onMounted(() => {
   fetchMetrics()
+  fetchUpdateStatus()
   timer = setInterval(fetchMetrics, 3000)
   nextTick(() => {
     initChart()
@@ -238,6 +422,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (timer) clearInterval(timer)
+  clearPolling()
   window.removeEventListener('resize', handleResize)
   chartInstance?.dispose()
 })
@@ -246,6 +431,9 @@ onUnmounted(() => {
 <style scoped>
 .dashboard-container {
   padding: 0;
+}
+.dashboard-header {
+  margin-bottom: 16px;
 }
 .stat-cards :deep(.arco-card-body) {
   display: flex;

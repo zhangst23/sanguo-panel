@@ -1,8 +1,9 @@
 # Sanguo Panel 三国面板
 
-Sanguo Panel 是一款专为 WordPress 优化设计的轻量级托管面板，基于 OpenLiteSpeed、MariaDB、Nginx 和 Redis Object Cache 构建。
+Sanguo Panel 是一款专为 WordPress 优化设计的轻量级托管面板，基于 **OpenLiteSpeed**、**MariaDB**、**Redis** 构建。
 
 ## 项目结构
+```
 sanguo-panel/
 ├── venv/                  # 虚拟环境（项目根目录）
 ├── backend/               # FastAPI 后端
@@ -12,6 +13,15 @@ sanguo-panel/
 ├── .gitignore            # 忽略 venv/ 等
 ├── README.md
 └── AGENTS.md
+```
+
+**运行时目录（不在代码仓库中）：**
+```
+/var/www/html/            # WordPress 站点文件（每个站点一个子目录）
+├── site1.com/
+├── site2.com/
+└── ...
+```
 
 ## 核心特性
 
@@ -19,6 +29,7 @@ sanguo-panel/
 - **一键优化**: 支持图片批量压缩 (WebP/AVIF)、前端资源合并、数据库碎片整理。
 - **运维便捷**: 包含 SSL 自动管理 (Let's Encrypt)、全站备份与恢复、多版本 PHP 切换。
 - **安全可靠**: 隐藏登录路径、JWT 安全验证、系统防火墙集成。
+- **OpenLiteSpeed 技术底座**: 采用 LSAPI (lsphp) 运行 PHP，性能卓越，原生支持 LSCache。
 
 ## 快速启动
 
@@ -41,13 +52,12 @@ sanguo-panel/
 - ❌ 不安装任何依赖、不初始化数据库，纯启动 / 检查
 
 启动成功后访问：
-- 前端界面（外网，推荐，走 80 端口 OpenLiteSpeed 反向代理，可绕过仅放行 80/443 的网络）: http://<服务器IP>/
-- 前端界面（本机开发）: http://localhost:5173
-- 后端 API: http://localhost:8000
-- API 文档: http://<服务器IP>/api-docs
+- **前端界面（外网，推荐，走 80 端口 OpenLiteSpeed 反向代理，可绕过仅放行 80/443 的网络）**: http://<服务器IP>/
+- **前端界面（本机开发）**: http://localhost:5173
+- **后端 API**: http://localhost:8000
+- **API 文档**: http://<服务器IP>/api-docs
 
 > 若需重新安装依赖、初始化数据库或配置 OpenLiteSpeed / MariaDB，请重新运行 `install.sh`。
-
 
 ### 前端界面默认账户
 
@@ -56,17 +66,34 @@ sanguo-panel/
 
 ## 技术栈
 
+- **Web 服务器**: OpenLiteSpeed (端口 80/443) — 服务前端静态文件、反代 API 到后端
 - **后端**: FastAPI, SQLAlchemy (SQLite), Pydantic, JWT, Psutil
 - **前端**: Vue 3, Vite, Arco Design, Pinia, Axios, ECharts
+- **数据库**: MariaDB (WordPress 站点), SQLite (面板配置)
+- **缓存**: Redis (WordPress 对象缓存)
+- **PHP**: OpenLiteSpeed 内置 LSAPI (lsphp83/82/81/74)，多版本共存，按站点切换
 
+## WordPress 站点管理
 
-当修改前端代码后静态资源构建生效：  
+- **站点根目录**: `/var/www/html/{domain}/` （创建站点时自动生成）
+- **文件属主**: `nobody:nogroup` (OLS LSAPI worker 用户)
+- **虚拟主机配置**: `/usr/local/lsws/conf/vhosts/{domain}/vhconf.conf`
+- **PHP 版本**: 面板创建/编辑站点时可选，自动生成 per-vhost LSAPI handler
+- **LSCache**: Rewrite 规则 + WP 插件双重启用
+- **SSL**: Let's Encrypt (acme.sh) → 部署到 OLS 443 SNI
+
+## 前端构建部署
+
+修改前端代码后需构建静态资源并重启 OpenLiteSpeed 生效：
+
 ```bash
-   cd /sanguo-panel/frontend
-   npm run build
-   /usr/local/lsws/bin/lswsctrl restart
-```                                  
+cd /sanguo-panel/frontend
+npm run build
+/usr/local/lsws/bin/lswsctrl restart
+```
+
+构建产物输出到 `frontend/dist/`，由 OLS `sanguo-panel` 虚拟主机直接服务。
 
 ## 文档参考
 
-详细的设计文档、测试用例和任务清单请参考 `doc-ai/prd/` 目录。
+详细的设计文档、测试用例和任务清单请参考 `.prd/` 目录。

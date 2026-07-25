@@ -51,8 +51,11 @@ npm run dev
 
 ## Architecture
 
+- **Web Server**: OpenLiteSpeed (port 80/443) — serves frontend static files & proxies API to backend
 - **Backend**: FastAPI + SQLAlchemy (SQLite by default at `backend/panel.db`) + JWT auth
 - **Frontend**: Vue 3 + Vite + Arco Design + Pinia + Axios
+- **Database**: MariaDB (for WordPress sites) + SQLite (for panel config)
+- **Cache**: Redis (object cache for WordPress)
 - **API prefix**: `/api/v1`
 - **Swagger**: `http://localhost:8000/api-docs`
 - **phpMyAdmin**: Proxied through backend at `/phpmyadmin/*` (PHP required in PATH, managed by `backend/utils/pma_server.py`)
@@ -81,9 +84,39 @@ npm run dev
 |------|---------|
 | `backend/` | Python FastAPI app |
 | `frontend/` | Vue 3 SPA |
-| `wordpress/` | WordPress site files |
+| `wordpress/` | Legacy (empty after migration) |
+| `/var/www/html/` | **WordPress site files** (each site in subdirectory: `site1.com/`, `site2.com/`, etc.) |
 | `backup/` | Backup storage |
 | `doc-ai/prd/` | Design docs, test cases, task lists |
+
+## Key Technical Details
+
+### WordPress Site Structure
+- **Root directory**: `/var/www/html/{domain}/`
+- Created automatically when adding sites via panel
+- Owned by `nobody:nogroup` (OLS LSAPI worker user)
+- OLS virtual host `vhRoot` points here
+
+### OpenLiteSpeed Configuration
+- Main config: `/usr/local/lsws/conf/httpd_config.conf`
+- Virtual hosts: `/usr/local/lsws/conf/vhosts/{domain}/vhconf.conf`
+- Panel listener: `Panel80` on `*:80` (maps all panel domains)
+- PHP: Per-vhost LSAPI handler (`lsphp83`, `lsphp82`, `lsphp81`, `lsphp74`)
+- LSCache: Enabled via rewrite rules + WP plugin
+- SSL: Let's Encrypt via `acme.sh`, deployed to OLS 443 SNI
+
+### Multi-PHP Support
+- Installed versions under `/usr/local/lsws/lsphp{83,82,81,74}/`
+- Per-site PHP version configured via panel → creates per-vhost `extProcessor` + `scriptHandler`
+- Default version from global `extProcessor lsphp`
+
+### Database (MariaDB)
+- Shared databases: Each site gets its own DB + user (isolated)
+- Panel config stored in SQLite (`backend/panel.db`)
+
+### Background Tasks
+- WordPress install runs in FastAPI `BackgroundTasks`
+- WP-CLI uses OLS-bundled PHP (`/usr/local/lsws/lsphp83/bin/lsphp`)
 
 ## Notes
 
@@ -91,3 +124,4 @@ npm run dev
 - `.env` file is empty — settings read from env with `pydantic-settings`
 - Backend depends on `psutil` (Windows-compatible system metrics)
 - phpMyAdmin PHP server starts on lifespan; crashes result in 503 errors
+- Frontend builds to `frontend/dist/` → served by OLS `sanguo-panel` vhost
