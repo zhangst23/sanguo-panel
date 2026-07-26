@@ -24,6 +24,7 @@ class SiteCreate(BaseModel):
     shared_db_id: Optional[int] = None
     table_prefix: Optional[str] = None
     performance_preset: str = "balanced"
+    ssl_mode: str = "cloudflare"
     notes: Optional[str] = None
 
     @field_validator('domain')

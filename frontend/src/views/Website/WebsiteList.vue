@@ -58,11 +58,13 @@
         :data="sites"
         :loading="loading"
         :pagination="false"
+        :scroll="{ x: 1200 }"
+        table-layout-fixed
         row-key="id"
         :row-selection="{ type: 'checkbox', selectedRowKeys: selectedIds, onSelect: onSelect, onSelectAll: onSelectAll }"
       >
         <template #columns>
-          <a-table-column title="域名">
+          <a-table-column title="域名" :width="220" ellipsis>
             <template #cell="{ record }">
               <div class="domain-info">
                 <div class="primary-domain">
@@ -133,14 +135,14 @@
               <a-tag color="arcoblue">{{ record.wp_version || '未安装' }}</a-tag>
             </template>
           </a-table-column>
-          <a-table-column title="创建时间">
+          <a-table-column title="创建时间" :width="160">
             <template #cell="{ record }">
               {{ formatDate(record.created_at) }}
             </template>
           </a-table-column>
-          <a-table-column title="操作" :width="280">
+          <a-table-column title="操作" :width="210">
             <template #cell="{ record }">
-              <a-space>
+              <div class="action-btns">
                 <a-button type="text" size="small" @click="handleManage(record)">设置</a-button>
                 <a-button type="text" size="small" @click="handleOpenFiles(record)">
                   <template #icon><icon-folder /></template>
@@ -153,7 +155,7 @@
                 <a-popconfirm content="确定要删除站点吗？此操作不可撤销！" @ok="handleDelete(record.id)" type="warning">
                   <a-button type="text" size="small" status="danger">删除</a-button>
                 </a-popconfirm>
-              </a-space>
+              </div>
             </template>
           </a-table-column>
         </template>
@@ -212,20 +214,40 @@
             ]"
             help="输入主域名，系统将自动配置根目录及数据库"
           >
-            <a-input v-model="form.domain" placeholder="例如: example.com" @input="handleDomainInput" />
+            <a-row :gutter="12">
+              <a-col :span="14">
+                <a-input v-model="form.domain" placeholder="例如: example.com" @input="handleDomainInput" />
+              </a-col>
+              <a-col :span="10">
+                <a-input-tag v-model="form.aliases" placeholder="别名: www.domain.com" allow-clear />
+              </a-col>
+            </a-row>
           </a-form-item>
-          <a-form-item field="php_version" label="PHP 版本">
-            <a-select v-model="form.php_version">
-              <a-option>8.2</a-option>
-              <a-option>8.1</a-option>
-              <a-option>7.4</a-option>
-            </a-select>
-          </a-form-item>
-          <a-form-item label="数据库类型">
-            <a-input placeholder="默认MariaDB" disabled />
-          </a-form-item>
+          <a-row :gutter="12">
+            <a-col :span="12">
+              <a-form-item field="php_version" label="PHP 版本">
+                <a-select v-model="form.php_version">
+                  <a-option>8.2</a-option>
+                  <a-option>8.1</a-option>
+                  <a-option>7.4</a-option>
+                </a-select>
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item label="数据库类型">
+                <a-input placeholder="MariaDB" disabled />
+              </a-form-item>
+            </a-col>
+          </a-row>
           <a-form-item field="root_path" label="根目录">
-            <a-input v-model="form.root_path" placeholder="默认: wordpress/域名" />
+            <a-input v-model="form.root_path" placeholder="/var/www/html/域名" />
+          </a-form-item>
+          <a-form-item field="ssl_mode" label="SSL 模式">
+            <a-radio-group v-model="form.ssl_mode" type="button">
+              <a-radio value="cloudflare">Cloudflare</a-radio>
+              <a-radio value="letsencrypt">面板自动申请</a-radio>
+              <a-radio value="none">不配置 HTTPS</a-radio>
+            </a-radio-group>
           </a-form-item>
         </div>
         <div class="form-section">
@@ -411,10 +433,10 @@
                   <a-button type="text" size="small">下载</a-button>
                   <a-popconfirm content="确定要删除该备份吗？" @ok="handleDeleteBackup(record)">
                     <a-button type="text" size="small" status="danger">删除</a-button>
-                  </a-popconfirm>
-                </a-space>
-              </template>
-            </a-table-column>
+                </a-popconfirm>
+              </a-space>
+            </template>
+          </a-table-column>
           </template>
         </a-table>
       </div>
@@ -494,8 +516,10 @@ const backupLoading = ref(false)
 
 const form = reactive({
   domain: '',
-  root_path: '',
+  aliases: [],
+  root_path: '/var/www/html/',
   php_version: '8.2',
+  ssl_mode: 'cloudflare',
   performance_preset: 'performance'
 })
 
@@ -531,7 +555,10 @@ const handleOpenPMA = async (record) => {
 }
 
 const handleDomainInput = () => {
-  form.root_path = form.domain ? `wordpress/${form.domain}` : ''
+  form.root_path = form.domain ? `/var/www/html/${form.domain}` : '/var/www/html/'
+  if (form.domain && !form.aliases.length) {
+    form.aliases = [`www.${form.domain}`]
+  }
 }
 
 const fetchSites = async () => {
@@ -554,10 +581,16 @@ const handleCreate = async () => {
   try {
     const newSite = await request.post('/sites/', form)
     const siteId = newSite.id
+    // Use raw axios for polling (no error interceptor)
+    const { default: axios } = await import('axios')
+    const poll = axios.create({ baseURL: '/api/v1', timeout: 30000 })
+    const token = localStorage.getItem('token')
     const pollInterval = setInterval(async () => {
       try {
-        const statusRes = await request.get(`/sites/${siteId}`)
-        const notes = statusRes.notes || ''
+        const { data } = await poll.get(`/sites/${siteId}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        })
+        const notes = data.notes || ''
         if (notes.includes('step1:')) installStep.value = 1
         else if (notes.includes('step2:')) installStep.value = 2
         else if (notes.includes('step3:')) installStep.value = 3
@@ -577,7 +610,7 @@ const handleCreate = async () => {
           Message.error('创建失败: ' + notes.replace('failed:', ''))
         }
       } catch (pollError) {
-        console.error(pollError)
+        // Poll silently
       }
     }, 1500)
   } catch (error) {
@@ -852,8 +885,10 @@ const handleDelete = async (id) => {
 const resetForm = () => {
   Object.assign(form, {
     domain: '',
-    root_path: '',
+    aliases: [],
+    root_path: '/var/www/html/',
     php_version: '8.2',
+    ssl_mode: 'cloudflare',
     performance_preset: 'performance'
   })
 }
@@ -885,6 +920,16 @@ onMounted(() => {
 .list-card {
   border-radius: 8px;
   margin-top: 16px;
+}
+.action-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.action-btns .arco-btn-text {
+  padding: 2px 6px;
+  line-height: 1.4;
+  white-space: nowrap;
 }
 .domain-info {
   display: flex;
