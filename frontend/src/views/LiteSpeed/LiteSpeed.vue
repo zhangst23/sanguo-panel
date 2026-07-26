@@ -7,7 +7,7 @@
     <a-tabs default-active-key="1">
       <a-tab-pane key="1" title="服务状态">
         <a-row :gutter="20">
-          <a-col :span="12">
+          <a-col :span="8">
             <a-card title="运行状态" hoverable>
               <template #extra>
                 <a-tag :color="olsStatus.status === 'running' ? 'green' : 'red'">
@@ -47,8 +47,8 @@
               </a-space>
             </a-card>
           </a-col>
-          
-          <a-col :span="12">
+
+          <a-col :span="8">
             <a-card title="性能开关" hoverable>
               <a-space direction="vertical" fill>
                 <div class="config-item">
@@ -70,9 +70,8 @@
               </a-space>
             </a-card>
           </a-col>
-        </a-row>
-        <a-row :gutter="20" style="margin-top: 20px;">
-          <a-col :span="24">
+
+          <a-col :span="8">
             <a-card title="OLS 管理后台" hoverable>
               <template #extra>
                 <a-link href="http://217.69.2.217:7080" target="_blank" :hoverable="false">
@@ -92,7 +91,7 @@
                 </div>
                 <div class="status-item">
                   <span>密&emsp;&emsp;码:</span>
-                  <a-tag>admin123</a-tag>
+                  <a-tag>yLQD50HwqCq4daR</a-tag>
                 </div>
               </a-space>
             </a-card>
