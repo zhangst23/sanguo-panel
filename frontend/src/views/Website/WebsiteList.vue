@@ -64,7 +64,7 @@
         :row-selection="{ type: 'checkbox', selectedRowKeys: selectedIds, onSelect: onSelect, onSelectAll: onSelectAll }"
       >
         <template #columns>
-          <a-table-column title="域名" :width="220" ellipsis>
+          <a-table-column title="域名" :width="200" ellipsis>
             <template #cell="{ record }">
               <div class="domain-info">
                 <div class="primary-domain">
@@ -80,12 +80,12 @@
             </template>
           </a-table-column>
 
-          <a-table-column title="状态">
+          <a-table-column title="状态" :width="100" >
             <template #cell="{ record }">
               <a-badge :status="record.status === 'active' ? 'success' : 'danger'" :text="record.status === 'active' ? '运行中' : '已停止'" />
             </template>
           </a-table-column>
-          <a-table-column title="速度评分（PC/移动）">
+          <a-table-column title="速度（PC/移动）" :width="100">
             <template #cell="{ record }">
               <a-space :size="6">
                 <a-progress
@@ -98,26 +98,26 @@
               </a-space>
             </template>
           </a-table-column>
-          <a-table-column title="缓存状态">
+          <a-table-column title="缓存状态" :width="100" >
             <template #cell="{ record }">
               <a-tag color="green" v-if="record.lscache_enabled">已开启 (四层)</a-tag>
               <a-tag color="gray" v-else>未开启</a-tag>
             </template>
           </a-table-column>
-          <a-table-column title="备份">
+          <a-table-column title="备份" :width="100">
             <template #cell="{ record }">
               <a-link @click="handleBackupList(record)">
                 {{ record.backup_count > 0 ? record.backup_count : '无备份' }}
               </a-link>
             </template>
           </a-table-column>
-          <a-table-column title="监控">
+          <a-table-column title="监控" :width="100">
             <template #cell="{ record }">
               <a-tag color="green" v-if="record.monitor_enabled">已启用</a-tag>
               <a-tag color="gray" v-else>未开启</a-tag>
             </template>
           </a-table-column>
-          <a-table-column title="SSL证书到期时间">
+          <a-table-column title="SSL证书到期时间" :width="150">
             <template #cell="{ record }">
               <div v-if="record.ssl_mode === 'cloudflare'" class="ssl-info">
                 <a-tag size="mini" color="green" style="margin-right: 4px">https</a-tag>
@@ -130,22 +130,21 @@
               <a-tag v-else color="gray">未配置</a-tag>
             </template>
           </a-table-column>
-          <a-table-column title="WordPress版本">
+          <a-table-column title="WordPress版本" :width="90" >
             <template #cell="{ record }">
               <a-tag color="arcoblue">{{ record.wp_version || '未安装' }}</a-tag>
             </template>
           </a-table-column>
-          <a-table-column title="创建时间" :width="160">
+          <a-table-column title="创建时间" :width="150">
             <template #cell="{ record }">
               {{ formatDate(record.created_at) }}
             </template>
           </a-table-column>
-          <a-table-column title="操作" :width="210">
+          <a-table-column title="操作" :width="250">
             <template #cell="{ record }">
               <div class="action-btns">
                 <a-button type="text" size="small" @click="handleManage(record)">设置</a-button>
                 <a-button type="text" size="small" @click="handleOpenFiles(record)">
-                  <template #icon><icon-folder /></template>
                   文件
                 </a-button>
                 <a-button type="text" size="small" @click="handleOpenPMA(record)" style="color: #165dff">
