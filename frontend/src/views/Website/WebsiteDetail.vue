@@ -36,28 +36,24 @@
                   <a class="action-link" @click="openPhpMyAdmin">数据库管理</a>
                 </a-descriptions-item>
                 <a-descriptions-item label="管理后台">
-                  <div class="admin-creds">
-                    <div class="admin-row">
-                      <a class="admin-url-link" :href="adminUrl" target="_blank">
-                        {{ adminUrl || '-' }} <icon-launch />
-                      </a>
-                      <a-button type="text" size="mini" @click="copyToClipboard(adminUrl)">
-                        <template #icon><icon-copy /></template>
-                      </a-button>
-                    </div>
-                    <div class="admin-row">
-                      <span>用户名: {{ adminUser }}</span>
-                      <a-button type="text" size="mini" @click="copyToClipboard(adminUser)">
-                        <template #icon><icon-copy /></template>
-                      </a-button>
-                    </div>
-                    <div class="admin-row">
-                      <span>密码: {{ adminPass }}</span>
-                      <a-button type="text" size="mini" @click="copyToClipboard(adminPass)">
-                        <template #icon><icon-copy /></template>
-                      </a-button>
-                    </div>
-                  </div>
+                  <a class="admin-url-link" :href="adminUrl" target="_blank">
+                    {{ adminUrl || '-' }} <icon-launch />
+                  </a>
+                  <a-button type="text" size="mini" @click="copyToClipboard(adminUrl)">
+                    <template #icon><icon-copy /></template>
+                  </a-button>
+                </a-descriptions-item>
+                <a-descriptions-item label="用户名">
+                  <span>{{ adminUser }}</span>
+                  <a-button type="text" size="mini" @click="copyToClipboard(adminUser)">
+                    <template #icon><icon-copy /></template>
+                  </a-button>
+                </a-descriptions-item>
+                <a-descriptions-item label="密码">
+                  <span>{{ adminPass }}</span>
+                  <a-button type="text" size="mini" @click="copyToClipboard(adminPass)">
+                    <template #icon><icon-copy /></template>
+                  </a-button>
                 </a-descriptions-item>
                 <a-descriptions-item v-if="site.wc_key" label="WooCommerce Key">
                   <a-tag color="arcoblue" copyable>{{ site.wc_key }}</a-tag>
@@ -383,11 +379,27 @@ const adminUrl = computed(() => {
 })
 
 const copyToClipboard = (text) => {
-  navigator.clipboard?.writeText(text).then(() => {
-    Message.success('已复制到剪贴板')
-  }).catch(() => {
-    Message.warning('复制失败')
-  })
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => {
+      Message.success('已复制到剪贴板')
+    }).catch(() => {
+      Message.warning('复制失败')
+    })
+  } else {
+    const el = document.createElement('textarea')
+    el.value = text
+    el.style.position = 'fixed'
+    el.style.opacity = '0'
+    document.body.appendChild(el)
+    el.select()
+    try {
+      document.execCommand('copy')
+      Message.success('已复制到剪贴板')
+    } catch (e) {
+      Message.warning('复制失败')
+    }
+    document.body.removeChild(el)
+  }
 }
 
 const getScoreColor = (score) => {
@@ -661,19 +673,7 @@ onMounted(() => {
   line-height: 1.4;
 }
 
-.admin-creds {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.admin-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 13px;
-}
 .admin-url-link {
   color: var(--color-primary-6);
-  word-break: break-all;
 }
 </style>
