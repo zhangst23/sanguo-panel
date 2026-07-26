@@ -140,7 +140,7 @@
               {{ formatDate(record.created_at) }}
             </template>
           </a-table-column>
-          <a-table-column title="操作" :width="250">
+          <a-table-column title="操作" :width="300">
             <template #cell="{ record }">
               <div class="action-btns">
                 <a-button type="text" size="small" @click="handleManage(record)">设置</a-button>
