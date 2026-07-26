@@ -35,8 +35,29 @@
                   {{ site.db_name || '-' }}
                   <a class="action-link" @click="openPhpMyAdmin">数据库管理</a>
                 </a-descriptions-item>
-                <a-descriptions-item label="创建时间">
-                  {{ site.created_at ? new Date(site.created_at).toLocaleString('zh-CN') : '-' }}
+                <a-descriptions-item label="管理后台">
+                  <div class="admin-creds">
+                    <div class="admin-row">
+                      <a class="admin-url-link" :href="adminUrl" target="_blank">
+                        {{ adminUrl || '-' }} <icon-launch />
+                      </a>
+                      <a-button type="text" size="mini" @click="copyToClipboard(adminUrl)">
+                        <template #icon><icon-copy /></template>
+                      </a-button>
+                    </div>
+                    <div class="admin-row">
+                      <span>用户名: {{ adminUser }}</span>
+                      <a-button type="text" size="mini" @click="copyToClipboard(adminUser)">
+                        <template #icon><icon-copy /></template>
+                      </a-button>
+                    </div>
+                    <div class="admin-row">
+                      <span>密码: {{ adminPass }}</span>
+                      <a-button type="text" size="mini" @click="copyToClipboard(adminPass)">
+                        <template #icon><icon-copy /></template>
+                      </a-button>
+                    </div>
+                  </div>
                 </a-descriptions-item>
                 <a-descriptions-item v-if="site.wc_key" label="WooCommerce Key">
                   <a-tag color="arcoblue" copyable>{{ site.wc_key }}</a-tag>
@@ -290,7 +311,7 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import request from '@/utils/request'
 import { Message } from '@arco-design/web-vue'
-import { IconLeft, IconCheckCircleFill, IconEmpty } from '@arco-design/web-vue/es/icon'
+import { IconLeft, IconCheckCircleFill, IconEmpty, IconCopy, IconLaunch } from '@arco-design/web-vue/es/icon'
 
 const route = useRoute()
 const router = useRouter()
@@ -341,6 +362,34 @@ const latestBackup = computed(() => {
     (a, b) => new Date(b.created_at) - new Date(a.created_at)
   )[0]
 })
+
+const adminUser = computed(() => {
+  const n = site.value.notes || ''
+  const m = n.match(/管理员:\s*(\S+)/)
+  return m ? m[1] : ''
+})
+
+const adminPass = computed(() => {
+  const n = site.value.notes || ''
+  const m = n.match(/密码:\s*(\S+)/)
+  return m ? m[1] : ''
+})
+
+const adminUrl = computed(() => {
+  const d = site.value.domain
+  if (!d) return ''
+  const proto = site.value.ssl_mode && site.value.ssl_mode !== 'none' ? 'https' : 'http'
+  const loginPath = site.value.wp_hide_login_path || 'wp-login.php'
+  return `${proto}://${d}/${loginPath}`
+})
+
+const copyToClipboard = (text) => {
+  navigator.clipboard?.writeText(text).then(() => {
+    Message.success('已复制到剪贴板')
+  }).catch(() => {
+    Message.warning('复制失败')
+  })
+}
 
 const getScoreColor = (score) => {
   if (score >= 90) return '#00b42a'
@@ -611,5 +660,21 @@ onMounted(() => {
   font-size: 12px;
   color: var(--color-text-3);
   line-height: 1.4;
+}
+
+.admin-creds {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.admin-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+}
+.admin-url-link {
+  color: var(--color-primary-6);
+  word-break: break-all;
 }
 </style>
