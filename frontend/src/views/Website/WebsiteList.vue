@@ -57,11 +57,13 @@
       <a-table
         :data="sites"
         :loading="loading"
-        :pagination="false"
+        :pagination="pagination"
         :scroll="{ x: 1200 }"
         table-layout-fixed
         row-key="id"
-        :row-selection="{ type: 'checkbox', selectedRowKeys: selectedIds, onSelect: onSelect, onSelectAll: onSelectAll }"
+        v-model:selected-keys="selectedIds"
+        :row-selection="{ type: 'checkbox', showCheckedAll: true }"
+        @selection-change="onSelectionChange"
       >
         <template #columns>
           <a-table-column title="域名" :width="200" ellipsis>
@@ -522,8 +524,16 @@ const form = reactive({
   performance_preset: 'performance'
 })
 
-const onSelect = (rowKeys) => selectedIds.value = rowKeys
-const onSelectAll = (rowKeys) => selectedIds.value = rowKeys
+const onSelectionChange = (rowKeys) => {
+  selectedIds.value = rowKeys
+}
+
+const pagination = {
+  pageSize: 10,
+  pageSizeOptions: [10, 100, 500],
+  showTotal: (total) => `共 ${total} 站点`,
+  showPageSize: true,
+}
 
 const getScoreColor = (score) => {
   if (score >= 90) return '#00b42a'
