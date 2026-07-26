@@ -620,14 +620,298 @@ def create_shared_database(
 
 
 # ----------------------------------------------------
-# Change Domain
+# Change Domain (with progress tracking)
 # ----------------------------------------------------
-@router.put("/{id}/change-domain", response_model=Site)
+import time as _time
+import threading as _threading
+
+_domain_change_tasks: dict = {}
+_task_lock = _threading.Lock()
+
+
+def _set_progress(task_id: str, steps: list):
+    with _task_lock:
+        _domain_change_tasks[task_id] = {"steps": steps, "done": False}
+
+
+def _mark_done(task_id: str, result: dict):
+    with _task_lock:
+        if task_id in _domain_change_tasks:
+            _domain_change_tasks[task_id]["done"] = True
+            _domain_change_tasks[task_id]["result"] = result
+
+
+def _run_domain_change(
+    task_id: str, db_factory, site_id: int, old_domain: str, new_domain: str,
+    old_root_path: str, new_root_path: str, old_db_password: str,
+    old_db_name: str, old_db_user: str, new_db_name: str, new_db_user: str,
+    shared_db_host: str, shared_db_port: int, shared_db_user: str, shared_db_pass: str,
+    php_version: str, ssl_mode: str,
+):
+    steps = [
+        {"name": "重命名WordPress文件夹", "message": f"{old_root_path} → {new_root_path}", "status": "pending"},
+        {"name": "创建新数据库和用户", "message": f"数据库: {new_db_name}, 用户: {new_db_user}", "status": "pending"},
+        {"name": "迁移数据库数据", "message": f"mysqldump {old_db_name} → {new_db_name}", "status": "pending"},
+        {"name": "更新wp-config.php", "message": "更新 DB_NAME / DB_USER", "status": "pending"},
+        {"name": "更新WordPress站点URL", "message": "更新 home 和 siteurl 选项", "status": "pending"},
+        {"name": "更新OLS虚拟主机", "message": f"删除 {old_domain}, 创建 {new_domain}", "status": "pending"},
+        {"name": "更新面板记录", "message": "保存新域名到数据库", "status": "pending"},
+    ]
+    _set_progress(task_id, steps)
+
+    def step_run(idx, message=None):
+        steps[idx]["status"] = "running"
+        if message:
+            steps[idx]["message"] = message
+        _set_progress(task_id, steps)
+        _time.sleep(0.3)
+
+    def step_ok(idx, message=None):
+        steps[idx]["status"] = "done"
+        if message:
+            steps[idx]["message"] = message
+        _set_progress(task_id, steps)
+        _time.sleep(0.3)
+
+    def step_fail(idx, message):
+        steps[idx]["status"] = "failed"
+        steps[idx]["message"] = message
+        _set_progress(task_id, steps)
+
+    # --- Step 0: Rename folder ---
+    step_run(0)
+    if os.path.isdir(old_root_path):
+        if not os.path.isdir(new_root_path):
+            try:
+                shutil.move(old_root_path, new_root_path)
+                step_ok(0)
+            except Exception as e:
+                step_fail(0, f"重命名失败: {e}")
+                _mark_done(task_id, {"error": f"文件夹重命名失败: {e}"})
+                return
+        else:
+            step_ok(0, "目标文件夹已存在，跳过重命名")
+    else:
+        step_fail(0, f"原文件夹不存在: {old_root_path}")
+        _mark_done(task_id, {"error": f"原文件夹不存在: {old_root_path}"})
+        return
+
+    # --- Step 1: Create new DB & user ---
+    step_run(1)
+    if shared_db_host and old_db_name:
+        try:
+            conn = mysql.connector.connect(
+                host=shared_db_host, port=shared_db_port,
+                user=shared_db_user, password=shared_db_pass,
+                connect_timeout=5,
+            )
+            cursor = conn.cursor()
+            cursor.execute(
+                f"CREATE DATABASE IF NOT EXISTS `{new_db_name}` "
+                f"CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+            )
+            try:
+                cursor.execute(
+                    f"CREATE USER '{new_db_user}'@'localhost' "
+                    f"IDENTIFIED BY '{old_db_password}'"
+                )
+            except Exception:
+                cursor.execute(
+                    f"ALTER USER '{new_db_user}'@'localhost' "
+                    f"IDENTIFIED BY '{old_db_password}'"
+                )
+            cursor.execute(
+                f"GRANT ALL PRIVILEGES ON `{new_db_name}`.* "
+                f"TO '{new_db_user}'@'localhost'"
+            )
+            cursor.execute("FLUSH PRIVILEGES")
+            cursor.close()
+            conn.close()
+            step_ok(1)
+        except Exception as e:
+            step_fail(1, f"数据库连接失败: {e}")
+            _mark_done(task_id, {"error": f"数据库连接失败: {e}"})
+            return
+
+    # --- Step 2: Migrate data ---
+    step_run(2)
+    try:
+        dump_pass = shared_db_pass.replace("'", "'\\''")
+        dump_cmd = (
+            f"mysqldump -h {shared_db_host} -P {shared_db_port} "
+            f"-u {shared_db_user} -p'{dump_pass}' "
+            f"--single-transaction --skip-lock-tables '{old_db_name}' "
+            f"| mysql -h {shared_db_host} -P {shared_db_port} "
+            f"-u {shared_db_user} -p'{dump_pass}' '{new_db_name}'"
+        )
+        r = subprocess.run(
+            dump_cmd, shell=True, capture_output=True, text=True, timeout=120
+        )
+        if r.returncode != 0:
+            step_fail(2, f"迁移失败: {r.stderr[:200]}")
+            _mark_done(task_id, {"error": f"数据库迁移失败: {r.stderr[:200]}"})
+            return
+        step_ok(2)
+    except subprocess.TimeoutExpired:
+        step_fail(2, "迁移超时")
+        _mark_done(task_id, {"error": "数据库迁移超时"})
+        return
+    except Exception as e:
+        step_fail(2, f"迁移异常: {e}")
+        _mark_done(task_id, {"error": f"数据库迁移异常: {e}"})
+        return
+
+    # --- Step 3: Update wp-config.php ---
+    step_run(3)
+    wp_config_path = os.path.join(new_root_path, "wp-config.php")
+    if os.path.exists(wp_config_path):
+        try:
+            with open(wp_config_path, "r") as f:
+                config = f.read()
+            config = re.sub(
+                r"define\(\s*['\"]DB_NAME['\"]\s*,\s*['\"][^'\"]*['\"]\s*\)",
+                f"define('DB_NAME', '{new_db_name}')",
+                config,
+            )
+            config = re.sub(
+                r"define\(\s*['\"]DB_USER['\"]\s*,\s*['\"][^'\"]*['\"]\s*\)",
+                f"define('DB_USER', '{new_db_user}')",
+                config,
+            )
+            with open(wp_config_path, "w") as f:
+                f.write(config)
+            step_ok(3)
+        except Exception as e:
+            step_fail(3, f"更新失败: {e}")
+            _mark_done(task_id, {"error": f"wp-config更新失败: {e}"})
+            return
+    else:
+        step_fail(3, "wp-config.php 不存在")
+        _mark_done(task_id, {"error": "wp-config.php 不存在"})
+        return
+
+    # --- Step 4: Update WordPress options ---
+    step_run(4)
+    try:
+        php_path, wp_cli_path = _get_wp_cli_paths_raw()
+        if php_path and os.path.exists(wp_cli_path) and \
+           os.path.exists(os.path.join(new_root_path, "wp-load.php")):
+            protocol = "https" if ssl_mode and ssl_mode != "none" else "http"
+            new_url = f"{protocol}://{new_domain}"
+            for opt in ("home", "siteurl"):
+                r = subprocess.run(
+                    [
+                        php_path, wp_cli_path, "option", "update", opt, new_url,
+                        f"--path={new_root_path}", "--allow-root",
+                    ],
+                    capture_output=True, text=True, timeout=60,
+                )
+                if r.returncode != 0:
+                    steps[4]["message"] = f"WP-CLI 命令返回错误: {opt} {r.stderr[:100]}"
+        step_ok(4)
+    except Exception as e:
+        step_fail(4, f"WP-CLI 失败: {e}")
+        # Continue anyway - this is not a blocking error
+
+    # --- Step 5: Update OLS vhost (single restart) ---
+    step_run(5)
+    try:
+        _update_ols_domain(old_domain, new_domain, new_root_path)
+        step_ok(5)
+    except Exception as e:
+        step_fail(5, f"OLS 失败: {e}")
+        _mark_done(task_id, {"error": f"OLS更新失败: {e}"})
+        return
+
+    # --- Step 6: Update panel DB record ---
+    step_run(6)
+    try:
+        db = db_factory()
+        site = db.query(SiteModel).filter(SiteModel.id == site_id).first()
+        if site:
+            site.domain = new_domain
+            site.root_path = new_root_path
+            site.db_name = new_db_name
+            site.db_user = new_db_user
+            db.add(site)
+            db.commit()
+            db.refresh(site)
+            step_ok(6)
+            _mark_done(task_id, {"success": True, "domain": new_domain})
+        else:
+            step_fail(6, "面板中未找到该站点")
+            _mark_done(task_id, {"error": "面板记录更新失败"})
+        db.close()
+    except Exception as e:
+        step_fail(6, f"面板记录失败: {e}")
+        _mark_done(task_id, {"error": f"面板记录更新失败: {e}"})
+
+
+def _get_wp_cli_paths_raw():
+    php_path = get_php_path()
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    wp_cli_path = os.path.join(project_root, "backend", "bin", "wp-cli.phar")
+    return php_path, wp_cli_path
+
+
+def _update_ols_domain(old_domain: str, new_domain: str, new_root_path: str):
+    """Update OLS vhost domain in-place (one restart)."""
+    from backend.utils.ols_utils import OLS_CONF, VHOSTS_DIR, restart_ols
+
+    old_domain = old_domain.lower()
+    new_domain = new_domain.lower()
+
+    with open(OLS_CONF, "r") as f:
+        conf = f.read()
+
+    # Replace virtualHost block: change domain + vhRoot
+    def _replace_vhost(m):
+        block = m.group(0)
+        block = block.replace(old_domain, new_domain)
+        block = re.sub(r"(vhRoot\s+)\S+", r"\g<1>" + new_root_path, block)
+        return block
+
+    conf = re.sub(
+        r"virtualHost " + re.escape(old_domain) + r"\{[^{}]*\}",
+        _replace_vhost,
+        conf,
+    )
+
+    # Replace listener map line
+    conf = re.sub(
+        r"map\s+" + re.escape(old_domain) + r"\s+" + re.escape(old_domain),
+        f"map                      {new_domain} {new_domain}",
+        conf,
+    )
+
+    with open(OLS_CONF, "w") as f:
+        f.write(conf)
+
+    # Rename vhost config directory
+    old_vhost_dir = os.path.join(VHOSTS_DIR, old_domain)
+    new_vhost_dir = os.path.join(VHOSTS_DIR, new_domain)
+    if os.path.isdir(old_vhost_dir) and not os.path.isdir(new_vhost_dir):
+        shutil.move(old_vhost_dir, new_vhost_dir)
+
+    # Update configFile reference inside the new vhconf
+    vhconf_path = os.path.join(new_vhost_dir, "vhconf.conf")
+    if os.path.exists(vhconf_path):
+        with open(vhconf_path, "r") as f:
+            vhconf = f.read()
+        vhconf = vhconf.replace(old_domain, new_domain)
+        with open(vhconf_path, "w") as f:
+            f.write(vhconf)
+
+    restart_ols()
+
+
+@router.put("/{id}/change-domain")
 def change_site_domain(
     *,
     db: Session = Depends(deps.get_db),
     id: int,
     req: ChangeDomainRequest,
+    background_tasks: BackgroundTasks,
     current_user: Any = Depends(deps.get_current_active_user),
 ) -> Any:
     site = db.query(SiteModel).filter(SiteModel.id == id).first()
@@ -636,18 +920,62 @@ def change_site_domain(
     existing = db.query(SiteModel).filter(SiteModel.domain == req.new_domain).first()
     if existing:
         raise HTTPException(status_code=400, detail="Domain already exists")
+
     old_domain = site.domain
-    site.domain = req.new_domain
-    # Update OLS vhost
-    try:
-        remove_ols_vhost(old_domain)
-        create_ols_vhost(req.new_domain, site.root_path, site.php_version)
-    except Exception as e:
-        print(f"OLS domain change error: {e}")
-    db.add(site)
-    db.commit()
-    db.refresh(site)
-    return site
+    new_domain = req.new_domain
+    old_root_path = site.root_path
+    new_root_path = os.path.join("/var/www/html", new_domain)
+    old_db_password = site.db_password
+    old_db_name = site.db_name
+    old_db_user = site.db_user
+
+    safe_new = new_domain.replace('.', '_').replace('-', '_')
+    new_db_name = f"db_{safe_new}"
+    new_db_user = f"u_{safe_new}"[:16]
+
+    # Get shared DB info
+    shared_db = db.query(SharedDatabaseModel).filter(
+        SharedDatabaseModel.id == site.shared_db_id
+    ).first()
+    shared_db_host = shared_db.db_host if shared_db else ""
+    shared_db_port = shared_db.db_port if shared_db else 3306
+    shared_db_user = shared_db.db_user if shared_db else ""
+    shared_db_pass = shared_db.db_password if shared_db else ""
+
+    # Create a reusable db session factory for the background thread
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from backend.core.config import settings
+    engine = create_engine(settings.DATABASE_URL)
+    SessionLocal = sessionmaker(bind=engine)
+    def db_factory():
+        return SessionLocal()
+
+    task_id = f"{id}_{new_domain}_{int(_time.time())}"
+
+    thread = _threading.Thread(
+        target=_run_domain_change,
+        args=(
+            task_id, db_factory, id, old_domain, new_domain,
+            old_root_path, new_root_path, old_db_password,
+            old_db_name, old_db_user, new_db_name, new_db_user,
+            shared_db_host, shared_db_port, shared_db_user, shared_db_pass,
+            site.php_version, site.ssl_mode or "",
+        ),
+        daemon=True,
+    )
+    thread.start()
+
+    return {"task_id": task_id}
+
+
+@router.get("/change-domain/{task_id}/progress")
+def get_domain_change_progress(task_id: str) -> Any:
+    with _task_lock:
+        data = _domain_change_tasks.get(task_id)
+    if not data:
+        return {"steps": [], "done": False, "error": "任务不存在"}
+    return data
 
 
 # ----------------------------------------------------

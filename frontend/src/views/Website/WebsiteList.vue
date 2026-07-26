@@ -341,7 +341,7 @@
     </a-modal>
 
     <!-- Change Domain Modal -->
-    <a-modal v-model:visible="showDomainModal" title="更换域名" :width="400" @cancel="showDomainModal = false" :footer="false">
+    <a-modal v-model:visible="showDomainModal" title="更换域名" :width="500" @cancel="onCancelDomainChange" :footer="false">
       <a-form :model="domainForm" layout="vertical">
         <a-form-item label="当前域名">
           <a-input :model-value="currentSite?.domain" disabled />
@@ -349,10 +349,35 @@
         <a-form-item field="new_domain" label="新域名" required
           :rules="[{ required: true, message: '请输入新域名' }]"
         >
-          <a-input v-model="domainForm.new_domain" placeholder="new-domain.com" />
+          <a-input v-model="domainForm.new_domain" placeholder="new-domain.com" :disabled="domainChanging" />
         </a-form-item>
       </a-form>
-      <a-button type="primary" long :loading="domainLoading" @click="handleDomainChange">确认更换</a-button>
+      <!-- Progress steps -->
+      <div v-if="domainChanging" class="domain-progress">
+        <div
+          v-for="(step, idx) in domainSteps"
+          :key="idx"
+          class="domain-progress-step"
+          :class="'status-' + step.status"
+        >
+          <span class="step-icon">
+            <icon-loading v-if="step.status === 'running'" />
+            <icon-check-circle v-else-if="step.status === 'done'" />
+            <icon-close-circle v-else-if="step.status === 'failed'" />
+            <span class="step-dot" v-else />
+          </span>
+          <span class="step-text">{{ step.name }}</span>
+          <span class="step-msg">{{ step.message }}</span>
+        </div>
+      </div>
+      <a-button
+        v-if="!domainChanging"
+        type="primary" long :loading="domainLoading" @click="handleDomainChange"
+      >确认更换</a-button>
+      <a-button
+        v-if="domainChanging && domainDone"
+        type="primary" long @click="onDomainChangeComplete"
+      >完成</a-button>
     </a-modal>
 
     <!-- Nginx CF Config Modal -->
@@ -407,6 +432,8 @@ import {
   IconMore,
   IconInfoCircle,
   IconCheckCircleFill,
+  IconCheckCircle,
+  IconCloseCircle,
   IconLaunch,
   IconLoading,
   IconFolder,
@@ -448,6 +475,10 @@ const showDomainModal = ref(false)
 const domainLoading = ref(false)
 const currentSite = ref(null)
 const domainForm = reactive({ new_domain: '' })
+const domainChanging = ref(false)
+const domainDone = ref(false)
+const domainSteps = ref([])
+let domainPollTimer = null
 
 const batchPluginSlug = ref('')
 const pluginSlugVisible = ref(false)
@@ -668,21 +699,69 @@ const handleMigrateSSH = async () => {
 const openDomainChange = (record) => {
   currentSite.value = record
   domainForm.new_domain = ''
+  domainChanging.value = false
+  domainDone.value = false
+  domainSteps.value = []
   showDomainModal.value = true
+}
+
+const onCancelDomainChange = () => {
+  if (domainChanging.value && !domainDone.value) return
+  stopDomainPolling()
+  showDomainModal.value = false
+}
+
+const stopDomainPolling = () => {
+  if (domainPollTimer) {
+    clearInterval(domainPollTimer)
+    domainPollTimer = null
+  }
+}
+
+const onDomainChangeComplete = () => {
+  stopDomainPolling()
+  showDomainModal.value = false
+  domainChanging.value = false
+  domainDone.value = false
+  fetchSites()
 }
 
 const handleDomainChange = async () => {
   if (!domainForm.new_domain) { Message.warning('请输入新域名'); return }
   domainLoading.value = true
   try {
-    await request.put(`/sites/${currentSite.value.id}/change-domain`, { new_domain: domainForm.new_domain })
-    Message.success('域名更换成功')
-    showDomainModal.value = false
-    fetchSites()
-  } catch (error) {
-    Message.error('更换域名失败: ' + (error.response?.data?.detail || error.message))
-  } finally {
+    const res = await request.put(`/sites/${currentSite.value.id}/change-domain`, { new_domain: domainForm.new_domain })
+    const taskId = res.task_id
+    domainChanging.value = true
     domainLoading.value = false
+    domainDone.value = false
+
+    const { default: axios } = await import('axios')
+    const poll = axios.create({ baseURL: '/api/v1', timeout: 15000 })
+
+    domainPollTimer = setInterval(async () => {
+      try {
+        const token = localStorage.getItem('token')
+        const { data } = await poll.get(`/sites/change-domain/${taskId}/progress`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        })
+        domainSteps.value = data.steps || []
+        if (data.done) {
+          stopDomainPolling()
+          domainDone.value = true
+          if (data.result?.error) {
+            Message.error(data.result.error)
+          } else if (data.result?.success) {
+            Message.success('域名更换完成')
+          }
+        }
+      } catch (e) {
+        // Poll silently, don't show error toasts
+      }
+    }, 2000)
+  } catch (error) {
+    domainLoading.value = false
+    Message.error('更换域名失败: ' + (error.response?.data?.detail || error.message))
   }
 }
 
@@ -915,5 +994,59 @@ onMounted(() => {
 .migrate-hint {
   color: var(--color-text-3);
   margin-bottom: 16px;
+}
+
+/* Domain change progress */
+.domain-progress {
+  margin: 16px 0;
+}
+.domain-progress-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 13px;
+}
+.step-icon {
+  display: flex;
+  align-items: center;
+  font-size: 16px;
+  width: 20px;
+  flex-shrink: 0;
+}
+.step-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-fill-3);
+  display: inline-block;
+  margin-left: 4px;
+}
+.status-running .step-icon {
+  color: var(--color-primary-6);
+  animation: arco-loading-circle 1s linear infinite;
+}
+.status-done .step-icon {
+  color: #00b42a;
+}
+.status-failed .step-icon {
+  color: #f53f3f;
+}
+.status-running .step-text {
+  color: var(--color-primary-6);
+  font-weight: 500;
+}
+.status-done .step-text {
+  color: #00b42a;
+}
+.status-failed .step-text {
+  color: #f53f3f;
+}
+.step-msg {
+  display: block;
+  width: 100%;
+  font-size: 11px;
+  color: var(--color-text-3);
+  word-break: break-all;
 }
 </style>
