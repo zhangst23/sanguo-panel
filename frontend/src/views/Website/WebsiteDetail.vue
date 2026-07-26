@@ -379,8 +379,7 @@ const adminUrl = computed(() => {
   const d = site.value.domain
   if (!d) return ''
   const proto = site.value.ssl_mode && site.value.ssl_mode !== 'none' ? 'https' : 'http'
-  const loginPath = site.value.wp_hide_login_path || 'wp-login.php'
-  return `${proto}://${d}/${loginPath}`
+  return `${proto}://${d}/wp-login.php`
 })
 
 const copyToClipboard = (text) => {

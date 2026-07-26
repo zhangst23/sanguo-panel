@@ -78,6 +78,13 @@ def install_wordpress_task(site_id: int):
             if ols_res.get("success")
             else f"⚠️ OLS 虚拟主机创建失败: {ols_res.get('msg')}"
         )
+
+        # 1.7 Register domain on SSL listener for HTTPS (cloudflare/letsencrypt)
+        try:
+            _register_ssl_listener(site.domain)
+        except Exception:
+            pass
+
         db.add(site)
         db.commit()
 
@@ -852,6 +859,21 @@ def _get_wp_cli_paths_raw():
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     wp_cli_path = os.path.join(project_root, "backend", "bin", "wp-cli.phar")
     return php_path, wp_cli_path
+
+
+def _register_ssl_listener(domain: str):
+    """Add domain to OLS Panel443 SSL listener so HTTPS works."""
+    from backend.utils.ols_utils import OLS_CONF
+    with open(OLS_CONF, "r") as f:
+        conf = f.read()
+    map_line = f"    map                      {domain} {domain}"
+    if map_line not in conf:
+        idx = conf.find("listener Panel443{")
+        if idx != -1:
+            end = conf.find("}", idx)
+            conf = conf[:end] + map_line + "\n" + conf[end:]
+            with open(OLS_CONF, "w") as f:
+                f.write(conf)
 
 
 def _update_ols_domain(old_domain: str, new_domain: str, new_root_path: str):
