@@ -34,9 +34,9 @@
         >
           <a-option v-for="p in presetPlugins" :key="p.slug" :value="p.slug" :label="p.name" />
         </a-select>
-        <a-button size="small" type="outline" @click="batchInstallPlugin" :disabled="selectedIds.length === 0 || !batchInstallSlug">安装</a-button>
+        <a-button size="small" type="outline" @click="batchInstallPlugin" :disabled="selectedIds.length === 0 || !batchInstallSlug">安装插件</a-button>
         <a-popover trigger="manual" v-model:popup-visible="pluginSlugVisible">
-          <a-button size="small" status="warning" @click="batchReleaseIndex" :disabled="selectedIds.length === 0" :loading="batchReleaseLoading">放开索引</a-button>
+          
         <a-button size="small" status="danger" @click="batchDeletePlugin" :disabled="selectedIds.length === 0">删除插件</a-button>
           <template #content>
             <div style="width: 240px">
@@ -46,6 +46,8 @@
             </div>
           </template>
         </a-popover>
+
+        <a-button size="small" status="warning" @click="batchReleaseIndex" :disabled="selectedIds.length === 0" :loading="batchReleaseLoading">放开索引</a-button>
       </a-space>
     </a-card>
 
