@@ -36,7 +36,8 @@
         </a-select>
         <a-button size="small" type="outline" @click="batchInstallPlugin" :disabled="selectedIds.length === 0 || !batchInstallSlug">安装</a-button>
         <a-popover trigger="manual" v-model:popup-visible="pluginSlugVisible">
-          <a-button size="small" status="danger" @click="batchDeletePlugin" :disabled="selectedIds.length === 0">删除插件</a-button>
+          <a-button size="small" status="warning" @click="batchReleaseIndex" :disabled="selectedIds.length === 0" :loading="batchReleaseLoading">放开索引</a-button>
+        <a-button size="small" status="danger" @click="batchDeletePlugin" :disabled="selectedIds.length === 0">删除插件</a-button>
           <template #content>
             <div style="width: 240px">
               <p>输入要删除的插件 slug：</p>
@@ -69,6 +70,8 @@
         v-model:selected-keys="selectedIds"
         :row-selection="{ type: 'checkbox', showCheckedAll: true }"
         @selection-change="onSelectionChange"
+        @page-change="handlePageChange"
+        @page-size-change="handlePageSizeChange"
       >
         <template #columns>
           <a-table-column title="域名" :width="200" ellipsis>
@@ -573,6 +576,7 @@ const showBatchModal = ref(false)
 const csvContent = ref('')
 const batchLoading = ref(false)
 const batchWPUpdateLoading = ref(false)
+const batchReleaseLoading = ref(false)
 
 const showAIRepairModal = ref(false)
 const aiRepairLoading = ref(false)
@@ -659,11 +663,21 @@ const onSelectionChange = (rowKeys) => {
   selectedIds.value = rowKeys
 }
 
-const pagination = {
+const pagination = reactive({
+  current: 1,
   pageSize: 10,
   pageSizeOptions: [10, 100, 500],
   showTotal: (total) => `共 ${total} 站点`,
   showPageSize: true,
+})
+
+const handlePageChange = (page) => {
+  pagination.current = page
+}
+
+const handlePageSizeChange = (size) => {
+  pagination.pageSize = size
+  pagination.current = 1
 }
 
 const getScoreColor = (score) => {
@@ -966,6 +980,27 @@ const confirmDeletePlugin = async () => {
     }
   }
   batchTaskLoading.value = false
+}
+
+const batchReleaseIndex = async () => {
+  if (selectedIds.value.length === 0) { Message.warning('请先选择站点'); return }
+  batchReleaseLoading.value = true
+  try {
+    const res = await request.post('/sites/batch/release-index', selectedIds.value, { timeout: 60000 })
+    const results = res.results || []
+    const success = results.filter(r => r.success).length
+    const failed = results.filter(r => !r.success).length
+    if (failed > 0) {
+      Message.warning(`放开索引完成: ${success} 成功, ${failed} 失败`)
+    } else {
+      Message.success(`已为 ${success} 个站点放开搜索引擎索引`)
+    }
+    fetchSites()
+  } catch (e) {
+    Message.error('操作失败: ' + (e.response?.data?.detail || e.message))
+  } finally {
+    batchReleaseLoading.value = false
+  }
 }
 
 const batchGenerateWooKeys = async () => {

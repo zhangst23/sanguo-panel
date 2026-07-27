@@ -1711,6 +1711,34 @@ wp rewrite flush
     }
 
 
+@router.post("/batch/release-index")
+def batch_release_index(
+    *,
+    db: Session = Depends(deps.get_db),
+    site_ids: List[int],
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    results = []
+    for site_id in site_ids:
+        site = db.query(SiteModel).filter(SiteModel.id == site_id).first()
+        if not site or site.status != "active":
+            results.append({"id": site_id, "domain": site.domain if site else None, "success": False, "msg": "站点不存在或未激活"})
+            continue
+        try:
+            php_path, wp_cli_path = _get_wp_cli(site)
+            subprocess.run(
+                [php_path, wp_cli_path, "option", "update", "blog_public", "1", f"--path={site.root_path}", "--allow-root"],
+                check=True, capture_output=True
+            )
+            site.discourage_search_engines = False
+            db.add(site)
+            results.append({"id": site_id, "domain": site.domain, "success": True, "msg": "已放开搜索引擎索引"})
+        except Exception as e:
+            results.append({"id": site_id, "domain": site.domain, "success": False, "msg": str(e)})
+    db.commit()
+    return {"results": results}
+
+
 @router.get("/{id}/nginx-cloudflare")
 def get_nginx_cloudflare_config(
     *,
