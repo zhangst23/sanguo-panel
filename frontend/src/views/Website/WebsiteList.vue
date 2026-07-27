@@ -23,25 +23,29 @@
       <a-space wrap>
         <span class="action-label">批量操作：</span>
         <a-button size="small" @click="batchUpdateWP" :disabled="selectedIds.length === 0" :loading="batchWPUpdateLoading">更新 WordPress</a-button>
-        <a-input-search
+        <a-select
+          v-model="batchInstallSlug"
           size="small"
-          placeholder="输入插件 slug 名称"
           :style="{ width: '200px' }"
-          search-button="安装插件"
-          @search="batchInstallPlugin"
+          placeholder="选择或输入插件 slug"
           :disabled="selectedIds.length === 0"
-        />
-        <a-button size="small" status="danger" @click="batchDeletePlugin" :disabled="selectedIds.length === 0">删除插件</a-button>
+          allow-search
+          allow-create
+        >
+          <a-option v-for="p in presetPlugins" :key="p.slug" :value="p.slug" :label="p.name" />
+        </a-select>
+        <a-button size="small" type="outline" @click="batchInstallPlugin" :disabled="selectedIds.length === 0 || !batchInstallSlug">安装</a-button>
+        <a-popover trigger="manual" v-model:popup-visible="pluginSlugVisible">
+          <a-button size="small" status="danger" @click="batchDeletePlugin" :disabled="selectedIds.length === 0">删除插件</a-button>
+          <template #content>
+            <div style="width: 240px">
+              <p>输入要删除的插件 slug：</p>
+              <a-input v-model="batchPluginSlug" size="small" style="margin-bottom:10px" />
+              <a-button type="primary" size="small" @click="confirmDeletePlugin">确认删除</a-button>
+            </div>
+          </template>
+        </a-popover>
       </a-space>
-      <a-popover v-if="batchPluginSlug" trigger="click" v-model:popup-visible="pluginSlugVisible">
-        <template #content>
-          <div style="width: 240px">
-            <p>输入要删除的插件 slug：</p>
-            <a-input v-model="batchPluginSlug" size="small" style="margin-bottom:10px" />
-            <a-button type="primary" size="small" @click="confirmDeletePlugin">确认删除</a-button>
-          </div>
-        </template>
-      </a-popover>
     </a-card>
 
     <!-- 站群功能 -->
@@ -501,6 +505,28 @@
         </a-space>
       </template>
     </a-modal>
+
+    <!-- Batch Task Progress Modal -->
+    <a-modal
+      v-model:visible="showBatchTaskModal"
+      :title="batchTaskTitle"
+      :width="600"
+      :mask-closable="false"
+      :footer="false"
+    >
+      <div class="ai-repair-log" ref="batchTaskLogRef" style="height: 400px">
+        <div v-if="batchTaskLoading && batchTaskLog.length === 0" class="ai-loading">
+          <a-spin />
+          <span style="margin-left: 8px">正在执行...</span>
+        </div>
+        <div v-for="(item, i) in batchTaskLog" :key="i" class="ai-log-line">
+          <span :class="{ 'ai-log-success': item.includes('成功'), 'ai-log-error': item.includes('失败') }">{{ item }}</span>
+        </div>
+      </div>
+      <div v-if="!batchTaskLoading && batchTaskLog.length > 0" style="margin-top: 12px; text-align: right">
+        <a-button type="primary" @click="showBatchTaskModal = false">关闭</a-button>
+      </div>
+    </a-modal>
   </div>
 </template>
 
@@ -573,6 +599,31 @@ let domainPollTimer = null
 
 const batchPluginSlug = ref('')
 const pluginSlugVisible = ref(false)
+const batchInstallSlug = ref('')
+
+const showBatchTaskModal = ref(false)
+const batchTaskTitle = ref('')
+const batchTaskLog = ref([])
+const batchTaskLoading = ref(false)
+const batchTaskLogRef = ref(null)
+
+const presetPlugins = [
+  { slug: 'litespeed-cache', name: 'LiteSpeed Cache' },
+  { slug: 'wordfence', name: 'Wordfence Security' },
+  { slug: 'wordpress-seo', name: 'Yoast SEO' },
+  { slug: 'woocommerce', name: 'WooCommerce' },
+  { slug: 'contact-form-7', name: 'Contact Form 7' },
+  { slug: 'akismet', name: 'Akismet Anti-Spam' },
+  { slug: 'elementor', name: 'Elementor' },
+  { slug: 'updraftplus', name: 'UpdraftPlus Backup' },
+  { slug: 'wp-optimize', name: 'WP-Optimize' },
+  { slug: 'really-simple-ssl', name: 'Really Simple SSL' },
+  { slug: 'wp-rocket', name: 'WP Rocket' },
+  { slug: 'rank-math', name: 'Rank Math SEO' },
+  { slug: 'imagify', name: 'Imagify' },
+  { slug: 'redirection', name: 'Redirection' },
+  { slug: 'wp-mail-smtp', name: 'WP Mail SMTP' },
+]
 
 const showNginxModal = ref(false)
 const nginxSiteId = ref(null)
@@ -806,29 +857,42 @@ const handleBatchCreateCSV = async () => {
 }
 
 const batchUpdateWP = async () => {
+  batchTaskTitle.value = '批量更新 WordPress'
+  batchTaskLog.value = []
+  batchTaskLoading.value = true
+  showBatchTaskModal.value = true
   batchWPUpdateLoading.value = true
   for (const id of selectedIds.value) {
     try {
+      batchTaskLog.value.push(`站点 #${id} 正在更新 WordPress...`)
       await request.post(`/sites/${id}/wp/update`, {}, { timeout: 130000 })
-      Message.success(`站点 #${id} 更新成功`)
+      batchTaskLog.value.push(`站点 #${id} 更新成功 ✓`)
     } catch (e) {
-      Message.error(`站点 #${id} 更新失败: ${e.response?.data?.detail || e.message}`)
+      batchTaskLog.value.push(`站点 #${id} 更新失败: ${e.response?.data?.detail || e.message}`)
     }
   }
   fetchSites()
   batchWPUpdateLoading.value = false
+  batchTaskLoading.value = false
 }
 
-const batchInstallPlugin = async (slug) => {
+const batchInstallPlugin = async () => {
+  const slug = batchInstallSlug.value
   if (!slug) return
+  batchTaskTitle.value = `批量安装插件: ${slug}`
+  batchTaskLog.value = []
+  batchTaskLoading.value = true
+  showBatchTaskModal.value = true
   for (const id of selectedIds.value) {
     try {
-      await request.post(`/sites/${id}/wp/plugins/install`, { slug })
-      Message.success(`站点 #${id} 插件 ${slug} 安装成功`)
+      batchTaskLog.value.push(`站点 #${id} 正在安装 ${slug}...`)
+      await request.post(`/sites/${id}/wp/plugins/install`, { slug }, { timeout: 60000 })
+      batchTaskLog.value.push(`站点 #${id} 安装成功 ✓`)
     } catch (e) {
-      Message.error(`站点 #${id} 安装失败: ${e.response?.data?.detail || e.message}`)
+      batchTaskLog.value.push(`站点 #${id} 安装失败: ${e.response?.data?.detail || e.message}`)
     }
   }
+  batchTaskLoading.value = false
 }
 
 const batchDeletePlugin = () => {
@@ -840,14 +904,21 @@ const confirmDeletePlugin = async () => {
   const slug = batchPluginSlug.value
   if (!slug) { Message.warning('请输入插件 slug'); return }
   pluginSlugVisible.value = false
+  batchTaskTitle.value = `批量删除插件: ${slug}`
+  batchTaskLog.value = []
+  batchTaskLoading.value = true
+  showBatchTaskModal.value = true
   for (const id of selectedIds.value) {
     try {
-      await request.delete(`/sites/${id}/wp/plugins/${slug}`)
-      Message.success(`站点 #${id} 插件 ${slug} 已删除`)
+      batchTaskLog.value.push(`站点 #${id} 正在停用 ${slug}...`)
+      batchTaskLog.value.push(`站点 #${id} 正在删除 ${slug}...`)
+      await request.delete(`/sites/${id}/wp/plugins/${slug}`, { timeout: 150000 })
+      batchTaskLog.value.push(`站点 #${id} 删除成功 ✓`)
     } catch (e) {
-      Message.error(`站点 #${id} 删除失败: ${e.response?.data?.detail || e.message}`)
+      batchTaskLog.value.push(`站点 #${id} 删除失败: ${e.response?.data?.detail || e.message}`)
     }
   }
+  batchTaskLoading.value = false
 }
 
 const batchGenerateWooKeys = async () => {
@@ -1306,5 +1377,13 @@ onMounted(() => {
 .ai-log-cmd {
   color: #ffb020;
   font-weight: bold;
+}
+
+.ai-log-success {
+  color: #a8c97e;
+}
+
+.ai-log-error {
+  color: #f76965;
 }
 </style>

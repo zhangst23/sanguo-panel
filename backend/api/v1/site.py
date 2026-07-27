@@ -1275,8 +1275,15 @@ def delete_plugin(
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
     php_path, wp_cli_path = _get_wp_cli(site)
-    cmd = [php_path, wp_cli_path, "plugin", "delete", slug, f"--path={site.root_path}", "--allow-root"]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    base = [php_path, wp_cli_path, f"--path={site.root_path}", "--allow-root"]
+
+    deactivate = subprocess.run(base + ["plugin", "deactivate", slug], capture_output=True, text=True, timeout=30)
+    if deactivate.returncode != 0 and "not active" not in deactivate.stderr:
+        raise HTTPException(status_code=500, detail=f"停用插件失败: {deactivate.stderr}")
+
+    result = subprocess.run(base + ["plugin", "delete", slug], capture_output=True, text=True, timeout=120)
+    if result.returncode != 0:
+        raise HTTPException(status_code=500, detail=result.stderr)
     return {"success": True, "output": result.stdout}
 
 
