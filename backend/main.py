@@ -20,7 +20,11 @@ async def lifespan(app: FastAPI):
     pma = get_pma_manager()
     if pma:
         threading.Thread(target=pma.start, daemon=True).start()
-        
+
+    # Start SSL expiry checker (initial + daily)
+    from backend.utils.ssl_expiry_checker import start_ssl_checker
+    threading.Thread(target=start_ssl_checker, daemon=True).start()
+
     yield
     # Shutdown logic
     print(f"--- {settings.PROJECT_NAME} is shutting down ---")

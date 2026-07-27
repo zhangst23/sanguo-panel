@@ -126,13 +126,11 @@
           </a-table-column>
           <a-table-column title="SSL证书到期时间" :width="150">
             <template #cell="{ record }">
-              <div v-if="record.ssl_mode === 'cloudflare'" class="ssl-info">
-                <a-tag size="mini" color="green" style="margin-right: 4px">https</a-tag>
-                <span>{{ record.ssl_expire_at || '查询中...' }}</span>
-              </div>
-              <div v-else-if="record.ssl_mode === 'letsencrypt'" class="ssl-info">
-                <a-tag size="mini" color="green" style="margin-right: 4px">https</a-tag>
-                <span>永不过期</span>
+              <div v-if="record.ssl_mode && record.ssl_mode !== 'none'" class="ssl-info">
+                <a-tag size="mini" :color="record.ssl_mode === 'cloudflare' ? 'arcoblue' : 'green'" style="margin-right: 4px">https</a-tag>
+                <span :style="{ color: getSSLExpireColor(record.ssl_expire_at) }">
+                  {{ formatSSLExpire(record.ssl_expire_at) || '查询中...' }}
+                </span>
               </div>
               <a-tag v-else color="gray">未配置</a-tag>
             </template>
@@ -671,6 +669,29 @@ const getStatusText = (status) => {
   if (status === 'active') return '运行中'
   if (status === 'creating') return '创建中'
   return '已停止'
+}
+
+const formatSSLExpire = (expireStr) => {
+  if (!expireStr) return ''
+  // Already YYYY-MM-DD format
+  if (/^\d{4}-\d{2}-\d{2}$/.test(expireStr)) return expireStr
+  // Try to parse other formats
+  const d = new Date(expireStr)
+  if (!isNaN(d.getTime())) {
+    return d.toISOString().split('T')[0]
+  }
+  return expireStr
+}
+
+const getSSLExpireColor = (expireStr) => {
+  if (!expireStr) return ''
+  const d = new Date(expireStr)
+  if (isNaN(d.getTime())) return ''
+  const now = new Date()
+  const diff = (d.getTime() - now.getTime()) / (1000 * 3600 * 24)
+  if (diff < 0) return '#f53f3f'
+  if (diff < 30) return '#ff7d00'
+  return ''
 }
 
 const formatDate = (dateStr) => {
