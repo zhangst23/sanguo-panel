@@ -239,13 +239,9 @@ const formatUptime = (sec) => {
 }
 
 const fetchData = async () => {
-  try {
-    fetchLogs()
-    fetchAIConfig()
-    fetchOverview()
-  } catch (error) {
-    console.error(error)
-  }
+  fetchLogs()
+  fetchAIConfig()
+  fetchOverview()
 }
 
 const fetchOverview = async () => {

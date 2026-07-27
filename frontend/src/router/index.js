@@ -85,14 +85,14 @@ const routes = [
       {
         path: 'php',
         name: 'PHP',
-        component: () => import('@/views/PHP/PHP.vue'),
-        meta: { requiresAuth: true, title: 'PHP管理' },
+        component: () => import('@/views/System/SystemManage.vue'),
+        meta: { requiresAuth: true, title: '系统管理', defaultTab: 'php' },
       },
       {
         path: 'linux',
         name: 'Linux',
-        component: () => import('@/views/Linux/Linux.vue'),
-        meta: { requiresAuth: true, title: 'Linux管理' },
+        component: () => import('@/views/System/SystemManage.vue'),
+        meta: { requiresAuth: true, title: '系统管理', defaultTab: 'linux' },
       },
       {
         path: 'system/settings',
@@ -139,8 +139,20 @@ const routes = [
       {
         path: 'redis',
         name: 'Redis',
-        component: () => import('@/views/Redis/Redis.vue'),
-        meta: { requiresAuth: true, title: 'Redis管理' },
+        component: () => import('@/views/System/SystemManage.vue'),
+        meta: { requiresAuth: true, title: '系统管理', defaultTab: 'redis' },
+      },
+      {
+        path: 'nginx',
+        name: 'Nginx',
+        component: () => import('@/views/System/SystemManage.vue'),
+        meta: { requiresAuth: true, title: '系统管理', defaultTab: 'nginx' },
+      },
+      {
+        path: 'system-manage',
+        name: 'SystemManage',
+        component: () => import('@/views/System/SystemManage.vue'),
+        meta: { requiresAuth: true, title: '系统管理', defaultTab: 'redis' },
       },
       {
         path: 'system',
