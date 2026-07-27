@@ -154,12 +154,16 @@ def toggle_firewall(enable: bool, current_user=Depends(get_current_user)):
 # 来源(source): web Web防护 / 404 404防御 / ssh SSH防护 / panel_scan 面板扫描防御 / manual 手动封禁
 # 原因(reason): 触发封禁的具体说明；过期时间(expire_at): permanent=永久 / temp_*=计算得到的过期时间 / ratelimit=长期限速
 F2B_BAN_RECORDS = [
-    {"ip": "192.168.1.100", "level": "permanent", "source": "ssh", "count": 12, "banned_at": "2026-07-20 10:23", "reason": "SSH 暴力破解尝试", "expire_at": "永久"},
-    {"ip": "45.33.22.11", "level": "temp_24h", "source": "web", "count": 3, "banned_at": "2026-07-26 18:05", "reason": "触发 Web 访问频率限制", "expire_at": "2026-07-27 18:05"},
-    {"ip": "10.0.0.45", "level": "temp_10m", "source": "404", "count": 7, "banned_at": "2026-07-27 09:41", "reason": "频繁请求不存在的页面 (404)", "expire_at": "2026-07-27 09:51"},
-    {"ip": "8.8.8.8", "level": "ratelimit", "source": "panel_scan", "count": 2, "banned_at": "2026-07-27 11:12", "reason": "扫描面板登录入口", "expire_at": "长期限速"},
-    {"ip": "203.0.113.7", "level": "permanent", "source": "manual", "count": 1, "banned_at": "2026-07-27 08:00", "reason": "管理员手动封禁", "expire_at": "永久"},
+    {"ip": "192.168.1.100", "level": "permanent", "source": "ssh", "count": 12, "banned_at": "2026-07-20 10:23", "reason": "SSH 暴力破解尝试", "expire_at": "永久", "paths": ["/wp-login.php", "/xmlrpc.php", "/admin", "/wp-admin"]},
+    {"ip": "45.33.22.11", "level": "temp_24h", "source": "web", "count": 3, "banned_at": "2026-07-26 18:05", "reason": "触发 Web 访问频率限制", "expire_at": "2026-07-27 18:05", "paths": ["/", "/index.php", "/products", "/cart", "/checkout"]},
+    {"ip": "10.0.0.45", "level": "temp_10m", "source": "404", "count": 7, "banned_at": "2026-07-27 09:41", "reason": "频繁请求不存在的页面 (404)", "expire_at": "2026-07-27 09:51", "paths": ["/nonexistent-1", "/missing-page", "/old-url", "/test", "/abc"]},
+    {"ip": "8.8.8.8", "level": "ratelimit", "source": "panel_scan", "count": 2, "banned_at": "2026-07-27 11:12", "reason": "扫描面板登录入口", "expire_at": "长期限速", "paths": ["/wp-admin", "/admin", "/login", "/panel"]},
+    {"ip": "203.0.113.7", "level": "permanent", "source": "manual", "count": 1, "banned_at": "2026-07-27 08:00", "reason": "管理员手动封禁", "expire_at": "永久", "paths": ["/"]},
 ]
+
+
+# 人工启停覆盖：None 表示以系统实际状态为准，True/False 表示人工指定
+F2B_ACTIVE_OVERRIDE = None
 
 
 def _jail_for_source(source):
@@ -207,15 +211,19 @@ def _now_str():
 @router.get("/fail2ban/status")
 def get_fail2ban_status(current_user=Depends(get_current_user)):
     if os.name == 'nt':
+        active = F2B_ACTIVE_OVERRIDE if F2B_ACTIVE_OVERRIDE is not None else True
         return {
-            "active": True,
+            "active": active,
             "banned_ips": [r["ip"] for r in F2B_BAN_RECORDS],
             "config": {"bantime": 600, "findtime": 600, "maxretry": 5},
             "bans": F2B_BAN_RECORDS,
         }
 
-    res = run_shell("systemctl is-active fail2ban")
-    active = res["stdout"].strip() == "active"
+    if F2B_ACTIVE_OVERRIDE is not None:
+        active = F2B_ACTIVE_OVERRIDE
+    else:
+        res = run_shell("systemctl is-active fail2ban")
+        active = res["stdout"].strip() == "active"
 
     config = {"bantime": 600, "findtime": 600, "maxretry": 5}
 
@@ -316,6 +324,26 @@ def update_fail2ban_config(config: dict, current_user=Depends(get_current_user))
     run_shell(f"fail2ban-client set sshd maxretry {maxretry}")
 
     return {"success": True}
+
+
+@router.post("/fail2ban/start")
+def start_fail2ban(current_user=Depends(get_current_user)):
+    """启动 / 重启 Fail2ban 服务（人工操作）。"""
+    global F2B_ACTIVE_OVERRIDE
+    if os.name != 'nt':
+        run_shell("systemctl start fail2ban || fail2ban-client start")
+    F2B_ACTIVE_OVERRIDE = True
+    return {"success": True, "active": True}
+
+
+@router.post("/fail2ban/stop")
+def stop_fail2ban(current_user=Depends(get_current_user)):
+    """停止 Fail2ban 服务（人工操作）。"""
+    global F2B_ACTIVE_OVERRIDE
+    if os.name != 'nt':
+        run_shell("systemctl stop fail2ban || fail2ban-client stop")
+    F2B_ACTIVE_OVERRIDE = False
+    return {"success": True, "active": False}
 
 
 # --- 请求频率限制 (Rate Limit) ---

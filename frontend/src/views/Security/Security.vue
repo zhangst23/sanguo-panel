@@ -184,7 +184,13 @@
           <a-grid-item :span="24">
             <a-card title="IP 封禁列表">
               <template #extra>
-                <a-tag :color="fail2ban.active ? 'green' : 'red'">{{ fail2ban.active ? '运行中' : '已停止' }}</a-tag>
+                <a-space>
+                  <a-tag :color="fail2ban.active ? 'green' : 'red'">{{ fail2ban.active ? '运行中' : '已停止' }}</a-tag>
+                  <a-button size="small" :loading="restarting" @click="handleStartFail2ban">
+                    <template #icon><icon-refresh /></template>
+                    重新启动
+                  </a-button>
+                </a-space>
               </template>
 
               <!-- 手动封禁 IP -->
@@ -236,6 +242,14 @@
                       <a-tag :color="sourceMap[record.source] ? sourceMap[record.source].color : 'gray'">
                         {{ sourceMap[record.source] ? sourceMap[record.source].text : record.source }}
                       </a-tag>
+                    </template>
+                  </a-table-column>
+                  <a-table-column title="访问路径">
+                    <template #cell="{ record }">
+                      <span v-if="!(record.paths && record.paths.length)">-</span>
+                      <span v-else>
+                        {{ record.paths.slice(0, 3).join('、') }}<template v-if="record.paths.length > 3">…</template>
+                      </span>
                     </template>
                   </a-table-column>
                   <a-table-column title="封禁时间" data-index="banned_at" :width="150" />
@@ -376,6 +390,7 @@ const banLoading = ref(false)
 const manualBanIp = ref('')
 const manualBanLevel = ref('permanent')
 const manualBanLoading = ref(false)
+const restarting = ref(false)
 
 const levelMap = {
   permanent: { text: '永久封禁', color: 'red' },
@@ -623,6 +638,19 @@ const handlePermanent = async (ip) => {
     fetchData()
   } catch (error) {
     Message.error('操作失败')
+  }
+}
+
+const handleStartFail2ban = async () => {
+  restarting.value = true
+  try {
+    await request.post('/security/fail2ban/start')
+    Message.success('Fail2ban 已启动')
+    fetchData()
+  } catch (error) {
+    Message.error('启动失败')
+  } finally {
+    restarting.value = false
   }
 }
 
