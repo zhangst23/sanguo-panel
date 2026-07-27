@@ -750,7 +750,7 @@ const sourceMap = {
 const fetchBanList = async () => {
   banLoading.value = true
   try {
-    const res = await request.get('/security/fail2ban/bans')
+    const res = await request.get('/security/fail2ban/bans', { params: { site_id: siteId } })
     banList.value = res.bans || []
   } catch (error) {
     console.error('获取封禁列表失败:', error)
@@ -768,7 +768,7 @@ const handleManualBan = async () => {
   manualBanLoading.value = true
   try {
     await request.post('/security/fail2ban/ban', null, {
-      params: { ip, level: manualBanLevel.value, source: 'manual' }
+      params: { ip, level: manualBanLevel.value, source: 'manual', site_id: siteId }
     })
     Message.success(`已封禁 ${ip}`)
     manualBanIp.value = ''

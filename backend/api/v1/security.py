@@ -186,11 +186,11 @@ def delete_firewall_rule(port: int, protocol: str = "tcp", current_user=Depends(
 # 来源(source): web Web防护 / 404 404防御 / ssh SSH防护 / panel_scan 面板扫描防御 / manual 手动封禁
 # 原因(reason): 触发封禁的具体说明；过期时间(expire_at): permanent=永久 / temp_*=计算得到的过期时间 / ratelimit=长期限速
 F2B_BAN_RECORDS = [
-    {"ip": "192.168.1.100", "level": "permanent", "source": "ssh", "count": 12, "banned_at": "2026-07-20 10:23", "reason": "SSH 暴力破解尝试", "expire_at": "永久", "paths": ["/wp-login.php", "/xmlrpc.php", "/admin", "/wp-admin"]},
-    {"ip": "45.33.22.11", "level": "temp_24h", "source": "web", "count": 3, "banned_at": "2026-07-26 18:05", "reason": "触发 Web 访问频率限制", "expire_at": "2026-07-27 18:05", "paths": ["/", "/index.php", "/products", "/cart", "/checkout"]},
-    {"ip": "10.0.0.45", "level": "temp_10m", "source": "404", "count": 7, "banned_at": "2026-07-27 09:41", "reason": "频繁请求不存在的页面 (404)", "expire_at": "2026-07-27 09:51", "paths": ["/nonexistent-1", "/missing-page", "/old-url", "/test", "/abc"]},
-    {"ip": "8.8.8.8", "level": "ratelimit", "source": "panel_scan", "count": 2, "banned_at": "2026-07-27 11:12", "reason": "扫描面板登录入口", "expire_at": "长期限速", "paths": ["/wp-admin", "/admin", "/login", "/panel"]},
-    {"ip": "203.0.113.7", "level": "permanent", "source": "manual", "count": 1, "banned_at": "2026-07-27 08:00", "reason": "管理员手动封禁", "expire_at": "永久", "paths": ["/"]},
+    {"ip": "192.168.1.100", "level": "permanent", "source": "ssh", "site_id": 7, "count": 12, "banned_at": "2026-07-20 10:23", "reason": "SSH 暴力破解尝试", "expire_at": "永久", "paths": ["/wp-login.php", "/xmlrpc.php", "/admin", "/wp-admin"]},
+    {"ip": "45.33.22.11", "level": "temp_24h", "source": "web", "site_id": 7, "count": 3, "banned_at": "2026-07-26 18:05", "reason": "触发 Web 访问频率限制", "expire_at": "2026-07-27 18:05", "paths": ["/", "/index.php", "/products", "/cart", "/checkout"]},
+    {"ip": "10.0.0.45", "level": "temp_10m", "source": "404", "site_id": 5, "count": 7, "banned_at": "2026-07-27 09:41", "reason": "频繁请求不存在的页面 (404)", "expire_at": "2026-07-27 09:51", "paths": ["/nonexistent-1", "/missing-page", "/old-url", "/test", "/abc"]},
+    {"ip": "8.8.8.8", "level": "ratelimit", "source": "panel_scan", "site_id": 7, "count": 2, "banned_at": "2026-07-27 11:12", "reason": "扫描面板登录入口", "expire_at": "长期限速", "paths": ["/wp-admin", "/admin", "/login", "/panel"]},
+    {"ip": "203.0.113.7", "level": "permanent", "source": "manual", "site_id": 7, "count": 1, "banned_at": "2026-07-27 08:00", "reason": "管理员手动封禁", "expire_at": "永久", "paths": ["/"]},
 ]
 
 
@@ -276,8 +276,16 @@ def get_fail2ban_status(current_user=Depends(get_current_user)):
 
 
 @router.get("/fail2ban/bans")
-def get_fail2ban_bans(current_user=Depends(get_current_user)):
-    return {"bans": F2B_BAN_RECORDS}
+def get_fail2ban_bans(
+    site_id: Optional[int] = None,
+    current_user=Depends(get_current_user)
+):
+    """返回封禁列表。传 site_id 时只返回访问过该站点并被封禁的 IP。"""
+    if site_id is None:
+        bans = F2B_BAN_RECORDS
+    else:
+        bans = [r for r in F2B_BAN_RECORDS if r.get("site_id") == site_id]
+    return {"bans": bans}
 
 @router.post("/fail2ban/ban")
 def ban_ip(
@@ -285,6 +293,7 @@ def ban_ip(
     level: str = "permanent",
     source: str = "manual",
     reason: Optional[str] = None,
+    site_id: Optional[int] = None,
     current_user=Depends(get_current_user),
 ):
     """封禁指定 IP，并写入结构化记录（level/source/count/reason/expire_at）。"""
@@ -304,6 +313,8 @@ def ban_ip(
         existing["banned_at"] = banned_at
         existing["reason"] = final_reason
         existing["expire_at"] = final_expire
+        if site_id is not None:
+            existing["site_id"] = site_id
     else:
         F2B_BAN_RECORDS.append({
             "ip": ip,
@@ -313,6 +324,7 @@ def ban_ip(
             "banned_at": banned_at,
             "reason": final_reason,
             "expire_at": final_expire,
+            "site_id": site_id,
         })
     return {"success": True, "bans": F2B_BAN_RECORDS}
 
