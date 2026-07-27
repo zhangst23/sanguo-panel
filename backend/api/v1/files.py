@@ -8,12 +8,37 @@ import stat
 import mimetypes
 import io
 from datetime import datetime
+from pydantic import BaseModel
 
 from backend.api import deps
 from backend.models.user import User
 from backend.models.site import Site
 
 router = APIRouter()
+
+
+class FilePathRequest(BaseModel):
+    site_id: int
+    path: str
+
+
+class RenameRequest(BaseModel):
+    site_id: int
+    src: str
+    dst: str
+
+
+class DeleteRequest(BaseModel):
+    site_id: int
+    path: str
+    is_dir: bool = False
+
+
+class ChmodRequest(BaseModel):
+    site_id: int
+    path: str
+    mode: int = 0o777
+    recursive: bool = True
 
 
 def _resolve_site_root(site: Site, requested_path: Optional[str]) -> str:
@@ -82,17 +107,16 @@ def list_files(
 
 @router.post("/mkdir")
 def create_folder(
-    site_id: int,
-    path: str,
+    req: FilePathRequest,
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_active_user)
 ):
     """创建文件夹"""
-    site = db.query(Site).filter(Site.id == site_id).first()
+    site = db.query(Site).filter(Site.id == req.site_id).first()
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
     try:
-        target = _resolve_site_root(site, path)
+        target = _resolve_site_root(site, req.path)
         if os.path.exists(target):
             raise HTTPException(status_code=400, detail="路径已存在")
         os.makedirs(target, exist_ok=False)
@@ -105,19 +129,17 @@ def create_folder(
 
 @router.post("/rename")
 def rename_item(
-    site_id: int,
-    src: str,
-    dst: str,
+    req: RenameRequest,
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_active_user)
 ):
     """重命名文件/文件夹"""
-    site = db.query(Site).filter(Site.id == site_id).first()
+    site = db.query(Site).filter(Site.id == req.site_id).first()
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
     try:
-        src_path = _resolve_site_root(site, src)
-        dst_path = _resolve_site_root(site, dst)
+        src_path = _resolve_site_root(site, req.src)
+        dst_path = _resolve_site_root(site, req.dst)
         if not os.path.exists(src_path):
             raise HTTPException(status_code=404, detail="源路径不存在")
         if os.path.exists(dst_path):
@@ -132,21 +154,19 @@ def rename_item(
 
 @router.post("/delete")
 def delete_item(
-    site_id: int,
-    path: str,
-    is_dir: bool = False,
+    req: DeleteRequest,
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_active_user)
 ):
     """删除文件/文件夹"""
-    site = db.query(Site).filter(Site.id == site_id).first()
+    site = db.query(Site).filter(Site.id == req.site_id).first()
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
     try:
-        target = _resolve_site_root(site, path)
+        target = _resolve_site_root(site, req.path)
         if not os.path.exists(target):
             raise HTTPException(status_code=404, detail="路径不存在")
-        if is_dir:
+        if req.is_dir:
             shutil.rmtree(target)
         else:
             os.remove(target)
@@ -159,45 +179,42 @@ def delete_item(
 
 @router.post("/chmod")
 def chmod_item(
-    site_id: int,
-    path: str,
-    mode: int = 0o777,
-    recursive: bool = True,
+    req: ChmodRequest,
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_active_user)
 ):
     """放开权限（chmod 777）"""
-    site = db.query(Site).filter(Site.id == site_id).first()
+    site = db.query(Site).filter(Site.id == req.site_id).first()
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
     try:
-        target = _resolve_site_root(site, path)
+        target = _resolve_site_root(site, req.path)
         if not os.path.exists(target):
             raise HTTPException(status_code=404, detail="路径不存在")
 
         count = 0
         if os.path.isdir(target):
-            if recursive:
+            if req.recursive:
                 for root, dirs, files in os.walk(target):
                     for d in dirs:
                         try:
-                            os.chmod(os.path.join(root, d), mode)
+                            os.chmod(os.path.join(root, d), req.mode)
                             count += 1
                         except Exception:
                             pass
                     for f in files:
                         try:
-                            os.chmod(os.path.join(root, f), mode)
+                            os.chmod(os.path.join(root, f), req.mode)
                             count += 1
                         except Exception:
                             pass
             else:
-                os.chmod(target, mode)
+                os.chmod(target, req.mode)
                 count = 1
         else:
-            os.chmod(target, mode)
+            os.chmod(target, req.mode)
             count = 1
-        return {"success": True, "changed": count, "mode": oct(mode)}
+        return {"success": True, "changed": count, "mode": oct(req.mode)}
     except HTTPException:
         raise
     except Exception as e:
