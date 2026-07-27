@@ -188,7 +188,7 @@
                   <a-tag :color="fail2ban.active ? 'green' : 'red'">{{ fail2ban.active ? '运行中' : '已停止' }}</a-tag>
                   <a-button size="small" :loading="restarting" @click="handleStartFail2ban">
                     <template #icon><icon-refresh /></template>
-                    重新启动
+                    重新启动Fail2ban
                   </a-button>
                 </a-space>
               </template>

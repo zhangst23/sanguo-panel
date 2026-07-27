@@ -130,6 +130,30 @@
           </template>
           <div ref="trafficChart" class="traffic-chart"></div>
         </a-card>
+
+        <!-- 热门页面 TOP 10 -->
+        <a-card :bordered="false" class="top-pages-card" style="margin-top: 24px;">
+          <template #title>热门页面 TOP 10</template>
+          <a-table
+            :data="topPages"
+            :loading="topPagesLoading"
+            :pagination="false"
+            size="small"
+            :scroll="{ y: 320 }"
+          >
+            <template #columns>
+              <a-table-column title="排名" :width="64">
+                <template #cell="{ record }">
+                  <a-tag v-if="record.rank <= 3" :color="['red', 'orange', 'arcoblue'][record.rank - 1]">{{ record.rank }}</a-tag>
+                  <span v-else>{{ record.rank }}</span>
+                </template>
+              </a-table-column>
+              <a-table-column title="页面路径" data-index="path" />
+              <a-table-column title="访问次数" data-index="hits" :width="90" />
+              <a-table-column title="访客数" data-index="visitors" :width="90" />
+            </template>
+          </a-table>
+        </a-card>
       </a-col>
 
       <!-- 右：IP 封禁列表 -->
@@ -629,10 +653,28 @@ let trafficChartInstance = null
 
 const fetchTraffic = async () => {
   try {
-    const res = await request.get('/monitor/traffic', { params: { range: trafficRange.value } })
+    const res = await request.get('/monitor/traffic', {
+      params: { range: trafficRange.value, site_id: siteId }
+    })
     renderTrafficChart(res)
   } catch (error) {
     console.error('获取流量统计失败:', error)
+  }
+}
+
+const topPages = ref([])
+const topPagesLoading = ref(false)
+const fetchTopPages = async () => {
+  topPagesLoading.value = true
+  try {
+    const res = await request.get('/monitor/traffic-top-pages', {
+      params: { site_id: siteId }
+    })
+    topPages.value = res.top_pages || []
+  } catch (error) {
+    console.error('获取热门页面失败:', error)
+  } finally {
+    topPagesLoading.value = false
   }
 }
 
@@ -640,7 +682,7 @@ const renderTrafficChart = (data) => {
   if (!trafficChartInstance) return
   trafficChartInstance.setOption({
     tooltip: { trigger: 'axis' },
-    legend: { data: ['请求数', '带宽(MB)'], right: 0, top: 0 },
+    legend: { data: ['请求数', '访客', '带宽(MB)'], right: 0, top: 0 },
     grid: { left: 48, right: 48, top: 40, bottom: 30 },
     xAxis: {
       type: 'category',
@@ -649,7 +691,7 @@ const renderTrafficChart = (data) => {
       axisLabel: { color: 'var(--color-text-3)' }
     },
     yAxis: [
-      { type: 'value', name: '请求数', splitLine: { lineStyle: { color: 'var(--color-border-2)' } } },
+      { type: 'value', name: '请求/访客', splitLine: { lineStyle: { color: 'var(--color-border-2)' } } },
       { type: 'value', name: 'MB', splitLine: { show: false } }
     ],
     series: [
@@ -661,6 +703,14 @@ const renderTrafficChart = (data) => {
         data: data.requests,
         areaStyle: { opacity: 0.15 },
         itemStyle: { color: '#165DFF' }
+      },
+      {
+        name: '访客',
+        type: 'line',
+        smooth: true,
+        showSymbol: false,
+        data: data.visitors || [],
+        itemStyle: { color: '#00B42A' }
       },
       {
         name: '带宽(MB)',
@@ -761,6 +811,7 @@ onMounted(() => {
       window.addEventListener('resize', handleChartResize)
     }
     fetchTraffic()
+    fetchTopPages()
   })
   fetchBanList()
 })
