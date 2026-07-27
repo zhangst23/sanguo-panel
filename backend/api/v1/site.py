@@ -194,6 +194,36 @@ def install_wordpress_task(site_id: int):
                 ]
                 subprocess.run(cmd_install, check=True, capture_output=True)
 
+                # Clean up default plugins
+                for plugin in ['akismet', 'hello']:
+                    try:
+                        subprocess.run(
+                            [php_path, wp_cli_path, "plugin", "delete", plugin, f"--path={site.root_path}", "--allow-root"],
+                            check=True, capture_output=True
+                        )
+                    except Exception:
+                        pass
+
+                # Clean up default themes
+                for theme in ['twentytwentytwo', 'twentytwentythree', 'twentytwentyfour']:
+                    try:
+                        subprocess.run(
+                            [php_path, wp_cli_path, "theme", "delete", theme, f"--path={site.root_path}", "--allow-root"],
+                            check=True, capture_output=True
+                        )
+                    except Exception:
+                        pass
+
+                # Discourage search engines
+                if site.discourage_search_engines:
+                    try:
+                        subprocess.run(
+                            [php_path, wp_cli_path, "option", "update", "blog_public", "0", f"--path={site.root_path}", "--allow-root"],
+                            check=True, capture_output=True
+                        )
+                    except Exception:
+                        pass
+
                 # Get WordPress version after install
                 try:
                     cmd_version = [

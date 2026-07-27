@@ -261,6 +261,9 @@
               <a-radio value="none">不配置 HTTPS</a-radio>
             </a-radio-group>
           </a-form-item>
+          <a-form-item field="discourage_search_engines">
+            <a-checkbox v-model="form.discourage_search_engines">建议搜索引擎不索引本站点</a-checkbox>
+          </a-form-item>
         </div>
         <div class="form-section">
           <div class="section-title">性能优化</div>
@@ -648,7 +651,8 @@ const form = reactive({
   root_path: '/var/www/html/',
   php_version: '8.2',
   ssl_mode: 'cloudflare',
-  performance_preset: 'performance'
+  performance_preset: 'performance',
+  discourage_search_engines: true
 })
 
 const onSelectionChange = (rowKeys) => {
@@ -1210,7 +1214,8 @@ const resetForm = () => {
     root_path: '/var/www/html/',
     php_version: '8.2',
     ssl_mode: 'cloudflare',
-    performance_preset: 'performance'
+    performance_preset: 'performance',
+    discourage_search_engines: true
   })
 }
 

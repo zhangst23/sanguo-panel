@@ -4,6 +4,7 @@ from backend.models.base import Base
 from backend.models.user import User
 from backend.models.site import SharedDatabase, Site
 from backend.core.security import get_password_hash
+from sqlalchemy import inspect, text
 
 def init_db():
     Base.metadata.create_all(bind=engine)
@@ -50,7 +51,16 @@ def init_db():
         print("Default shared database already exists.")
     
     db.close()
-    
+
+    # Migrate: add columns that may not exist in older DBs
+    with engine.connect() as conn:
+        inspector = inspect(engine)
+        site_cols = [c['name'] for c in inspector.get_columns('sites')]
+        if 'discourage_search_engines' not in site_cols:
+            conn.execute(text("ALTER TABLE sites ADD COLUMN discourage_search_engines BOOLEAN DEFAULT 1"))
+            conn.commit()
+            print("Added column 'discourage_search_engines' to sites table.")
+
     print("Database initialized successfully.")
 
 if __name__ == "__main__":

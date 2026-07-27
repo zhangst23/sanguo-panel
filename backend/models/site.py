@@ -74,6 +74,9 @@ class Site(Base):
     ssl_auto_renew = Column(Boolean, default=True)
     https_force = Column(Boolean, default=True)
 
+    # SEO
+    discourage_search_engines = Column(Boolean, default=True)
+
     # WooCommerce API
     wc_key = Column(String(255))
     wc_secret = Column(String(255))

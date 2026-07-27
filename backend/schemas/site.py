@@ -25,6 +25,7 @@ class SiteCreate(BaseModel):
     table_prefix: Optional[str] = None
     performance_preset: str = "balanced"
     ssl_mode: str = "cloudflare"
+    discourage_search_engines: bool = True
     notes: Optional[str] = None
 
     @field_validator('domain')
@@ -111,6 +112,7 @@ class Site(SiteBase):
     https_force: bool = True
     wp_version: str = "未安装"
     monitor_enabled: bool = False
+    discourage_search_engines: bool = True
     wc_key: Optional[str] = None
     wc_secret: Optional[str] = None
     created_at: datetime
