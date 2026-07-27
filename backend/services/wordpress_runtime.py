@@ -18,11 +18,18 @@ coherent, slowly evolving picture rather than random noise, and so that the
 from __future__ import annotations
 
 import math
+import os
+import json
 import random
+import subprocess
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+
+# Real stack paths (OpenLiteSpeed tech base)
+LSWS_HOME = "/usr/local/lsws"
+OLS_PHP_BIN = os.path.join(LSWS_HOME, "lsphp83", "bin", "lsphp")
 
 # ---------------------------------------------------------------------------
 # Tunable baseline configuration for the simulated stack
@@ -110,10 +117,15 @@ class WPRuntimeSimulator:
 
     # --- public API ------------------------------------------------------
 
-    def snapshot(self) -> Dict[str, Any]:
+    def snapshot(self, db=None) -> Dict[str, Any]:
         self._tick += 1
         self._evolve()
-        return self._build()
+        real = {
+            "ols": self._ols_status(),
+            "php": self._php_status(),
+            "mariadb": self._mariadb_status(db),
+        }
+        return self._build(real)
 
     def optimize(self, action: str) -> Dict[str, Any]:
         return self._apply_optimization(action)
@@ -172,19 +184,138 @@ class WPRuntimeSimulator:
         base = int(time.time()) - len(buf)
         return [{"t": base + i, "v": round(v, 2)} for i, v in enumerate(buf)]
 
+    # --- real data collectors -----------------------------------------
+
+    def _ols_status(self) -> Dict[str, Any]:
+        """真实 OpenLiteSpeed 状态（进程 / 版本）。"""
+        out: Dict[str, Any] = {"available": False, "running": False, "version": None, "error": None}
+        try:
+            if not os.path.exists(os.path.join(LSWS_HOME, "bin", "lswsctrl")):
+                out["error"] = "OLS 未安装"
+                return out
+            res = subprocess.run(
+                f"{LSWS_HOME}/bin/lswsctrl status", shell=True, capture_output=True, text=True, timeout=8
+            )
+            out["running"] = "is running" in res.stdout
+            v = subprocess.run(
+                f"{LSWS_HOME}/bin/lshttpd -v", shell=True, capture_output=True, text=True, timeout=8
+            )
+            if v.returncode == 0 and v.stdout:
+                out["version"] = v.stdout.splitlines()[0].strip()
+            out["available"] = True
+        except Exception as e:  # pragma: no cover
+            out["error"] = str(e)
+        return out
+
+    def _php_status(self) -> Dict[str, Any]:
+        """真实 PHP / OPcache 状态。"""
+        out: Dict[str, Any] = {
+            "available": False, "version": None, "opcache_enabled": None,
+            "opcache_hit_rate": None, "opcache_used_mb": None,
+            "opcache_total_mb": None, "error": None,
+        }
+        php_bin = OLS_PHP_BIN if os.path.exists(OLS_PHP_BIN) else None
+        if php_bin is None:
+            try:
+                from backend.utils.php_utils import find_php_executable
+                php_bin = find_php_executable()
+            except Exception:
+                php_bin = None
+        if not php_bin:
+            out["error"] = "未找到 PHP 可执行文件"
+            return out
+        try:
+            v = subprocess.run([php_bin, "-v"], capture_output=True, text=True, timeout=8)
+            if v.returncode == 0 and v.stdout:
+                parts = v.stdout.splitlines()[0].split(" ")
+                out["version"] = parts[1] if len(parts) >= 2 else None
+            code = (
+                "<?php $s=@opcache_get_status(false);"
+                "if($s&&!empty($s['opcache_statistics'])){"
+                "echo json_encode(['ok'=>true,"
+                "'hit_rate'=>round($s['opcache_statistics']['opcache_hit_rate']??0,2),"
+                "'used_mb'=>round($s['memory_usage']['used_memory']/1048576,1),"
+                "'total_mb'=>round(($s['memory_usage']['used_memory']+$s['memory_usage']['free_memory'])/1048576,1)]);"
+                "}else{echo json_encode(['ok'=>false]);}"
+            )
+            r = subprocess.run([php_bin, "-r", code], capture_output=True, text=True, timeout=8)
+            try:
+                j = json.loads(r.stdout.strip())
+                out["opcache_enabled"] = bool(j.get("ok"))
+                if j.get("ok"):
+                    out["opcache_hit_rate"] = j.get("hit_rate")
+                    out["opcache_used_mb"] = j.get("used_mb")
+                    out["opcache_total_mb"] = j.get("total_mb")
+            except Exception:
+                out["opcache_enabled"] = False
+            out["available"] = True
+        except Exception as e:  # pragma: no cover
+            out["error"] = str(e)
+        return out
+
+    def _mariadb_status(self, db) -> Dict[str, Any]:
+        """真实 MariaDB 全局状态（连接 / 慢查询 / QPS）。"""
+        out: Dict[str, Any] = {"available": False, "error": None}
+        if db is None:
+            out["error"] = "无数据库会话"
+            return out
+        try:
+            from backend.models.site import Site as SiteModel, SharedDatabase as SharedDatabaseModel
+            shared = db.query(SharedDatabaseModel).filter(SharedDatabaseModel.status == "active").first()
+            if not shared:
+                shared = db.query(SharedDatabaseModel).first()
+            if not shared:
+                out["error"] = "未找到共享数据库凭据"
+                return out
+            import mysql.connector
+            conn = mysql.connector.connect(
+                host=shared.db_host, port=shared.db_port,
+                user=shared.db_user, password=shared.db_password, connect_timeout=5,
+            )
+            cur = conn.cursor()
+            cur.execute(
+                "SHOW GLOBAL STATUS WHERE Variable_name IN "
+                "('Threads_connected','Connections','Queries','Slow_queries','Uptime',"
+                "'Aborted_connects','Max_used_connections')"
+            )
+            st = {k: int(v) for k, v in cur.fetchall()}
+            cur.execute("SHOW VARIABLES WHERE Variable_name IN ('max_connections')")
+            vars_ = {k: int(v) for k, v in cur.fetchall()}
+            cur.close()
+            conn.close()
+            uptime = max(1, st.get("Uptime", 1))
+            qps = round(st.get("Queries", 0) / uptime, 1)
+            slow = st.get("Slow_queries", 0)
+            slow_rate = round(slow / max(1, st.get("Queries", 1)) * 100, 3)
+            max_conn = vars_.get("max_connections", 151)
+            threads = st.get("Threads_connected", 0)
+            conn_util = round(threads / max(1, max_conn) * 100, 1)
+            out.update({
+                "available": True, "running": True,
+                "threads_connected": threads, "max_connections": max_conn,
+                "connection_util": conn_util, "qps": qps,
+                "queries": st.get("Queries", 0), "slow_queries": slow,
+                "slow_rate": slow_rate, "uptime": uptime,
+                "max_used_connections": st.get("Max_used_connections", 0),
+                "aborted_connects": st.get("Aborted_connects", 0),
+            })
+        except Exception as e:  # pragma: no cover
+            out["error"] = str(e)
+        return out
+
     # --- snapshot builder ------------------------------------------------
 
-    def _build(self) -> Dict[str, Any]:
+    def _build(self, real: Dict[str, Any]) -> Dict[str, Any]:
         s = self.state
-        score = self._score()
+        score = self._score(real)
         return {
             "generated_at": _now(),
             "score": score,
             "request": self._request(score),
             "cache": self._cache(),
-            "php": self._php(),
+            "php": self._php(real),
             "worker": self._worker(),
-            "database": self._database(),
+            "database": self._database(real),
             "redis": self._redis(),
             "wordpress": self._wordpress(),
             "storage": self._storage(),
@@ -193,35 +324,66 @@ class WPRuntimeSimulator:
             "timeline": self.timeline[-20:],
             "ai_analysis": self._ai_analysis(score),
             "optimizations": self._optimization_list(),
+            "real_signals": {
+                "ols": real.get("ols"),
+                "php": real.get("php"),
+                "mariadb": real.get("mariadb"),
+            },
         }
 
     # -- L4 score ---------------------------------------------------------
 
-    def _score(self) -> Dict[str, Any]:
+    def _score(self, real: Dict[str, Any]) -> Dict[str, Any]:
         s = self.state
+        real = real or {}
         # each component score is derived from a real-ish signal
         cache_score = int(_clamp((s["cache_hit"] - 70) / 30 * 100, 0, 100))
         redis_score = int(_clamp((s["redis_hit"] - 50) / 50 * 100, 0, 100))
-        php_score = int(_clamp(100 - max(0, s["php_avg_ms"] - 30) / 8, 0, 100))
         worker = self._worker()
         worker_score = int(_clamp(
             100 - max(0, worker["queue"] - 80) / 8 - max(0, worker["utilization"] - 75) / 5,
             0, 100,
         ))
-        db_score = int(_clamp(100 - max(0, s["db_avg_ms"] - 10) / 6, 0, 100))
         wp_score = int(_clamp(100 - self._wordpress()["plugin_total_ms"] / 30, 0, 100))
         storage_score = int(_clamp(100 - self._storage()["total_gb"] / 5, 0, 100))
-        # web server derives from p95 latency
-        web_score = int(_clamp(100 - max(0, s["p95_ms"] - 150) / 12, 0, 100))
+
+        # ---- web_server: 真实 OLS 状态 ----
+        ols = real.get("ols") or {}
+        if ols.get("available") and ols.get("running"):
+            web_score = 100
+        elif ols.get("available") and not ols.get("running"):
+            web_score = 0
+        else:
+            web_score = int(_clamp(100 - max(0, s["p95_ms"] - 150) / 12, 0, 100))
+
+        # ---- php_runtime: 真实 OPcache 命中率 ----
+        php_real = real.get("php") or {}
+        if php_real.get("opcache_enabled") and php_real.get("opcache_hit_rate") is not None:
+            php_score = int(_clamp(php_real["opcache_hit_rate"], 0, 100))
+        elif php_real.get("available") and not php_real.get("opcache_enabled"):
+            php_score = int(_clamp(100 - max(0, s["php_avg_ms"] - 30) / 8, 0, 100)) - 10
+        else:
+            php_score = int(_clamp(100 - max(0, s["php_avg_ms"] - 30) / 8, 0, 100))
+
+        # ---- database: 真实 MariaDB 慢查询率 / 连接利用率 ----
+        db_real = real.get("mariadb") or {}
+        if db_real.get("available"):
+            db_score = int(_clamp(
+                100 - db_real.get("slow_rate", 0) * 120 - max(0, db_real.get("connection_util", 0) - 70) / 2,
+                0, 100,
+            ))
+        else:
+            db_score = int(_clamp(100 - max(0, s["db_avg_ms"] - 10) / 6, 0, 100))
+
         components = {
-            "web_server": {"label": "Web Server", "score": web_score},
-            "cache": {"label": "Cache Layer", "score": cache_score},
-            "php_runtime": {"label": "PHP Runtime", "score": php_score},
-            "worker": {"label": "Worker Pool", "score": worker_score},
-            "database": {"label": "Database", "score": db_score},
-            "redis": {"label": "Redis", "score": redis_score},
-            "wordpress": {"label": "WordPress Core", "score": wp_score},
-            "storage": {"label": "Storage", "score": storage_score},
+            "web_server": {"label": "Web Server", "score": web_score, "source": "real" if ols.get("available") else "sim"},
+            "cache": {"label": "Cache Layer", "score": cache_score, "source": "sim"},
+            "php_runtime": {"label": "PHP Runtime", "score": php_score, "source": "real" if php_real.get("available") else "sim"},
+            "worker": {"label": "Worker Pool", "score": worker_score, "source": "sim"},
+            "database": {"label": "Database", "score": db_score, "source": "real" if db_real.get("available") else "sim"},
+            "redis": {"label": "Redis", "score": redis_score, "source": "sim"},
+            "wordpress": {"label": "WordPress Core", "score": wp_score, "source": "sim"},
+            "storage": {"label": "Storage", "score": storage_score, "source": "sim"},
         }
         total = int(round(sum(c["score"] for c in components.values()) / len(components)))
         grade = "A" if total >= 90 else "B" if total >= 80 else "C" if total >= 70 else "D"
@@ -281,11 +443,26 @@ class WPRuntimeSimulator:
 
     # -- L1 php -----------------------------------------------------------
 
-    def _php(self) -> Dict[str, Any]:
+    def _php(self, real: Dict[str, Any] = None) -> Dict[str, Any]:
         s = self.state
+        real = real or {}
+        php_real = real.get("php") or {}
+        version = php_real.get("version") or "8.3"
+        opcache = {
+            "used": round(s["opcache_mb"], 1),
+            "total": round(s["opcache_total_mb"], 1),
+            "hit_rate": round(_walk(97.5, 0.01, 80, 100), 2),
+        }
+        if php_real.get("opcache_used_mb") is not None:
+            opcache["used"] = php_real["opcache_used_mb"]
+        if php_real.get("opcache_total_mb") is not None:
+            opcache["total"] = php_real["opcache_total_mb"]
+        if php_real.get("opcache_hit_rate") is not None:
+            opcache["hit_rate"] = php_real["opcache_hit_rate"]
         return {
             "avg_time": round(s["php_avg_ms"], 1),
-            "version": "8.3",
+            "version": version,
+            "opcache_enabled": php_real.get("opcache_enabled"),
             "slow_scripts": [
                 {"script": "wp-admin/admin-ajax.php", "ms": round(_walk(820, 0.1, 200, 2000), 0)},
                 {"script": "wp-content/plugins/woocommerce/includes/class-wc-ajax.php", "ms": round(_walk(540, 0.1, 100, 1500), 0)},
@@ -298,11 +475,7 @@ class WPRuntimeSimulator:
                 "notice": random.randint(60, 180),
                 "deprecated": random.randint(2, 12),
             },
-            "opcache": {
-                "used": round(s["opcache_mb"], 1),
-                "total": round(s["opcache_total_mb"], 1),
-                "hit_rate": round(_walk(97.5, 0.01, 80, 100), 2),
-            },
+            "opcache": opcache,
         }
 
     # -- L1 worker --------------------------------------------------------
@@ -328,16 +501,27 @@ class WPRuntimeSimulator:
 
     # -- L1 database ------------------------------------------------------
 
-    def _database(self) -> Dict[str, Any]:
+    def _database(self, real: Dict[str, Any] = None) -> Dict[str, Any]:
         s = self.state
+        real = real or {}
+        db_real = real.get("mariadb") or {}
+        qps = db_real.get("qps", round(s["db_qps"], 1)) if db_real.get("available") else round(s["db_qps"], 1)
+        connections = db_real.get("threads_connected", random.randint(30, 70)) if db_real.get("available") else random.randint(30, 70)
+        max_connections = db_real.get("max_connections", 151) if db_real.get("available") else 151
+        slow_queries = db_real.get("slow_queries", random.randint(12, 60)) if db_real.get("available") else random.randint(12, 60)
+        avg_query_ms = round(s["db_avg_ms"], 2)
+        if db_real.get("available") and db_real.get("qps") is not None:
+            # 真实 QPS 越高，典型查询耗时估算越低（粗粒度关联）
+            avg_query_ms = round(_clamp(1000.0 / max(1, db_real["qps"]), 1, 200), 2)
         return {
-            "qps": round(s["db_qps"], 1),
-            "avg_query_ms": round(s["db_avg_ms"], 2),
-            "slow_queries": random.randint(12, 60),
+            "qps": qps,
+            "avg_query_ms": avg_query_ms,
+            "slow_queries": slow_queries,
             "locks": random.randint(0, 6),
             "deadlocks": random.randint(0, 2),
-            "connections": random.randint(30, 70),
-            "max_connections": 151,
+            "connections": connections,
+            "max_connections": max_connections,
+            "connection_util": db_real.get("connection_util"),
             "top_tables": [
                 {"table": "wp_postmeta", "ms": round(_walk(820, 0.1, 200, 2000), 0)},
                 {"table": "wp_options", "ms": round(_walk(680, 0.1, 150, 1800), 0)},
@@ -585,8 +769,8 @@ class WPRuntimeSimulator:
 _simulator = WPRuntimeSimulator()
 
 
-def get_runtime_snapshot() -> Dict[str, Any]:
-    return _simulator.snapshot()
+def get_runtime_snapshot(db=None) -> Dict[str, Any]:
+    return _simulator.snapshot(db)
 
 
 def apply_optimization(action: str) -> Dict[str, Any]:

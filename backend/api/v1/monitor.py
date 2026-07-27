@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Dict, Any
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 from backend.api import deps
 from backend.models.user import User
 from backend.utils import monitor_utils
@@ -172,9 +173,12 @@ def _mock_top_pages():
 # ---------------------------------------------------------------------------
 
 @router.get("/wp-runtime")
-async def get_wp_runtime(current_user: User = Depends(deps.get_current_active_user)):
-    """WordPress 运行时可观测性快照（L1-L4 全量）。"""
-    return wordpress_runtime.get_runtime_snapshot()
+async def get_wp_runtime(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+):
+    """WordPress 运行时可观测性快照（L1-L4 全量，含真实 OLS/PHP/MariaDB 数据）。"""
+    return wordpress_runtime.get_runtime_snapshot(db)
 
 
 @router.post("/wp-runtime/optimize")

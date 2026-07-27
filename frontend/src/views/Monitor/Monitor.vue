@@ -75,7 +75,12 @@
                 :stroke-color="scoreColor(c.score)"
                 :trail-color="'rgba(255,255,255,0.08)'"
               />
-              <div class="wp-comp-label">{{ c.label }}</div>
+              <div class="wp-comp-meta">
+                <div class="wp-comp-label">{{ c.label }}</div>
+                <a-tag :color="c.source === 'real' ? 'green' : 'gray'" size="small" class="wp-comp-src">
+                  {{ c.source === 'real' ? '真实' : '模拟' }}
+                </a-tag>
+              </div>
             </div>
           </div>
         </a-card>
@@ -168,9 +173,25 @@
                 </a-card>
               </a-col>
             </a-row>
+            <a-card class="wp-card wp-mt" title="真实运行时信号 (OLS / PHP)" :bordered="false">
+              <a-descriptions :column="2" bordered size="small">
+                <a-descriptions-item label="OpenLiteSpeed">
+                  <a-tag :color="ols.running ? 'green' : 'red'">{{ ols.running ? '运行中' : '未运行' }}</a-tag>
+                </a-descriptions-item>
+                <a-descriptions-item label="OLS 版本">{{ ols.version || '未知' }}</a-descriptions-item>
+                <a-descriptions-item label="PHP 版本">{{ phpReal.version || '未知' }}</a-descriptions-item>
+                <a-descriptions-item label="OPcache">
+                  <a-tag :color="phpReal.opcache_enabled ? 'green' : (phpReal.opcache_enabled === false ? 'orange' : 'gray')">
+                    {{ phpReal.opcache_enabled === null ? '未探测' : (phpReal.opcache_enabled ? '已启用' : '未启用') }}
+                  </a-tag>
+                </a-descriptions-item>
+              </a-descriptions>
+              <a-alert v-if="ols.error" class="wp-mt" type="warning">{{ ols.error }}</a-alert>
+              <a-alert v-else-if="phpReal.error" class="wp-mt" type="warning">{{ phpReal.error }}</a-alert>
+            </a-card>
             <a-row :gutter="16" class="wp-mt">
               <a-col :span="24">
-                <a-card title="PHP 错误统计 (PHP 8.3)" :bordered="false" class="wp-card">
+                <a-card title="PHP 错误统计" :bordered="false" class="wp-card">
                   <a-space>
                     <a-tag color="red">Fatal {{ data.php.errors.fatal }}</a-tag>
                     <a-tag color="orange">Warning {{ data.php.errors.warning }}</a-tag>
@@ -232,6 +253,19 @@
                 </a-card>
               </a-col>
             </a-row>
+            <a-card class="wp-card wp-mt" title="真实 MariaDB 信号" :bordered="false">
+              <a-descriptions :column="3" bordered size="small">
+                <a-descriptions-item label="状态">
+                  <a-tag :color="mariadb.running ? 'green' : 'red'">{{ mariadb.running ? '运行中' : '未连接' }}</a-tag>
+                </a-descriptions-item>
+                <a-descriptions-item label="连接数">{{ mariadb.threads_connected ?? '-' }} / {{ mariadb.max_connections ?? '-' }}</a-descriptions-item>
+                <a-descriptions-item label="连接利用率">{{ mariadb.connection_util ?? '-' }}%</a-descriptions-item>
+                <a-descriptions-item label="QPS (查询/秒)">{{ mariadb.qps ?? '-' }}</a-descriptions-item>
+                <a-descriptions-item label="慢查询总数">{{ mariadb.slow_queries ?? '-' }}</a-descriptions-item>
+                <a-descriptions-item label="慢查询率">{{ mariadb.slow_rate ?? '-' }}%</a-descriptions-item>
+              </a-descriptions>
+              <a-alert v-if="mariadb.error" class="wp-mt" type="warning">{{ mariadb.error }}</a-alert>
+            </a-card>
           </a-tab-pane>
 
           <!-- Redis -->
@@ -470,6 +504,10 @@ const scoreColor = (s) => (s >= 90 ? COLORS.green : s >= 80 ? COLORS.cyan : s >=
 const gradeColor = (g) => ({ A: COLORS.green, B: COLORS.cyan, C: COLORS.orange, D: COLORS.red }[g] || COLORS.gray)
 const errClass = computed(() => (data.value && data.value.request.error_rate < 1 ? '' : 'wp-err'))
 const aiSummary = computed(() => (data.value ? data.value.ai_analysis.summary : ''))
+const realSignals = computed(() => (data.value ? data.value.real_signals || {} : {}))
+const ols = computed(() => realSignals.value.ols || {})
+const phpReal = computed(() => realSignals.value.php || {})
+const mariadb = computed(() => realSignals.value.mariadb || {})
 
 const levelMeta = {
   critical: { title: '严重 Critical', type: 'error' },
@@ -678,9 +716,11 @@ onBeforeUnmount(stopTimer)
 .wp-kpi-l { font-size: 12px; color: #86909c; margin-top: 2px; }
 
 .wp-divider { height: 90px; }
-.wp-score-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; flex: 1; }
-.wp-comp { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 8px; background: rgba(255,255,255,0.03); }
+.wp-score-grid { display: flex; flex-wrap: wrap; gap: 10px; flex: 1; }
+.wp-comp { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,0.03); flex: 1 1 130px; }
+.wp-comp-meta { display: flex; flex-direction: column; gap: 4px; }
 .wp-comp-label { font-size: 12px; color: #c9cdd4; }
+.wp-comp-src { align-self: flex-start; }
 
 .wp-tabs { margin-top: 16px; }
 .wp-card { background: #16171a; border-radius: 12px; }
