@@ -63,6 +63,4 @@ backend/phpmyadmin/*.log
 /backup/*.tar.gz
 /backup/*.sql
 
-# WordPress uploads (large files)
-/wordpress/
-/wordpress/*/wp-content/uploads/
+

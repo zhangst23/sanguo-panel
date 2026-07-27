@@ -30,6 +30,8 @@ from typing import Any, Dict, List, Optional
 # Real stack paths (OpenLiteSpeed tech base)
 LSWS_HOME = "/usr/local/lsws"
 OLS_PHP_BIN = os.path.join(LSWS_HOME, "lsphp83", "bin", "lsphp")
+# 标准 CLI 二进制（支持 -r 探针）；lsphp 是 LSAPI 二进制，不支持 -r
+OLS_PHP_CLI_BIN = os.path.join(LSWS_HOME, "lsphp83", "bin", "php")
 
 # ---------------------------------------------------------------------------
 # Tunable baseline configuration for the simulated stack
@@ -208,44 +210,60 @@ class WPRuntimeSimulator:
         return out
 
     def _php_status(self) -> Dict[str, Any]:
-        """真实 PHP / OPcache 状态。"""
+        """真实 PHP / OPcache 状态。
+
+        OPcache 探针必须走标准 CLI 二进制（``php``）：``lsphp`` 是 LSAPI 二进制，
+        不支持 ``-r``；且 CLI 下需 ``opcache.enable_cli=1`` 才能拿到 OPcache 状态。
+        CLI 进程是全新进程，其命中率/已用内存不具代表性，故仅上报「是否已启用」
+        与真实配置的内存上限，命中率与已用内存仍交由模拟值估算，避免误导。
+        """
         out: Dict[str, Any] = {
             "available": False, "version": None, "opcache_enabled": None,
             "opcache_hit_rate": None, "opcache_used_mb": None,
             "opcache_total_mb": None, "error": None,
         }
-        php_bin = OLS_PHP_BIN if os.path.exists(OLS_PHP_BIN) else None
-        if php_bin is None:
+        lsphp = OLS_PHP_BIN if os.path.exists(OLS_PHP_BIN) else None
+        cli = OLS_PHP_CLI_BIN if os.path.exists(OLS_PHP_CLI_BIN) else lsphp
+        if cli is None:
             try:
                 from backend.utils.php_utils import find_php_executable
-                php_bin = find_php_executable()
+                cli = find_php_executable()
             except Exception:
-                php_bin = None
-        if not php_bin:
+                cli = None
+        if not cli:
             out["error"] = "未找到 PHP 可执行文件"
             return out
+        # 版本优先用 LSAPI lsphp（更贴近 Web 运行时 SAPI）
+        version_bin = lsphp or cli
         try:
-            v = subprocess.run([php_bin, "-v"], capture_output=True, text=True, timeout=8)
+            v = subprocess.run([version_bin, "-v"], capture_output=True, text=True, timeout=8)
             if v.returncode == 0 and v.stdout:
                 parts = v.stdout.splitlines()[0].split(" ")
                 out["version"] = parts[1] if len(parts) >= 2 else None
             code = (
-                "<?php $s=@opcache_get_status(false);"
+                "$enabledCli=(bool)ini_get('opcache.enable_cli');"
+                "$enabled=(bool)ini_get('opcache.enable');"
+                "$active=$enabled&&(PHP_SAPI!=='cli'||$enabledCli);"
+                "$s=@opcache_get_status(false);"
+                "$out=['enabled'=>$active,'sapi'=>PHP_SAPI,'enable_cli'=>$enabledCli];"
                 "if($s&&!empty($s['opcache_statistics'])){"
-                "echo json_encode(['ok'=>true,"
-                "'hit_rate'=>round($s['opcache_statistics']['opcache_hit_rate']??0,2),"
-                "'used_mb'=>round($s['memory_usage']['used_memory']/1048576,1),"
-                "'total_mb'=>round(($s['memory_usage']['used_memory']+$s['memory_usage']['free_memory'])/1048576,1)]);"
-                "}else{echo json_encode(['ok'=>false]);}"
+                "$mem=$s['memory_usage'];"
+                "$out['total_mb']=round(($mem['used_memory']+$mem['free_memory'])/1048576,1);"
+                "if(PHP_SAPI!=='cli'&&isset($s['opcache_statistics']['opcache_hit_rate'])){"
+                "$out['hit_rate']=round($s['opcache_statistics']['opcache_hit_rate'],2);"
+                "$out['used_mb']=round($mem['used_memory']/1048576,1);"
+                "}}"
+                "echo json_encode($out);"
             )
-            r = subprocess.run([php_bin, "-r", code], capture_output=True, text=True, timeout=8)
+            r = subprocess.run([cli, "-r", code], capture_output=True, text=True, timeout=8)
             try:
                 j = json.loads(r.stdout.strip())
-                out["opcache_enabled"] = bool(j.get("ok"))
-                if j.get("ok"):
+                out["opcache_enabled"] = bool(j.get("enabled"))
+                if j.get("total_mb") is not None:
+                    out["opcache_total_mb"] = j.get("total_mb")
+                if j.get("hit_rate") is not None:
                     out["opcache_hit_rate"] = j.get("hit_rate")
                     out["opcache_used_mb"] = j.get("used_mb")
-                    out["opcache_total_mb"] = j.get("total_mb")
             except Exception:
                 out["opcache_enabled"] = False
             out["available"] = True
@@ -356,12 +374,13 @@ class WPRuntimeSimulator:
         else:
             web_score = int(_clamp(100 - max(0, s["p95_ms"] - 150) / 12, 0, 100))
 
-        # ---- php_runtime: 真实 OPcache 命中率 ----
+        # ---- php_runtime: 真实 OPcache 启用态 ----
+        # CLI 进程命中率不具代表性，故评分由运行时延迟驱动；
+        # OPcache 真实启用则给满分基准，未启用则扣分。
         php_real = real.get("php") or {}
-        if php_real.get("opcache_enabled") and php_real.get("opcache_hit_rate") is not None:
-            php_score = int(_clamp(php_real["opcache_hit_rate"], 0, 100))
-        elif php_real.get("available") and not php_real.get("opcache_enabled"):
-            php_score = int(_clamp(100 - max(0, s["php_avg_ms"] - 30) / 8, 0, 100)) - 10
+        if php_real.get("available"):
+            base = int(_clamp(100 - max(0, s["php_avg_ms"] - 30) / 8, 0, 100))
+            php_score = base if php_real.get("opcache_enabled") else base - 10
         else:
             php_score = int(_clamp(100 - max(0, s["php_avg_ms"] - 30) / 8, 0, 100))
 

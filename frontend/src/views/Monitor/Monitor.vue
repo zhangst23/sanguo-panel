@@ -185,6 +185,7 @@
                     {{ phpReal.opcache_enabled === null ? '未探测' : (phpReal.opcache_enabled ? '已启用' : '未启用') }}
                   </a-tag>
                 </a-descriptions-item>
+                <a-descriptions-item label="OPcache 内存">{{ phpReal.opcache_total_mb != null ? phpReal.opcache_total_mb + ' MB' : '未知' }}</a-descriptions-item>
               </a-descriptions>
               <a-alert v-if="ols.error" class="wp-mt" type="warning">{{ ols.error }}</a-alert>
               <a-alert v-else-if="phpReal.error" class="wp-mt" type="warning">{{ phpReal.error }}</a-alert>
