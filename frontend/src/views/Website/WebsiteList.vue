@@ -22,7 +22,7 @@
     <a-card class="action-row" :bordered="false" size="small">
       <a-space wrap>
         <span class="action-label">批量操作：</span>
-        <a-button size="small" @click="batchUpdateWP" :disabled="selectedIds.length === 0">更新 WordPress</a-button>
+        <a-button size="small" @click="batchUpdateWP" :disabled="selectedIds.length === 0" :loading="batchWPUpdateLoading">更新 WordPress</a-button>
         <a-input-search
           size="small"
           placeholder="输入插件 slug 名称"
@@ -476,6 +476,7 @@ const formRef = ref(null)
 const showBatchModal = ref(false)
 const csvContent = ref('')
 const batchLoading = ref(false)
+const batchWPUpdateLoading = ref(false)
 
 const showMigrateModal = ref(false)
 const migrateLoading = ref(false)
@@ -664,15 +665,17 @@ const handleBatchCreateCSV = async () => {
 }
 
 const batchUpdateWP = async () => {
+  batchWPUpdateLoading.value = true
   for (const id of selectedIds.value) {
     try {
-      await request.post(`/sites/${id}/wp/update`)
+      await request.post(`/sites/${id}/wp/update`, {}, { timeout: 130000 })
       Message.success(`站点 #${id} 更新成功`)
     } catch (e) {
       Message.error(`站点 #${id} 更新失败: ${e.response?.data?.detail || e.message}`)
     }
   }
   fetchSites()
+  batchWPUpdateLoading.value = false
 }
 
 const batchInstallPlugin = async (slug) => {
