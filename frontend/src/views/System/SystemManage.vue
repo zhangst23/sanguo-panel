@@ -9,7 +9,7 @@
       <a-tab-pane key="redis" title="Redis 管理">
         <RedisManager />
       </a-tab-pane>
-      <a-tab-pane key="php" title="PHP 管理">
+      <a-tab-pane key="php" title="PHP Runtime 管理">
         <PHPManager />
       </a-tab-pane>
       <a-tab-pane key="linux" title="Linux 管理">
@@ -17,9 +17,6 @@
       </a-tab-pane>
       <a-tab-pane key="ols" title="OLS 虚拟主机管理">
         <OLSManager />
-      </a-tab-pane>
-      <a-tab-pane key="phpworker" title="PHP Worker">
-        <PHPWorkerManager />
       </a-tab-pane>
       <a-tab-pane key="lscache" title="LSCache">
         <LSCacheManager />
@@ -42,7 +39,6 @@ import PHPManager from '@/views/PHP/PHP.vue'
 import LinuxManager from '@/views/Linux/Linux.vue'
 import OLSManager from '@/views/LiteSpeed/LiteSpeed.vue'
 import SystemStatus from '@/views/System/SystemStatus.vue'
-import PHPWorkerManager from '@/views/PHP/PHPWorker.vue'
 import LSCacheManager from '@/views/LiteSpeed/LSCache.vue'
 import RewriteManager from '@/views/LiteSpeed/Rewrite.vue'
 import LogManager from '@/views/LiteSpeed/Log.vue'
@@ -50,7 +46,7 @@ import LogManager from '@/views/LiteSpeed/Log.vue'
 const route = useRoute()
 const router = useRouter()
 
-const TAB_KEYS = ['status', 'redis', 'php', 'linux', 'ols', 'phpworker', 'lscache', 'rewrite', 'log']
+const TAB_KEYS = ['status', 'redis', 'php', 'linux', 'ols', 'lscache', 'rewrite', 'log']
 const activeTab = ref(getInitialTab())
 
 function getInitialTab() {

@@ -62,17 +62,16 @@
             <template #icon><icon-cloud-download /></template>
             备份迁移
           </a-menu-item>
-          <a-menu-item key="TaskList">
-            <template #icon><icon-list /></template>
-            任务列表
-          </a-menu-item>
+          
           <a-sub-menu key="System">
             <template #icon><icon-settings /></template>
             <template #title>系统工具</template>
             <a-menu-item key="Linux">系统管理</a-menu-item>
             <a-menu-item key="Monitor">监控中心</a-menu-item>
-            <a-menu-item key="ApiDocs">API 接口文档</a-menu-item>
             <a-menu-item key="SystemSettings">系统设置</a-menu-item>
+            <a-menu-item key="TaskList">任务列表</a-menu-item>
+            <a-menu-item key="ApiDocs">API 接口文档</a-menu-item>
+            
           </a-sub-menu>
         </a-menu>
       </div>
