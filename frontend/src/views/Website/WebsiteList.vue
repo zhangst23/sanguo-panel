@@ -53,6 +53,7 @@
       <a-space wrap>
         <span class="action-label">站群功能：</span>
         <a-button size="small" @click="batchGenerateWooKeys" :disabled="selectedIds.length === 0">生成 Woo API</a-button>
+        <a-button size="small" @click="downloadWooKeysCSV">下载本页 Woo Key</a-button>
         <a-button size="small" @click="handleShowNginx(selectedIds[0])" :disabled="selectedIds.length !== 1">修改 nginx（CF 反代版）</a-button>
       </a-space>
     </a-card>
@@ -931,6 +932,29 @@ const batchGenerateWooKeys = async () => {
     }
   }
   fetchSites()
+}
+
+const downloadWooKeysCSV = () => {
+  const header = '\uFEFFID,Domain,WooCommerce Key,WooCommerce Secret'
+  const rows = sites.value
+    .filter(s => s.wc_key || s.wc_secret)
+    .map(s => {
+      const escape = (v) => `"${(v || '').replace(/"/g, '""')}"`
+      return `${s.id},${escape(s.domain)},${escape(s.wc_key)},${escape(s.wc_secret)}`
+    })
+  if (rows.length === 0) {
+    Message.warning('本页没有可下载的 WooCommerce Key')
+    return
+  }
+  const csv = [header, ...rows].join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const url = window.URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `woocommerce-keys-${new Date().toISOString().split('T')[0]}.csv`
+  a.click()
+  window.URL.revokeObjectURL(url)
+  Message.success(`已导出 ${rows.length} 条记录`)
 }
 
 // --- Migrate ---

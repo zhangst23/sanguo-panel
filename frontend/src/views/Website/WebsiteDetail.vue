@@ -18,7 +18,7 @@
     <a-tabs default-active-key="overview" class="detail-tabs">
       <a-tab-pane key="overview" title="概览">
         <a-row :gutter="24">
-          <a-col :span="7">
+          <a-col :span="8">
             <a-card title="站点信息" :bordered="false" class="site-info-card">
               <a-descriptions :column="1" layout="horizontal" size="small">
                 <a-descriptions-item label="WordPress 版本">
@@ -80,7 +80,7 @@
               </div>
             </a-card>
           </a-col>
-          <a-col :span="9">
+          <a-col :span="8">
             <a-card title="备份" :bordered="false">
               <a-space direction="vertical" fill size="medium">
                 <a-empty v-if="!latestBackup" description="暂无备份记录" />
