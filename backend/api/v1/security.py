@@ -9,6 +9,7 @@ from backend.models.backup import Backup as BackupModel, BackupSchedule as Backu
 from backend.models.task import Task as TaskModel, TaskStatus
 from backend.schemas.backup import Backup, BackupCreate, BackupSchedule, BackupScheduleCreate
 from backend.utils.backup_utils import create_site_backup, restore_site_backup
+from backend.utils import panel_backup_utils as pbu
 from backend.core import security as security_utils
 from backend.models.user import User
 from typing import List, Optional
@@ -907,3 +908,78 @@ def restore_backup(
 def import_site(panel_type: str, file_path: str, current_user=Depends(get_current_user)):
     # Mock migration logic
     return {"success": True, "message": f"Starting migration from {panel_type}"}
+
+
+# --- 面板备份 (Panel Backup) ---
+@router.get("/panel-backups")
+def list_panel_backups(current_user=Depends(get_current_user)):
+    return pbu.load_records()
+
+
+@router.get("/panel-backups/config")
+def get_panel_backup_config(current_user=Depends(get_current_user)):
+    return pbu.get_config_with_next()
+
+
+@router.post("/panel-backups/config")
+def update_panel_backup_config(
+    payload: dict,
+    current_user=Depends(get_current_user)
+):
+    cfg = pbu.load_config()
+    if "enabled" in payload:
+        cfg["enabled"] = bool(payload["enabled"])
+    pbu.save_config(cfg)
+    return pbu.get_config_with_next()
+
+
+@router.post("/panel-backups/create")
+def create_panel_backup_manual(
+    background_tasks: BackgroundTasks,
+    current_user=Depends(get_current_user)
+):
+    rec = pbu.begin_panel_backup(trigger="manual")
+    background_tasks.add_task(pbu.finalize_panel_backup, rec["id"])
+    return rec
+
+
+@router.get("/panel-backups/{backup_id}/download")
+def download_panel_backup(
+    backup_id: str,
+    current_user=Depends(get_current_user)
+):
+    rec = next((r for r in pbu.load_records() if r["id"] == backup_id), None)
+    if not rec:
+        raise HTTPException(status_code=404, detail="备份不存在")
+    if rec.get("file_path") and os.path.exists(rec["file_path"]):
+        return FileResponse(
+            rec["file_path"],
+            filename=rec["name"],
+            media_type="application/gzip"
+        )
+    raise HTTPException(status_code=404, detail="备份文件不存在")
+
+
+@router.delete("/panel-backups/{backup_id}")
+def delete_panel_backup_endpoint(
+    backup_id: str,
+    current_user=Depends(get_current_user)
+):
+    ok = pbu.delete_panel_backup(backup_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="备份不存在")
+    return {"success": True}
+
+
+@router.post("/panel-backups/{backup_id}/restore")
+def restore_panel_backup_endpoint(
+    backup_id: str,
+    background_tasks: BackgroundTasks,
+    current_user=Depends(get_current_user)
+):
+    try:
+        rec = pbu.begin_restore(backup_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="备份不存在")
+    background_tasks.add_task(pbu.finalize_restore, backup_id)
+    return {"success": True, "id": backup_id, "record": rec}

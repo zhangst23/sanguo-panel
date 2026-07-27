@@ -1,8 +1,8 @@
 <template>
   <div class="litespeed-container">
     <a-tabs default-active-key="2">
-      <a-tab-pane key="2" title="虚拟主机">
-        <a-table :data="vhosts" :loading="loading">
+      <a-tab-pane key="2" >
+        <a-table :data="vhosts">
           <template #columns>
             <a-table-column title="主机名" data-index="name"></a-table-column>
             <a-table-column title="绑定域名" data-index="domain"></a-table-column>

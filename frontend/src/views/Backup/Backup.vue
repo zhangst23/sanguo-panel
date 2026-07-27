@@ -4,7 +4,7 @@
 
     <a-tabs v-model:active-key="activeTab">
       <!-- 备份记录标签页 -->
-      <a-tab-pane key="records" title="备份管理">
+      <a-tab-pane key="records" title="网站备份管理">
         <a-row :gutter="20">
           <a-col :span="16">
             <a-card>
@@ -186,6 +186,67 @@
           </a-form>
         </a-card>
       </a-tab-pane>
+
+      <!-- 面板备份标签页（位于一键迁移右侧） -->
+      <a-tab-pane key="panel" title="面板备份">
+        <a-row :gutter="20">
+          <a-col :span="24">
+            <a-card title="定时备份策略">
+              <a-space size="large" wrap>
+                <a-tag color="arcoblue">计划：每周日 23:00</a-tag>
+                <span>状态：<a-tag :color="panelConfig.enabled ? 'green' : 'gray'">{{ panelConfig.enabled ? '已启用' : '已停用' }}</a-tag></span>
+                <span>下次运行：<a-typography-text code>{{ panelConfig.next_run || '—' }}</a-typography-text></span>
+                <a-switch v-model="panelConfig.enabled" @change="togglePanelSchedule" checked-text="开" unchecked-text="关" />
+                <a-button type="primary" @click="createPanelBackup" :loading="loading.panelBackup">
+                  <template #icon><icon-plus /></template>立即备份
+                </a-button>
+              </a-space>
+              <a-alert type="warning" style="margin-top: 12px;">
+                备份将打包 <a-typography-text code>/sanguo-panel</a-typography-text> 目录（不含 venv、backup 文件夹）与面板数据库，保存到 <a-typography-text code>/sanguo-panel/backup</a-typography-text>。恢复会覆盖当前面板文件与数据库，建议恢复后重启面板服务。
+              </a-alert>
+            </a-card>
+          </a-col>
+        </a-row>
+
+        <a-card title="面板备份列表" style="margin-top: 16px;">
+          <a-table :data="panelBackups" :loading="loading.panelList" :pagination="false">
+            <template #columns>
+              <a-table-column title="备份名称" data-index="name" />
+              <a-table-column title="大小" data-index="file_size">
+                <template #cell="{ record }">{{ formatSize(record.file_size) }}</template>
+              </a-table-column>
+              <a-table-column title="创建时间" data-index="created_at" />
+              <a-table-column title="触发方式" data-index="trigger">
+                <template #cell="{ record }">
+                  <a-tag :color="record.trigger === 'schedule' ? 'purple' : 'blue'">
+                    {{ record.trigger === 'schedule' ? '定时' : '手动' }}
+                  </a-tag>
+                </template>
+              </a-table-column>
+              <a-table-column title="状态" data-index="status">
+                <template #cell="{ record }">
+                  <a-tag :color="record.status === 'success' ? 'green' : (record.status === 'running' ? 'orange' : 'red')">
+                    {{ statusText(record.status) }}
+                  </a-tag>
+                </template>
+              </a-table-column>
+              <a-table-column title="操作">
+                <template #cell="{ record }">
+                  <a-space>
+                    <a-button size="small" @click="downloadPanel(record)" :disabled="record.status !== 'success'">下载</a-button>
+                    <a-popconfirm content="恢复将覆盖当前面板文件与数据库，确定继续？" @ok="restorePanel(record)">
+                      <a-button size="small" type="outline" status="warning" :disabled="record.status !== 'success'">恢复</a-button>
+                    </a-popconfirm>
+                    <a-popconfirm content="确定删除该备份？" @ok="deletePanel(record)">
+                      <a-button size="small" type="outline" status="danger">删除</a-button>
+                    </a-popconfirm>
+                  </a-space>
+                </template>
+              </a-table-column>
+            </template>
+          </a-table>
+        </a-card>
+      </a-tab-pane>
     </a-tabs>
 
     <!-- 手动备份弹窗 -->
@@ -222,7 +283,9 @@ const activeTab = ref('records')
 const loading = reactive({
   fetch: false,
   backup: false,
-  migration: false
+  migration: false,
+  panelList: false,
+  panelBackup: false
 })
 
 const showManualModal = ref(false)
@@ -230,6 +293,106 @@ const backups = ref([])
 const activeTasks = ref([])
 const items = ref([])
 let pollTimer = null
+
+// ---- 面板备份 ----
+const panelBackups = ref([])
+const panelConfig = reactive({
+  enabled: true,
+  cron: '0 23 * * 0',
+  description: '每周日 23:00',
+  last_run: null,
+  next_run: null
+})
+
+const formatSize = (bytes) => {
+  if (!bytes) return '0 MB'
+  const mb = bytes / 1024 / 1024
+  if (mb >= 1024) return (mb / 1024).toFixed(2) + ' GB'
+  return mb.toFixed(2) + ' MB'
+}
+const statusText = (s) => ({ running: '进行中', success: '成功', failed: '失败' }[s] || s)
+
+const fetchPanelBackups = async () => {
+  loading.panelList = true
+  try {
+    const res = await request.get('/security/panel-backups')
+    panelBackups.value = res || []
+    if (panelBackups.value.some(r => r.status === 'running')) {
+      setTimeout(fetchPanelBackups, 3000)
+    }
+  } catch (e) {
+    // ignore
+  } finally {
+    loading.panelList = false
+  }
+}
+
+const fetchPanelConfig = async () => {
+  try {
+    const res = await request.get('/security/panel-backups/config')
+    Object.assign(panelConfig, res)
+  } catch (e) {
+    // ignore
+  }
+}
+
+const createPanelBackup = async () => {
+  loading.panelBackup = true
+  try {
+    await request.post('/security/panel-backups/create', {})
+    Message.success('面板备份任务已启动')
+    fetchPanelBackups()
+  } catch (e) {
+    Message.error('启动备份失败')
+  } finally {
+    loading.panelBackup = false
+  }
+}
+
+const togglePanelSchedule = async (val) => {
+  try {
+    const res = await request.post('/security/panel-backups/config', { enabled: val })
+    Object.assign(panelConfig, res)
+    Message.success(val ? '已启用定时备份' : '已停用定时备份')
+  } catch (e) {
+    panelConfig.enabled = !val
+    Message.error('更新定时策略失败')
+  }
+}
+
+const downloadPanel = async (record) => {
+  try {
+    const resp = await request({ url: `/security/panel-backups/${record.id}/download`, method: 'GET', responseType: 'blob' })
+    const url = window.URL.createObjectURL(new Blob([resp.data]))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = record.name
+    a.click()
+    window.URL.revokeObjectURL(url)
+  } catch (e) {
+    Message.error('下载失败')
+  }
+}
+
+const restorePanel = async (record) => {
+  try {
+    await request.post(`/security/panel-backups/${record.id}/restore`, {})
+    Message.success('面板恢复任务已启动')
+    fetchPanelBackups()
+  } catch (e) {
+    Message.error('启动恢复失败')
+  }
+}
+
+const deletePanel = async (record) => {
+  try {
+    await request.delete(`/security/panel-backups/${record.id}`)
+    Message.success('已删除')
+    fetchPanelBackups()
+  } catch (e) {
+    Message.error('删除失败')
+  }
+}
 
 const handleOpenManualModal = async () => {
   showManualModal.value = true
@@ -463,6 +626,8 @@ const handleMigration = () => {
 onMounted(() => {
   fetchData()
   fetchTasks()
+  fetchPanelBackups()
+  fetchPanelConfig()
 })
 </script>
 

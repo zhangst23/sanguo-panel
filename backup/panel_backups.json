@@ -1,0 +1,22 @@
+[
+  {
+    "id": "20260727_233014_0b029f",
+    "name": "panel_backup_20260727_233014_0b029f.tar.gz",
+    "file_path": "/sanguo-panel/backup/panel_backup_20260727_233014_0b029f.tar.gz",
+    "file_size": 9849932,
+    "created_at": "2026-07-27 23:30:14",
+    "trigger": "manual",
+    "status": "success",
+    "error": null
+  },
+  {
+    "id": "20260727_232912_cb1dfd",
+    "name": "panel_backup_20260727_232912_cb1dfd.tar.gz",
+    "file_path": "/sanguo-panel/backup/panel_backup_20260727_232912_cb1dfd.tar.gz",
+    "file_size": 9848753,
+    "created_at": "2026-07-27 23:29:12",
+    "trigger": "schedule",
+    "status": "success",
+    "error": null
+  }
+]

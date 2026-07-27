@@ -25,6 +25,10 @@ async def lifespan(app: FastAPI):
     from backend.utils.ssl_expiry_checker import start_ssl_checker
     threading.Thread(target=start_ssl_checker, daemon=True).start()
 
+    # Start panel backup scheduler (每周日 23:00)
+    from backend.utils import panel_backup_utils as pbu
+    pbu.start_scheduler()
+
     yield
     # Shutdown logic
     print(f"--- {settings.PROJECT_NAME} is shutting down ---")
