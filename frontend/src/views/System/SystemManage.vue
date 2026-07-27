@@ -18,6 +18,18 @@
       <a-tab-pane key="ols" title="OLS 虚拟主机管理">
         <OLSManager />
       </a-tab-pane>
+      <a-tab-pane key="phpworker" title="PHP Worker">
+        <PHPWorkerManager />
+      </a-tab-pane>
+      <a-tab-pane key="lscache" title="LSCache">
+        <LSCacheManager />
+      </a-tab-pane>
+      <a-tab-pane key="rewrite" title="Rewrite">
+        <RewriteManager />
+      </a-tab-pane>
+      <a-tab-pane key="log" title="Log">
+        <LogManager />
+      </a-tab-pane>
     </a-tabs>
   </div>
 </template>
@@ -30,6 +42,10 @@ import PHPManager from '@/views/PHP/PHP.vue'
 import LinuxManager from '@/views/Linux/Linux.vue'
 import OLSManager from '@/views/LiteSpeed/LiteSpeed.vue'
 import SystemStatus from '@/views/System/SystemStatus.vue'
+import PHPWorkerManager from '@/views/PHP/PHPWorker.vue'
+import LSCacheManager from '@/views/LiteSpeed/LSCache.vue'
+import RewriteManager from '@/views/LiteSpeed/Rewrite.vue'
+import LogManager from '@/views/LiteSpeed/Log.vue'
 
 const route = useRoute()
 const router = useRouter()

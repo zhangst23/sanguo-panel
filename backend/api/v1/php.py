@@ -124,3 +124,33 @@ def get_php_config(
         "max_execution_time": "300",
         "disable_functions": "exec,shell_exec,system"
     }
+
+
+@router.get("/worker")
+def get_php_worker(
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    """PHP Worker (LSAPI/lsphp) 进程状态"""
+    if os.name == 'nt':
+        return {"running": True, "count": 4, "memory_mb": 128, "version": "8.2"}
+    try:
+        from backend.utils.ols_utils import get_default_php_version
+        version = get_default_php_version() or "8.2"
+    except Exception:
+        version = "8.2"
+    count_res = run_shell("pgrep -c lsphp 2>/dev/null || echo 0")
+    try:
+        count = int(str(count_res["stdout"]).strip() or "0")
+    except Exception:
+        count = 0
+    mem_res = run_shell("ps -o rss= -C lsphp 2>/dev/null | awk '{s+=$1} END {print s+0}'")
+    try:
+        mem_kb = int(str(mem_res["stdout"]).strip() or "0")
+    except Exception:
+        mem_kb = 0
+    return {
+        "running": count > 0,
+        "count": count,
+        "memory_mb": round(mem_kb / 1024, 1),
+        "version": version,
+    }

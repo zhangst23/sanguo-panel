@@ -86,6 +86,10 @@ def _service_status(name: str) -> str:
     if name == "sanguo-panel":
         # 面板自身始终在线（能响应请求即说明在运行）
         return "running"
+    if name == "php-worker":
+        # OpenLiteSpeed 使用 LSAPI，PHP 以 lsphp 进程方式运行
+        res = run_shell("pgrep -f lsphp >/dev/null 2>&1")
+        return "running" if res["success"] else "stopped"
     res = run_shell(f"systemctl is-active {name} 2>/dev/null")
     if res["success"]:
         return "running"

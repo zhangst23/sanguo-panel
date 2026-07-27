@@ -1,7 +1,5 @@
 <template>
   <div class="redis-container">
-    <a-typography-title :heading="2">Redis 管理</a-typography-title>
-    
     <a-row :gutter="20">
       <!-- Redis Service Metrics -->
       <a-col :span="16">

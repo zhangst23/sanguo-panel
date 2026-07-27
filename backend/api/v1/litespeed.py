@@ -12,6 +12,10 @@ class FeatureToggle(BaseModel):
     feature: str
     enabled: bool
 
+
+class RewriteRules(BaseModel):
+    rules: str
+
 # OLS Paths
 LSWS_HOME = "/usr/local/lsws"
 CONF_FILE = os.path.join(LSWS_HOME, "conf", "httpd_config.conf")
@@ -171,3 +175,58 @@ def toggle_feature(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"切换失败: {e}")
+
+
+@router.get("/log")
+def get_ols_log(
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    """读取 OpenLiteSpeed 错误日志（最近 200 行）"""
+    log_path = os.path.join(LSWS_HOME, "logs", "error.log")
+    if not os.path.exists(log_path):
+        return {"log": ""}
+    res = run_shell(f"tail -n 200 {log_path}")
+    return {"log": res["stdout"] if res["success"] else ""}
+
+
+@router.get("/vhosts/{name}/rewrite")
+def get_rewrite_rules(
+    name: str,
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    """读取指定虚拟主机的重写规则"""
+    vhost_conf = os.path.join(LSWS_HOME, "conf", "vhosts", name, "vhost.conf")
+    if not os.path.exists(vhost_conf):
+        return {"rules": ""}
+    try:
+        with open(vhost_conf) as f:
+            conf = f.read()
+        m = re.search(r'rewrite\s*\{.*?rules\s+<<<END\s*(.*?)\s*END', conf, re.DOTALL)
+        return {"rules": m.group(1) if m else ""}
+    except Exception:
+        return {"rules": ""}
+
+
+@router.post("/vhosts/{name}/rewrite")
+def save_rewrite_rules(
+    name: str,
+    data: RewriteRules,
+    current_user: Any = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """保存指定虚拟主机的重写规则并重载 OLS"""
+    vhost_conf = os.path.join(LSWS_HOME, "conf", "vhosts", name, "vhost.conf")
+    if not os.path.exists(vhost_conf):
+        raise HTTPException(status_code=404, detail="虚拟主机配置不存在")
+    try:
+        with open(vhost_conf) as f:
+            conf = f.read()
+        new_block = f"rewrite {{\n  rules <<<END\n{data.rules}\nEND\n}}"
+        conf = re.sub(r'rewrite\s*\{.*?END\s*\}', new_block, conf, flags=re.DOTALL)
+        with open(vhost_conf, "w") as f:
+            f.write(conf)
+        run_shell(f"{LSWS_HOME}/bin/lswsctrl restart")
+        return {"success": True, "msg": "重写规则已保存并重载 OLS"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"保存失败: {e}")

@@ -1,9 +1,5 @@
 <template>
   <div class="litespeed-container">
-    <div class="header-section">
-      <a-typography-title :heading="2">OLS 虚拟主机管理</a-typography-title>
-    </div>
-
     <a-tabs default-active-key="2">
       <a-tab-pane key="2" title="虚拟主机">
         <a-table :data="vhosts" :loading="loading">

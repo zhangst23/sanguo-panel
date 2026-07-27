@@ -1,12 +1,5 @@
 <template>
   <div class="linux-container">
-    <div class="header-section">
-      <a-typography-title :heading="2">Linux 系统优化</a-typography-title>
-      <a-typography-paragraph>
-        面板自动检测并优化 Linux 内核参数、服务配置，提升服务器整体处理能力。
-      </a-typography-paragraph>
-    </div>
-
     <a-row :gutter="20">
       <!-- 优化概览 -->
       <a-col :span="16">

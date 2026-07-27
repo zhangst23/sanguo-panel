@@ -2,126 +2,109 @@
   <div class="system-status-container">
     <a-row :gutter="20">
       <a-col :span="12">
-        <a-card title="系统信息" hoverable>
+        <a-card title="系统信息和服务状态">
           <a-descriptions :column="1" bordered size="medium">
             <a-descriptions-item label="主机名">{{ overview.system.hostname || '-' }}</a-descriptions-item>
             <a-descriptions-item label="操作系统">{{ overview.system.os || '-' }}</a-descriptions-item>
-            <a-descriptions-item label="内核版本">{{ overview.system.kernel || '-' }}</a-descriptions-item>
             <a-descriptions-item label="Python 版本">{{ overview.system.python_version || '-' }}</a-descriptions-item>
             <a-descriptions-item label="面板版本">{{ overview.system.panel_version || '-' }}</a-descriptions-item>
             <a-descriptions-item label="启动时间">{{ overview.system.boot_time || '-' }}</a-descriptions-item>
             <a-descriptions-item label="运行时长">{{ formatUptime(overview.system.uptime_seconds) }}</a-descriptions-item>
+            <a-descriptions-item v-for="svc in overview.services" :key="svc.name" :label="svc.label">
+              <a-tag :color="svc.status === 'running' ? 'green' : (svc.status === 'stopped' ? 'red' : 'gray')">
+                {{ svc.status === 'running' ? '运行中' : (svc.status === 'stopped' ? '已停止' : '未安装') }}
+              </a-tag>
+            </a-descriptions-item>
           </a-descriptions>
         </a-card>
       </a-col>
 
       <a-col :span="12">
-        <a-card title="服务 / 库状态" hoverable>
-          <a-list :bordered="false">
-            <a-list-item v-for="svc in overview.services" :key="svc.name">
-              <a-list-item-meta :title="svc.label">
-                <template #description>
-                  <a-tag :color="svc.status === 'running' ? 'green' : (svc.status === 'stopped' ? 'red' : 'gray')">
-                    {{ svc.status === 'running' ? '运行中' : (svc.status === 'stopped' ? '已停止' : '未安装') }}
-                  </a-tag>
-                </template>
-              </a-list-item-meta>
-            </a-list-item>
-          </a-list>
-        </a-card>
-      </a-col>
-    </a-row>
-
-    <a-divider orientation="left">OpenLiteSpeed 状态</a-divider>
-    <a-row :gutter="20">
-      <a-col :span="8">
-        <a-card title="运行状态" hoverable>
-          <template #extra>
-            <a-tag :color="olsStatus.status === 'running' ? 'green' : 'red'">
-              {{ olsStatus.status?.toUpperCase() }}
-            </a-tag>
-          </template>
-          <a-space direction="vertical" size="large" fill>
-            <div class="status-item">
-              <span>版本:</span>
-              <a-tag color="arcoblue">{{ olsStatus.version }}</a-tag>
-            </div>
-            <div class="status-item">
-              <span>PID:</span>
-              <a-tag>{{ olsStatus.pid }}</a-tag>
-            </div>
-            <div class="status-item">
-              <span>运行时间:</span>
-              <span>{{ olsStatus.uptime || 'N/A' }}</span>
-            </div>
-            <a-divider />
-            <a-space>
-              <a-button type="primary" @click="handleAction('restart')" :loading="loading">
-                <template #icon><icon-refresh /></template>
-                重启
-              </a-button>
-              <a-button @click="handleAction('reload')" :loading="loading">
-                <template #icon><icon-sync /></template>
-                重载配置
-              </a-button>
-              <a-button type="outline" status="danger" @click="handleAction('stop')" :loading="loading" v-if="olsStatus.status === 'running'">
-                停止
-              </a-button>
-              <a-button type="outline" status="success" @click="handleAction('start')" :loading="loading" v-else>
-                启动
-              </a-button>
+        <a-space direction="vertical" fill :size="20">
+          <a-card title="运行状态">
+            <template #extra>
+              <a-tag :color="olsStatus.status === 'running' ? 'green' : 'red'">
+                {{ olsStatus.status?.toUpperCase() }}
+              </a-tag>
+            </template>
+            <a-space direction="vertical" size="large" fill>
+              <div class="status-item">
+                <span>版本:</span>
+                <a-tag color="arcoblue">{{ olsStatus.version }}</a-tag>
+              </div>
+              <div class="status-item">
+                <span>PID:</span>
+                <a-tag>{{ olsStatus.pid }}</a-tag>
+              </div>
+              <div class="status-item">
+                <span>运行时间:</span>
+                <span>{{ olsStatus.uptime || 'N/A' }}</span>
+              </div>
+              <a-divider />
+              <a-space>
+                <a-button type="primary" @click="handleAction('restart')" :loading="loading">
+                  <template #icon><icon-refresh /></template>
+                  重启
+                </a-button>
+                <a-button @click="handleAction('reload')" :loading="loading">
+                  <template #icon><icon-sync /></template>
+                  重载配置
+                </a-button>
+                <a-button type="outline" status="danger" @click="handleAction('stop')" :loading="loading" v-if="olsStatus.status === 'running'">
+                  停止
+                </a-button>
+                <a-button type="outline" status="success" @click="handleAction('start')" :loading="loading" v-else>
+                  启动
+                </a-button>
+              </a-space>
             </a-space>
-          </a-space>
-        </a-card>
-      </a-col>
+          </a-card>
 
-      <a-col :span="8">
-        <a-card title="性能开关" hoverable>
-          <a-space direction="vertical" fill>
-            <div class="config-item">
-              <span>HTTP/2 协议</span>
-              <a-switch v-model="features.http2" @change="toggleFeature('http2', $event)" />
-            </div>
-            <div class="config-item">
-              <span>HTTP/3 (QUIC) 协议</span>
-              <a-switch v-model="features.http3" @change="toggleFeature('http3', $event)" />
-            </div>
-            <div class="config-item">
-              <span>Brotli 压缩</span>
-              <a-switch v-model="features.brotli" @change="toggleFeature('brotli', $event)" />
-            </div>
-            <div class="config-item">
-              <span>LSCache 全局开关</span>
-              <a-switch v-model="features.lscache" @change="toggleFeature('lscache', $event)" />
-            </div>
-          </a-space>
-        </a-card>
-      </a-col>
+          <a-card title="性能开关">
+            <a-space direction="vertical" fill>
+              <div class="config-item">
+                <span>HTTP/2 协议</span>
+                <a-switch v-model="features.http2" @change="toggleFeature('http2', $event)" />
+              </div>
+              <div class="config-item">
+                <span>HTTP/3 (QUIC) 协议</span>
+                <a-switch v-model="features.http3" @change="toggleFeature('http3', $event)" />
+              </div>
+              <div class="config-item">
+                <span>Brotli 压缩</span>
+                <a-switch v-model="features.brotli" @change="toggleFeature('brotli', $event)" />
+              </div>
+              <div class="config-item">
+                <span>LSCache 全局开关</span>
+                <a-switch v-model="features.lscache" @change="toggleFeature('lscache', $event)" />
+              </div>
+            </a-space>
+          </a-card>
 
-      <a-col :span="8">
-        <a-card title="OLS 管理后台" hoverable>
-          <template #extra>
-            <a-link href="http://217.69.2.217:7080" target="_blank" :hoverable="false">
-              <icon-export /> 打开管理后台
-            </a-link>
-          </template>
-          <a-space direction="vertical" size="medium">
-            <div class="status-item">
-              <span>管理员地址:</span>
-              <a-link href="http://217.69.2.217:7080" target="_blank">
-                http://217.69.2.217:7080 <icon-export />
+          <a-card title="OLS 管理后台">
+            <template #extra>
+              <a-link href="http://217.69.2.217:7080" target="_blank" :hoverable="false">
+                <icon-export /> 打开管理后台
               </a-link>
-            </div>
-            <div class="status-item">
-              <span>用户名:</span>
-              <a-tag color="arcoblue">admin</a-tag>
-            </div>
-            <div class="status-item">
-              <span>密&emsp;&emsp;码:</span>
-              <a-tag>yLQD50HwqCq4daR</a-tag>
-            </div>
-          </a-space>
-        </a-card>
+            </template>
+            <a-space direction="vertical" size="medium">
+              <div class="status-item">
+                <span>管理员地址:</span>
+                <a-link href="http://217.69.2.217:7080" target="_blank">
+                  http://217.69.2.217:7080 <icon-export />
+                </a-link>
+              </div>
+              <div class="status-item">
+                <span>用户名:</span>
+                <a-tag color="arcoblue">admin</a-tag>
+              </div>
+              <div class="status-item">
+                <span>密&emsp;&emsp;码:</span>
+                <a-tag>yLQD50HwqCq4daR</a-tag>
+              </div>
+            </a-space>
+          </a-card>
+        </a-space>
       </a-col>
     </a-row>
   </div>
@@ -204,7 +187,7 @@ const handleAction = async (action) => {
   loading.value = true
   try {
     await request.post(`/litespeed/action/${action}`)
-    Message.success(`操作成功`)
+    Message.success('操作成功')
     await fetchStatus()
   } catch (error) {
     console.error(error)
