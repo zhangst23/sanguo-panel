@@ -5,16 +5,10 @@
     <a-tabs v-model:active-key="activeTab" @change="onTabChange">
       <a-tab-pane key="status" title="系统状态">
         <SystemStatus />
-      </a-tab-pane>
-      <a-tab-pane key="redis" title="Redis 管理">
-        <RedisManager />
-      </a-tab-pane>
+      </a-tab-pane>    
       <a-tab-pane key="php" title="PHP Runtime 管理">
         <PHPManager />
-      </a-tab-pane>
-      <a-tab-pane key="linux" title="Linux 管理">
-        <LinuxManager />
-      </a-tab-pane>
+      </a-tab-pane>      
       <a-tab-pane key="ols" title="OLS 虚拟主机管理">
         <OLSManager />
       </a-tab-pane>
@@ -23,6 +17,12 @@
       </a-tab-pane>
       <a-tab-pane key="rewrite" title="Rewrite">
         <RewriteManager />
+      </a-tab-pane>
+      <a-tab-pane key="redis" title="Redis 管理">
+        <RedisManager />
+      </a-tab-pane>
+      <a-tab-pane key="linux" title="Linux 管理">
+        <LinuxManager />
       </a-tab-pane>
       <a-tab-pane key="log" title="Log">
         <LogManager />
