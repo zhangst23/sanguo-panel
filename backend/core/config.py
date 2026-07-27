@@ -22,9 +22,13 @@ class Settings(BaseSettings):
             return v
         raise ValueError(v)
 
+    # AI
+    DEEPSEEK_MODEL: str = ""
+    DEEPSEEK_API_KEY: str = ""
+
     # Database
     DATABASE_URL: str = "sqlite:///./backend/panel.db"
-    
+
     model_config = SettingsConfigDict(case_sensitive=True, env_file=".env")
 
 settings = Settings()

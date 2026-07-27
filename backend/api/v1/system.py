@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
 from datetime import datetime
 import threading
+import os
 import psutil
 from sqlalchemy.orm import Session
 from backend.api import deps
@@ -9,6 +10,7 @@ from backend.models.site import Site
 from backend.models.backup import Backup
 from backend.models.task import Task
 from backend.core import security
+from backend.core.config import settings
 from backend.utils import panel_ops
 from pydantic import BaseModel
 from typing import Optional
@@ -21,6 +23,10 @@ class PasswordChange(BaseModel):
 
 class PortChange(BaseModel):
     port: int
+
+class AIConfig(BaseModel):
+    model: str
+    api_key: str
 
 class TaskStatusOut(BaseModel):
     task_uuid: str
@@ -134,6 +140,68 @@ async def regenerate_secret(current_user: User = Depends(deps.get_current_active
     """重新生成 JWT 安全密钥"""
     # 实际项目中需要生成随机字符串并更新 .env 文件
     return {"message": "安全密钥已更新，请重新登录"}
+
+
+def _get_env_path():
+    return os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), ".env")
+
+
+@router.get("/ai-config")
+async def get_ai_config(current_user: User = Depends(deps.get_current_active_user)):
+    """获取 AI 配置"""
+    key_exists = bool(settings.DEEPSEEK_API_KEY)
+    return {
+        "model": settings.DEEPSEEK_MODEL,
+        "has_key": key_exists
+    }
+
+
+@router.post("/ai-config")
+async def save_ai_config(
+    data: AIConfig,
+    current_user: User = Depends(deps.get_current_active_user)
+):
+    """保存 AI 配置到 .env 文件"""
+    env_path = _get_env_path()
+    updates = {
+        "DEEPSEEK_MODEL": data.model,
+        "DEEPSEEK_API_KEY": data.api_key
+    }
+
+    try:
+        if os.path.exists(env_path):
+            with open(env_path, "r") as f:
+                lines = f.readlines()
+        else:
+            lines = []
+
+        new_lines = []
+        updated_keys = set()
+        for line in lines:
+            replaced = False
+            for key, value in updates.items():
+                if line.startswith(f"{key}="):
+                    new_lines.append(f"{key}={value}\n")
+                    updated_keys.add(key)
+                    replaced = True
+                    break
+            if not replaced:
+                # Keep empty/whitespace lines, but strip trailing newline to avoid double spacing
+                new_lines.append(line)
+
+        for key, value in updates.items():
+            if key not in updated_keys:
+                new_lines.append(f"{key}={value}\n")
+
+        content = "".join(new_lines)
+        with open(env_path, "w") as f:
+            f.write(content)
+
+        settings.DEEPSEEK_MODEL = data.model
+        settings.DEEPSEEK_API_KEY = data.api_key
+        return {"message": "AI 配置已保存", "model": data.model}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"保存配置失败: {str(e)}")
 
 
 @router.get("/update-check")
