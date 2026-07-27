@@ -56,10 +56,20 @@
                   </a-button>
                 </a-descriptions-item>
                 <a-descriptions-item v-if="site.wc_key" label="WooCommerce Key">
-                  <a-tag color="arcoblue" copyable>{{ site.wc_key }}</a-tag>
+                  <a-space>
+                    <a-tag>{{ site.wc_key }}</a-tag>
+                    <a-button type="text" size="mini" @click="copyToClipboard(site.wc_key)">
+                      <template #icon><icon-copy /></template>
+                    </a-button>
+                  </a-space>
                 </a-descriptions-item>
                 <a-descriptions-item v-if="site.wc_secret" label="WooCommerce Secret">
-                  <a-tag copyable>{{ site.wc_secret }}</a-tag>
+                  <a-space>
+                    <a-tag>{{ site.wc_secret }}</a-tag>
+                    <a-button type="text" size="mini" @click="copyToClipboard(site.wc_secret)">
+                      <template #icon><icon-copy /></template>
+                    </a-button>
+                  </a-space>
                 </a-descriptions-item>
               </a-descriptions>
             </a-card>
