@@ -69,7 +69,7 @@ class Site(Base):
     created_at = Column(DateTime, default=datetime.utcnow)  # 创建时间
     
     # SSL Extended Config
-    ssl_mode = Column(String(20), default="none") # none, cloudflare, letsencrypt
+    ssl_mode = Column(String(20), default="cloudflare") # none, cloudflare, letsencrypt
     ssl_email = Column(String(255))
     ssl_auto_renew = Column(Boolean, default=True)
     https_force = Column(Boolean, default=True)
