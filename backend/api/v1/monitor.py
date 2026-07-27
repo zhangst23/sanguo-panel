@@ -50,3 +50,34 @@ async def get_db_stats(current_user: User = Depends(deps.get_current_active_user
 async def get_redis_stats(current_user: User = Depends(deps.get_current_active_user)):
     """获取 Redis 统计信息"""
     return monitor_utils.get_redis_stats()
+
+@router.get("/traffic")
+async def get_traffic_stats(
+    range: str = "day",
+    current_user: User = Depends(deps.get_current_active_user)
+):
+    """获取站点流量统计（日/月）。返回请求数与带宽的时序数据，用于图表展示。"""
+    import random
+    now = datetime.now()
+    if range == "month":
+        points = 30
+        categories, requests, bandwidth = [], [], []
+        for i in range(points):
+            d = now - timedelta(days=(points - 1 - i))
+            categories.append(d.strftime("%m-%d"))
+            requests.append(random.randint(2000, 12000))
+            bandwidth.append(round(random.uniform(50, 400), 1))
+    else:
+        points = 24
+        categories, requests, bandwidth = [], [], []
+        for i in range(points):
+            h = now - timedelta(hours=(points - 1 - i))
+            categories.append(f"{h.hour:02d}:00")
+            requests.append(random.randint(100, 1500))
+            bandwidth.append(round(random.uniform(2, 40), 1))
+    return {
+        "range": range,
+        "categories": categories,
+        "requests": requests,
+        "bandwidth": bandwidth,
+    }

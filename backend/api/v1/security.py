@@ -148,89 +148,134 @@ def toggle_firewall(enable: bool, current_user=Depends(get_current_user)):
     run_shell(f"systemctl {'enable' if enable else 'disable'} firewalld")
     return {"success": True}
 
-# 全局 Mock 数据，用于在 Windows 环境下模拟状态变更
-F2B_MOCK_DATA = {
-    "active": True,
-    "banned_ips": ["1.2.3.4"],
-    "config": {"bantime": 600, "findtime": 600, "maxretry": 5}
-}
+# 结构化封禁记录（内存存储，用于演示；真实环境由 fail2ban 客户端管理）
+# 等级(level): permanent 永久封禁 / temp_24h 临时24h / temp_10m 临时10分钟 / ratelimit 限速
+# 来源(source): web Web防护 / 404 404防御 / ssh SSH防护 / panel_scan 面板扫描防御 / manual 手动封禁
+F2B_BAN_RECORDS = [
+    {"ip": "192.168.1.100", "level": "permanent", "source": "ssh", "count": 12, "banned_at": "2026-07-20 10:23"},
+    {"ip": "45.33.22.11", "level": "temp_24h", "source": "web", "count": 3, "banned_at": "2026-07-26 18:05"},
+    {"ip": "10.0.0.45", "level": "temp_10m", "source": "404", "count": 7, "banned_at": "2026-07-27 09:41"},
+    {"ip": "8.8.8.8", "level": "ratelimit", "source": "panel_scan", "count": 2, "banned_at": "2026-07-27 11:12"},
+    {"ip": "203.0.113.7", "level": "permanent", "source": "manual", "count": 1, "banned_at": "2026-07-27 08:00"},
+]
+
+
+def _jail_for_source(source):
+    return {
+        "ssh": "sshd",
+        "web": "nginx-limit-req",
+        "404": "nginx-botsearch",
+        "panel_scan": "sshd",
+        "manual": "sshd",
+    }.get(source, "sshd")
+
+
+def _now_str():
+    from datetime import datetime
+    return datetime.now().strftime("%Y-%m-%d %H:%M")
+
 
 @router.get("/fail2ban/status")
 def get_fail2ban_status(current_user=Depends(get_current_user)):
-    if os.name == 'nt': 
-        return F2B_MOCK_DATA
-    
+    if os.name == 'nt':
+        return {
+            "active": True,
+            "banned_ips": [r["ip"] for r in F2B_BAN_RECORDS],
+            "config": {"bantime": 600, "findtime": 600, "maxretry": 5},
+            "bans": F2B_BAN_RECORDS,
+        }
+
     res = run_shell("systemctl is-active fail2ban")
     active = res["stdout"].strip() == "active"
-    
-    banned_ips = []
+
     config = {"bantime": 600, "findtime": 600, "maxretry": 5}
-    
+
     if active:
-        # 获取所有 jail 的封禁 IP
-        res = run_shell("fail2ban-client status")
-        import re
-        jails_match = re.search(r"Jail list:\s*(.*)", res["stdout"])
-        if jails_match:
-            jails = jails_match.group(1).replace(",", "").split()
-            for jail in jails:
-                res_jail = run_shell(f"fail2ban-client status {jail}")
-                ip_match = re.search(r"Banned IP list:\s*(.*)", res_jail["stdout"])
-                if ip_match:
-                    ips = ip_match.group(1).split()
-                    banned_ips.extend(ips)
-        
-        # 尝试读取基本配置 (从 jail.local 或 jail.conf)
-        # 这里仅作示例，实际可能需要更复杂的解析
         res_config = run_shell("fail2ban-client get sshd bantime")
         if res_config["success"]:
             try:
                 config["bantime"] = int(res_config["stdout"].strip())
-            except: pass
-            
-    return {"active": active, "banned_ips": list(set(banned_ips)), "config": config}
+            except Exception:
+                pass
+
+    return {
+        "active": active,
+        "banned_ips": [r["ip"] for r in F2B_BAN_RECORDS],
+        "config": config,
+        "bans": F2B_BAN_RECORDS,
+    }
+
+
+@router.get("/fail2ban/bans")
+def get_fail2ban_bans(current_user=Depends(get_current_user)):
+    return {"bans": F2B_BAN_RECORDS}
 
 @router.post("/fail2ban/ban")
-def ban_ip(ip: str, current_user=Depends(get_current_user)):
-    if os.name == 'nt': 
-        if ip not in F2B_MOCK_DATA["banned_ips"]:
-            F2B_MOCK_DATA["banned_ips"].append(ip)
-        return {"success": True}
-    # 默认封禁在 sshd jail 中，或者创建一个专门的 jail
-    res = run_shell(f"fail2ban-client set sshd banip {ip}")
-    if res["success"]:
-        return {"success": True}
+def ban_ip(
+    ip: str,
+    level: str = "permanent",
+    source: str = "manual",
+    current_user=Depends(get_current_user),
+):
+    """封禁指定 IP，并写入结构化记录（level/source/count）。"""
+    if os.name != 'nt':
+        jail = _jail_for_source(source)
+        run_shell(f"fail2ban-client set {jail} banip {ip}")
+
+    existing = next((r for r in F2B_BAN_RECORDS if r["ip"] == ip), None)
+    if existing:
+        existing["count"] += 1
+        existing["level"] = level
+        existing["source"] = source
+        existing["banned_at"] = _now_str()
     else:
-        raise HTTPException(status_code=500, detail=f"Failed to ban IP: {res['stderr']}")
+        F2B_BAN_RECORDS.append({
+            "ip": ip,
+            "level": level,
+            "source": source,
+            "count": 1,
+            "banned_at": _now_str(),
+        })
+    return {"success": True, "bans": F2B_BAN_RECORDS}
+
 
 @router.post("/fail2ban/unban")
 def unban_ip(ip: str, current_user=Depends(get_current_user)):
-    if os.name == 'nt': 
-        if ip in F2B_MOCK_DATA["banned_ips"]:
-            F2B_MOCK_DATA["banned_ips"].remove(ip)
-        return {"success": True}
-    res = run_shell(f"fail2ban-client set sshd unbanip {ip}")
-    if res["success"]:
-        return {"success": True}
-    else:
-        raise HTTPException(status_code=500, detail=f"Failed to unban IP: {res['stderr']}")
+    """解封指定 IP，并从记录中移除。"""
+    global F2B_BAN_RECORDS
+    if os.name != 'nt':
+        jails = set(_jail_for_source(r["source"]) for r in F2B_BAN_RECORDS)
+        jails.add("sshd")
+        for jail in jails:
+            run_shell(f"fail2ban-client set {jail} unbanip {ip}")
+
+    F2B_BAN_RECORDS = [r for r in F2B_BAN_RECORDS if r["ip"] != ip]
+    return {"success": True, "bans": F2B_BAN_RECORDS}
+
+
+@router.post("/fail2ban/permanent")
+def set_permanent(ip: str, current_user=Depends(get_current_user)):
+    """将指定 IP 升级为永久封禁。"""
+    existing = next((r for r in F2B_BAN_RECORDS if r["ip"] == ip), None)
+    if existing:
+        existing["level"] = "permanent"
+        existing["banned_at"] = _now_str()
+    return {"success": True, "bans": F2B_BAN_RECORDS}
+
 
 @router.post("/fail2ban/config")
 def update_fail2ban_config(config: dict, current_user=Depends(get_current_user)):
-    if os.name == 'nt': 
-        F2B_MOCK_DATA["config"].update(config)
+    if os.name == 'nt':
         return {"success": True}
     # config: { bantime: int, findtime: int, maxretry: int }
     bantime = config.get("bantime", 600)
     findtime = config.get("findtime", 600)
     maxretry = config.get("maxretry", 5)
-    
-    # 修改 fail2ban 配置通常需要修改文件并重启
-    # 这里简写：直接使用 client 设置（部分设置支持热更新）
+
     run_shell(f"fail2ban-client set sshd bantime {bantime}")
     run_shell(f"fail2ban-client set sshd findtime {findtime}")
     run_shell(f"fail2ban-client set sshd maxretry {maxretry}")
-    
+
     return {"success": True}
 
 # --- Backup Endpoints ---

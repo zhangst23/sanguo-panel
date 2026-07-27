@@ -112,10 +112,103 @@
                   创建新备份
                 </a-button>
               </a-space>
-            </a-card>
-          </a-col>
-        </a-row>
-      </a-tab-pane>
+        </a-card>
+      </a-col>
+    </a-row>
+
+    <!-- 流量统计 & IP 封禁列表 -->
+    <a-row :gutter="24" style="margin-top: 24px;">
+      <!-- 左：流量统计 -->
+      <a-col :span="12">
+        <a-card :bordered="false" class="traffic-card">
+          <template #title>流量统计</template>
+          <template #extra>
+            <a-radio-group v-model="trafficRange" type="button" size="small" @change="fetchTraffic">
+              <a-radio value="day">日</a-radio>
+              <a-radio value="month">月</a-radio>
+            </a-radio-group>
+          </template>
+          <div ref="trafficChart" class="traffic-chart"></div>
+        </a-card>
+      </a-col>
+
+      <!-- 右：IP 封禁列表 -->
+      <a-col :span="12">
+        <a-card :bordered="false" class="ban-card">
+          <template #title>
+            IP 封禁列表
+            <a-tag size="small" color="red" style="margin-left: 8px;">{{ banList.length }} 个</a-tag>
+          </template>
+
+          <!-- 手动封禁 IP -->
+          <a-card :bordered="false" class="manual-ban-card" title="手动封禁 IP" size="small">
+            <a-space wrap>
+              <a-input
+                v-model="manualBanIp"
+                placeholder="请输入要封禁的 IP 地址"
+                allow-clear
+                style="width: 200px;"
+              />
+              <a-select v-model="manualBanLevel" style="width: 140px;">
+                <a-option value="permanent">永久封禁</a-option>
+                <a-option value="temp_24h">临时 24h</a-option>
+                <a-option value="temp_10m">临时 10 分钟</a-option>
+                <a-option value="ratelimit">限速</a-option>
+              </a-select>
+              <a-button
+                type="primary"
+                status="danger"
+                :loading="manualBanLoading"
+                @click="handleManualBan"
+              >
+                封禁
+              </a-button>
+            </a-space>
+          </a-card>
+
+          <!-- 当前封禁列表 -->
+          <a-table
+            :data="banList"
+            :loading="banLoading"
+            :pagination="false"
+            :scroll="{ y: 280 }"
+            style="margin-top: 16px;"
+          >
+            <template #columns>
+              <a-table-column title="IP 地址" data-index="ip" :width="140" />
+              <a-table-column title="等级">
+                <template #cell="{ record }">
+                  <a-tag :color="levelMap[record.level]?.color">{{ levelMap[record.level]?.text }}</a-tag>
+                </template>
+              </a-table-column>
+              <a-table-column title="来源">
+                <template #cell="{ record }">
+                  <a-tag :color="sourceMap[record.source]?.color">{{ sourceMap[record.source]?.text }}</a-tag>
+                </template>
+              </a-table-column>
+              <a-table-column title="累计次数" data-index="count" :width="90" />
+              <a-table-column title="操作" :width="130">
+                <template #cell="{ record }">
+                  <a-space>
+                    <a-button type="text" size="small" @click="handleUnban(record)">解封</a-button>
+                    <a-button
+                      v-if="record.level !== 'permanent'"
+                      type="text"
+                      size="small"
+                      status="danger"
+                      @click="handlePermanent(record)"
+                    >
+                      永久封禁
+                    </a-button>
+                  </a-space>
+                </template>
+              </a-table-column>
+            </template>
+          </a-table>
+        </a-card>
+      </a-col>
+    </a-row>
+  </a-tab-pane>
 
       <a-tab-pane key="ssl" title="域名与 SSL">
         <a-card :bordered="false">
@@ -313,11 +406,12 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, nextTick, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import request from '@/utils/request'
 import { Message } from '@arco-design/web-vue'
 import { IconLeft, IconCheckCircleFill, IconEmpty, IconCopy, IconLaunch } from '@arco-design/web-vue/es/icon'
+import * as echarts from 'echarts'
 
 const route = useRoute()
 const router = useRouter()
@@ -528,10 +622,156 @@ const handlePurgeCache = async () => {
   }
 }
 
+// ===================== 流量统计 =====================
+const trafficRange = ref('day')
+const trafficChart = ref(null)
+let trafficChartInstance = null
+
+const fetchTraffic = async () => {
+  try {
+    const res = await request.get('/monitor/traffic', { params: { range: trafficRange.value } })
+    renderTrafficChart(res)
+  } catch (error) {
+    console.error('获取流量统计失败:', error)
+  }
+}
+
+const renderTrafficChart = (data) => {
+  if (!trafficChartInstance) return
+  trafficChartInstance.setOption({
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['请求数', '带宽(MB)'], right: 0, top: 0 },
+    grid: { left: 48, right: 48, top: 40, bottom: 30 },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: data.categories,
+      axisLabel: { color: 'var(--color-text-3)' }
+    },
+    yAxis: [
+      { type: 'value', name: '请求数', splitLine: { lineStyle: { color: 'var(--color-border-2)' } } },
+      { type: 'value', name: 'MB', splitLine: { show: false } }
+    ],
+    series: [
+      {
+        name: '请求数',
+        type: 'line',
+        smooth: true,
+        showSymbol: false,
+        data: data.requests,
+        areaStyle: { opacity: 0.15 },
+        itemStyle: { color: '#165DFF' }
+      },
+      {
+        name: '带宽(MB)',
+        type: 'line',
+        smooth: true,
+        showSymbol: false,
+        yAxisIndex: 1,
+        data: data.bandwidth,
+        itemStyle: { color: '#FF7D00' }
+      }
+    ]
+  })
+}
+
+// ===================== IP 封禁列表 (Fail2ban) =====================
+const banList = ref([])
+const banLoading = ref(false)
+const manualBanIp = ref('')
+const manualBanLevel = ref('permanent')
+const manualBanLoading = ref(false)
+
+const levelMap = {
+  permanent: { text: '永久封禁', color: 'red' },
+  temp_24h: { text: '临时 24h', color: 'orange' },
+  temp_10m: { text: '临时 10 分钟', color: 'arcoblue' },
+  ratelimit: { text: '限速', color: 'purple' }
+}
+
+const sourceMap = {
+  web: { text: 'Web 防护', color: 'blue' },
+  '404': { text: '404 防御', color: 'cyan' },
+  ssh: { text: 'SSH 防护', color: 'green' },
+  panel_scan: { text: '面板扫描防御', color: 'magenta' },
+  manual: { text: '手动封禁', color: 'red' }
+}
+
+const fetchBanList = async () => {
+  banLoading.value = true
+  try {
+    const res = await request.get('/security/fail2ban/bans')
+    banList.value = res.bans || []
+  } catch (error) {
+    console.error('获取封禁列表失败:', error)
+  } finally {
+    banLoading.value = false
+  }
+}
+
+const handleManualBan = async () => {
+  const ip = manualBanIp.value.trim()
+  if (!ip) {
+    Message.warning('请输入要封禁的 IP 地址')
+    return
+  }
+  manualBanLoading.value = true
+  try {
+    await request.post('/security/fail2ban/ban', null, {
+      params: { ip, level: manualBanLevel.value, source: 'manual' }
+    })
+    Message.success(`已封禁 ${ip}`)
+    manualBanIp.value = ''
+    fetchBanList()
+  } catch (error) {
+    Message.error('封禁失败: ' + (error.response?.data?.detail || error.message))
+  } finally {
+    manualBanLoading.value = false
+  }
+}
+
+const handleUnban = async (record) => {
+  try {
+    await request.post('/security/fail2ban/unban', null, { params: { ip: record.ip } })
+    Message.success(`已解封 ${record.ip}`)
+    fetchBanList()
+  } catch (error) {
+    Message.error('解封失败: ' + (error.response?.data?.detail || error.message))
+  }
+}
+
+const handlePermanent = async (record) => {
+  try {
+    await request.post('/security/fail2ban/permanent', null, { params: { ip: record.ip } })
+    Message.success(`已将 ${record.ip} 设为永久封禁`)
+    fetchBanList()
+  } catch (error) {
+    Message.error('操作失败: ' + (error.response?.data?.detail || error.message))
+  }
+}
+
 onMounted(() => {
   fetchSiteDetail()
   fetchWpConfig()
   fetchBackupList()
+  // 流量统计 & 封禁列表
+  nextTick(() => {
+    if (trafficChart.value) {
+      trafficChartInstance = echarts.init(trafficChart.value)
+      window.addEventListener('resize', handleChartResize)
+    }
+    fetchTraffic()
+  })
+  fetchBanList()
+})
+
+const handleChartResize = () => {
+  trafficChartInstance && trafficChartInstance.resize()
+}
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleChartResize)
+  trafficChartInstance && trafficChartInstance.dispose()
 })
 </script>
 
@@ -685,5 +925,18 @@ onMounted(() => {
 
 .admin-url-link {
   color: var(--color-primary-6);
+}
+
+.traffic-chart {
+  height: 320px;
+  width: 100%;
+}
+
+.manual-ban-card {
+  background-color: var(--color-fill-1);
+}
+
+.ban-card :deep(.arco-table-cell) {
+  padding: 8px 12px;
 }
 </style>

@@ -38,7 +38,7 @@
       </a-tab-pane>
 
       <!-- 入侵防御标签页 -->
-      <a-tab-pane key="fail2ban" title="IP封禁">
+      <a-tab-pane key="fail2ban" title="Fail2ban IP 封禁">
         <a-grid :cols="24" :col-gap="16">
           <a-grid-item :span="10">
             <a-card title="基本封禁策略">
@@ -58,7 +58,7 @@
           </a-grid-item>
           
           <a-grid-item :span="14">
-            <a-card title="入侵防御 (Fail2ban)">
+            <a-card title="IP封禁列表">
               <template #extra>
                 <a-button type="primary" size="small" @click="showBanIpModal = true">
                   <template #icon><icon-plus /></template>
@@ -88,7 +88,7 @@
       </a-tab-pane>
 
       <!-- 系统安全标签页 -->
-      <a-tab-pane key="system" title="系统安全">
+      <a-tab-pane key="system" title="UFW 防火墙">
         <a-card title="系统防火墙" hoverable>
           <template #extra>
             <a-switch :model-value="firewall.active" @change="handleFirewallToggle" :loading="loading.firewall" />
