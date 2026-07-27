@@ -109,41 +109,6 @@
         </a-row>
       </a-tab-pane>
 
-      <!-- 系统状态 -->
-      <a-tab-pane key="status" title="系统状态">
-        <a-row :gutter="20">
-          <a-col :span="12">
-            <a-card title="系统信息" hoverable>
-              <a-descriptions :column="1" bordered size="medium">
-                <a-descriptions-item label="主机名">{{ overview.system.hostname || '-' }}</a-descriptions-item>
-                <a-descriptions-item label="操作系统">{{ overview.system.os || '-' }}</a-descriptions-item>
-                <a-descriptions-item label="内核版本">{{ overview.system.kernel || '-' }}</a-descriptions-item>
-                <a-descriptions-item label="Python 版本">{{ overview.system.python_version || '-' }}</a-descriptions-item>
-                <a-descriptions-item label="面板版本">{{ overview.system.panel_version || '-' }}</a-descriptions-item>
-                <a-descriptions-item label="启动时间">{{ overview.system.boot_time || '-' }}</a-descriptions-item>
-                <a-descriptions-item label="运行时长">{{ formatUptime(overview.system.uptime_seconds) }}</a-descriptions-item>
-              </a-descriptions>
-            </a-card>
-          </a-col>
-
-          <a-col :span="12">
-            <a-card title="服务 / 库状态" hoverable>
-              <a-list :bordered="false">
-                <a-list-item v-for="svc in overview.services" :key="svc.name">
-                  <a-list-item-meta :title="svc.label">
-                    <template #description>
-                      <a-tag :color="svc.status === 'running' ? 'green' : (svc.status === 'stopped' ? 'red' : 'gray')">
-                        {{ svc.status === 'running' ? '运行中' : (svc.status === 'stopped' ? '已停止' : '未安装') }}
-                      </a-tag>
-                    </template>
-                  </a-list-item-meta>
-                </a-list-item>
-              </a-list>
-            </a-card>
-          </a-col>
-        </a-row>
-      </a-tab-pane>
-
       <!-- 面板运行日志 -->
       <a-tab-pane key="logs" title="面板运行日志">
         <a-card title="面板运行日志" hoverable>
@@ -225,18 +190,6 @@ const overview = reactive({
   },
   services: []
 })
-
-const formatUptime = (sec) => {
-  if (!sec) return '-'
-  const d = Math.floor(sec / 86400)
-  const h = Math.floor((sec % 86400) / 3600)
-  const m = Math.floor((sec % 3600) / 60)
-  const parts = []
-  if (d) parts.push(`${d} 天`)
-  if (h) parts.push(`${h} 小时`)
-  if (m) parts.push(`${m} 分钟`)
-  return parts.join(' ') || '0 分钟'
-}
 
 const fetchData = async () => {
   fetchLogs()

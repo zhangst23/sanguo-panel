@@ -83,16 +83,10 @@ const routes = [
         meta: { requiresAuth: true, title: 'LiteSpeed配置' },
       },
       {
-        path: 'php',
-        name: 'PHP',
-        component: () => import('@/views/System/SystemManage.vue'),
-        meta: { requiresAuth: true, title: '系统管理', defaultTab: 'php' },
-      },
-      {
         path: 'linux',
         name: 'Linux',
         component: () => import('@/views/System/SystemManage.vue'),
-        meta: { requiresAuth: true, title: '系统管理', defaultTab: 'linux' },
+        meta: { requiresAuth: true, title: '系统管理', defaultTab: 'status' },
       },
       {
         path: 'system/settings',
@@ -137,12 +131,6 @@ const routes = [
         meta: { requiresAuth: true, title: '任务列表' },
       },
       {
-        path: 'redis',
-        name: 'Redis',
-        component: () => import('@/views/System/SystemManage.vue'),
-        meta: { requiresAuth: true, title: '系统管理', defaultTab: 'redis' },
-      },
-      {
         path: 'nginx',
         name: 'Nginx',
         component: () => import('@/views/System/SystemManage.vue'),
@@ -152,7 +140,7 @@ const routes = [
         path: 'system-manage',
         name: 'SystemManage',
         component: () => import('@/views/System/SystemManage.vue'),
-        meta: { requiresAuth: true, title: '系统管理', defaultTab: 'redis' },
+        meta: { requiresAuth: true, title: '系统管理', defaultTab: 'status' },
       },
       {
         path: 'system',

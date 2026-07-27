@@ -68,11 +68,9 @@
           </a-menu-item>
           <a-sub-menu key="System">
             <template #icon><icon-settings /></template>
-            <template #title>系统管理</template>
+            <template #title>系统工具</template>
+            <a-menu-item key="Linux">系统管理</a-menu-item>
             <a-menu-item key="Monitor">监控中心</a-menu-item>
-            <a-menu-item key="Redis">Redis 管理</a-menu-item>
-            <a-menu-item key="PHP">PHP 管理</a-menu-item>
-            <a-menu-item key="Linux">Linux 管理</a-menu-item>
             <a-menu-item key="Nginx">OpenLiteSpeed 管理</a-menu-item>
             <a-menu-item key="LiteSpeed">OpenLiteSpeed</a-menu-item>
             <a-menu-item key="ApiDocs">API 接口文档</a-menu-item>

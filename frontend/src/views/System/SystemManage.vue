@@ -3,6 +3,9 @@
     <a-typography-title :heading="2">系统管理</a-typography-title>
 
     <a-tabs v-model:active-key="activeTab" @change="onTabChange">
+      <a-tab-pane key="status" title="系统状态">
+        <SystemStatus />
+      </a-tab-pane>
       <a-tab-pane key="redis" title="Redis 管理">
         <RedisManager />
       </a-tab-pane>
@@ -12,7 +15,7 @@
       <a-tab-pane key="linux" title="Linux 管理">
         <LinuxManager />
       </a-tab-pane>
-      <a-tab-pane key="nginx" title="OpenLiteSpeed 管理">
+      <a-tab-pane key="ols" title="OLS 虚拟主机管理">
         <OLSManager />
       </a-tab-pane>
     </a-tabs>
@@ -26,17 +29,18 @@ import RedisManager from '@/views/Redis/Redis.vue'
 import PHPManager from '@/views/PHP/PHP.vue'
 import LinuxManager from '@/views/Linux/Linux.vue'
 import OLSManager from '@/views/LiteSpeed/LiteSpeed.vue'
+import SystemStatus from '@/views/System/SystemStatus.vue'
 
 const route = useRoute()
 const router = useRouter()
 
-const TAB_KEYS = ['redis', 'php', 'linux', 'nginx']
+const TAB_KEYS = ['status', 'redis', 'php', 'linux', 'ols']
 const activeTab = ref(getInitialTab())
 
 function getInitialTab() {
   if (route.query.tab && TAB_KEYS.includes(route.query.tab)) return route.query.tab
   if (route.meta.defaultTab && TAB_KEYS.includes(route.meta.defaultTab)) return route.meta.defaultTab
-  return 'redis'
+  return 'status'
 }
 
 const onTabChange = (key) => {
