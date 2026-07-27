@@ -122,7 +122,7 @@ const routes = [
         path: 'tools',
         name: 'OneClickTools',
         component: () => import('@/views/Tools/OneClickTools.vue'),
-        meta: { requiresAuth: true, title: '一键工具' },
+        meta: { requiresAuth: true, title: 'AI工具' },
       },
       {
         path: 'backup',

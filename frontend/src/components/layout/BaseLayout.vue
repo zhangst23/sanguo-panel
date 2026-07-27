@@ -52,7 +52,7 @@
           </a-menu-item>
           <a-menu-item key="OneClickTools">
             <template #icon><icon-thunderbolt /></template>
-            一键工具
+            AI工具
           </a-menu-item>
           <a-menu-item key="Security">
             <template #icon><icon-safe /></template>

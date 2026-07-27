@@ -1,192 +1,273 @@
 <template>
   <div class="tools-container">
-    <a-typography-title :heading="2">一键提速工具</a-typography-title>
-    <a-typography-paragraph>
-      将多个优化、修复步骤组合为一个原子化操作，用户点击即可完成全链路加速或故障恢复。
-    </a-typography-paragraph>
+    <a-typography-title :heading="2">AI工具</a-typography-title>
+   
 
-    <a-row :gutter="20">
-      <a-col :span="8" v-for="tool in tools" :key="tool.id" style="margin-bottom: 20px;">
-        <a-card hoverable class="tool-card">
-          <template #title>
-            <a-space>
-              <component :is="getIcon(tool.icon)" :style="{ fontSize: '20px', color: '#165DFF' }" />
-              <span>{{ tool.name }}</span>
-            </a-space>
-          </template>
-          <p class="tool-desc">{{ tool.description }}</p>
-          <template #actions>
-            <a-button type="primary" :loading="executingId === tool.id" @click="handleExecute(tool)">
-              立即执行
-            </a-button>
-          </template>
-        </a-card>
-      </a-col>
-    </a-row>
+    <a-tabs v-model:active-key="activeTab" class="tools-tabs">
+      <!-- AI 修复 -->
+      <a-tab-pane key="ai" title="AI 修复">
+        <a-row :gutter="16">
+          <a-col :xs="24" :md="10">
+            <a-card title="AI诊断" :bordered="false" class="tool-card">
+              <a-form :model="aiForm" layout="vertical">
+                <a-form-item field="site_id" label="网站">
+                  <a-select
+                    v-model="aiForm.site_id"
+                    placeholder="请选择站点"
+                    allow-clear
+                    allow-search
+                  >
+                    <a-option v-for="s in siteList" :key="s.id" :value="s.id">
+                      {{ s.domain }}
+                    </a-option>
+                  </a-select>
+                </a-form-item>
+                <a-form-item field="issue_type" label="问题类型">
+                  <a-select v-model="aiForm.issue_type" placeholder="请选择问题类型">
+                    <a-option v-for="o in issueOptions" :key="o.value" :value="o.value">
+                      {{ o.label }}
+                    </a-option>
+                  </a-select>
+                </a-form-item>
+                <a-space>
+                  <a-button
+                    type="primary"
+                    :loading="diagnosing"
+                    @click="handleDiagnose"
+                  >
+                    <template #icon><icon-search /></template>
+                    开始诊断
+                  </a-button>
+                  <a-button
+                    type="primary"
+                    status="success"
+                    :loading="fixing"
+                    @click="handleFix"
+                  >
+                    <template #icon><icon-bulb /></template>
+                    AI修复
+                  </a-button>
+                </a-space>
+              </a-form>
+            </a-card>
+          </a-col>
 
-    <!-- 执行进度弹窗 -->
-    <a-modal v-model:visible="visible" :title="currentTool?.name" :footer="false" @close="handleClose">
-      <div class="execution-content">
-        <a-steps direction="vertical" :current="currentStepIndex">
-          <a-step v-for="(res, index) in executionResults" :key="index" :title="res.step" :description="res.status === 'success' ? '已完成' : '执行中'">
-            <template #icon v-if="index === currentStepIndex && !isFinished">
-              <icon-loading />
-            </template>
-          </a-step>
-        </a-steps>
-        <div v-if="isFinished" class="finished-report">
-          <a-result status="success" title="执行完成">
-            <template #extra>
-              <a-button type="primary" @click="visible = false">查看报告</a-button>
-            </template>
-          </a-result>
-        </div>
-      </div>
+          <a-col :xs="24" :md="14">
+            <a-card title="AI分析结果" :bordered="false" class="tool-card">
+              <a-textarea
+                v-model="aiResult"
+                :auto-size="{ minRows: 16, maxRows: 28 }"
+                placeholder="点击“开始诊断”或“AI修复”后，AI 分析结果将显示在此处"
+                readonly
+                class="ai-result"
+              />
+            </a-card>
+          </a-col>
+        </a-row>
+      </a-tab-pane>
+
+      <!-- 一键提速工具 -->
+      <a-tab-pane key="tools" title="一键提速工具">
+        <a-row :gutter="16">
+          <a-col :xs="24" :md="8" v-for="tool in tools" :key="tool.id">
+            <a-card hoverable class="tool-card" :bordered="false">
+              <div class="tool-header">
+                <component :is="iconMap[tool.icon]" :size="26" class="tool-icon" />
+                <div class="tool-title">{{ tool.name }}</div>
+              </div>
+              <div class="tool-desc">{{ tool.description }}</div>
+              <a-button
+                long
+                type="primary"
+                :loading="loadingToolId === tool.id"
+                @click="runTool(tool)"
+              >
+                立即执行
+              </a-button>
+            </a-card>
+          </a-col>
+        </a-row>
+      </a-tab-pane>
+    </a-tabs>
+
+    <!-- 工具执行结果弹窗 -->
+    <a-modal
+      v-model:visible="resultVisible"
+      :title="resultTitle"
+      :footer="false"
+      :width="560"
+    >
+      <a-typography-paragraph v-if="resultContent">
+        {{ resultContent }}
+      </a-typography-paragraph>
+      <a-empty v-else description="暂无结果" />
     </a-modal>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { 
-  IconThunderbolt, 
-  IconTool, 
-  IconDelete, 
-  IconStorage, 
-  IconLock, 
+import { ref, reactive, onMounted, h } from 'vue'
+import { Message } from '@arco-design/web-vue'
+import {
+  IconThunderbolt,
+  IconTool,
+  IconDelete,
+  IconStorage,
+  IconLock,
   IconHeart,
-  IconLoading
+  IconSearch,
+  IconBulb
 } from '@arco-design/web-vue/es/icon'
 import request from '@/utils/request'
-import { Message } from '@arco-design/web-vue'
+
+const activeTab = ref('ai')
+
+const iconMap = {
+  Thunderbolt: IconThunderbolt,
+  Tool: IconTool,
+  Delete: IconDelete,
+  Storage: IconStorage,
+  Lock: IconLock,
+  HeartHealth: IconHeart
+}
 
 const tools = ref([])
-const executingId = ref(null)
-const visible = ref(false)
-const currentTool = ref(null)
-const executionResults = ref([])
-const currentStepIndex = ref(0)
-const isFinished = ref(false)
+const loadingToolId = ref('')
+const resultVisible = ref(false)
+const resultTitle = ref('')
+const resultContent = ref('')
 
-console.log('OneClick component setup')
+// AI 修复
+const siteList = ref([])
+const aiForm = reactive({ site_id: undefined, issue_type: undefined })
+const aiResult = ref('')
+const diagnosing = ref(false)
+const fixing = ref(false)
 
-const getIcon = (name) => {
-  const icons = {
-    Thunderbolt: IconThunderbolt,
-    Tool: IconTool,
-    Delete: IconDelete,
-    Storage: IconStorage,
-    Lock: IconLock,
-    HeartHealth: IconHeart
-  }
-  return icons[name] || IconTool
-}
+const issueOptions = [
+  { value: '500', label: '网站500错误' },
+  { value: 'wp_admin', label: 'wp-admin无法访问' },
+  { value: 'ssl', label: 'SSL证书故障' },
+  { value: 'db', label: '数据库连接异常' },
+  { value: 'cache_perm', label: '缓存/权限异常' },
+  { value: 'perf', label: '性能问题' }
+]
 
 const fetchTools = async () => {
-  console.log('Fetching tools...')
   try {
     const res = await request.get('/tools/list')
-    console.log('Tools fetched:', res)
-    if (res && res.length > 0) {
-      tools.value = res
-    } else {
-      console.warn('No tools returned from API, loading mock data')
-      loadMockData()
-    }
-  } catch (e) {
-    console.error('Fetch tools failed:', e)
-    Message.error('获取工具列表失败，使用模拟数据')
-    loadMockData()
+    tools.value = res || []
+  } catch (error) {
+    console.error('获取工具列表失败:', error)
   }
 }
 
-const loadMockData = () => {
-  tools.value = [
-    { id: 'full_optimize', name: '一键全站极速优化', description: '开启四层缓存、图片转WebP、合并压缩CSS/JS、数据库优化等', icon: 'Thunderbolt' },
-    { id: 'env_fix', name: '一键环境修复', description: '检测并修复OLS、MariaDB、Redis服务状态及文件权限', icon: 'Tool' },
-    { id: 'clean_junk', name: '一键清理垃圾', description: '清理修订版本、草稿、垃圾评论、过期transient等', icon: 'Delete' },
-    { id: 'db_optimize', name: '一键数据库优化', description: '对所有数据表执行 OPTIMIZE 和 REPAIR', icon: 'Storage' },
-    { id: 'reset_perm', name: '一键重置权限', description: '将所有站点目录及文件权限重置为安全推荐值', icon: 'Lock' },
-    { id: 'fix_wp', name: '一键修复故障', description: '自动修复常见WordPress白屏、内存耗尽、插件冲突等问题', icon: 'HeartHealth' }
-  ]
+const fetchSites = async () => {
+  try {
+    const res = await request.get('/sites/')
+    siteList.value = res || []
+  } catch (error) {
+    console.error('获取站点列表失败:', error)
+  }
 }
 
-const handleExecute = async (tool) => {
-  if (!tool) return
-  
-  Message.info(`准备执行: ${tool.name}`)
-  
-  currentTool.value = tool
-  executingId.value = tool.id
-  visible.value = true
-  executionResults.value = []
-  currentStepIndex.value = 0
-  isFinished.value = false
-
-  console.log('Executing tool:', tool.id)
-
+const runTool = async (tool) => {
+  loadingToolId.value = tool.id
   try {
     const res = await request.post(`/tools/execute/${tool.id}`)
-    console.log('Execution response:', res)
-    
-    if (!res || !res.results) {
-      throw new Error('Invalid response from server')
-    }
-    
-    // 模拟流式展示步骤
-    for (let i = 0; i < res.results.length; i++) {
-      currentStepIndex.value = i
-      executionResults.value.push(res.results[i])
-      await new Promise(resolve => setTimeout(resolve, 600))
-    }
-    
-    isFinished.value = true
-    Message.success(`${tool.name} 执行成功`)
-  } catch (e) {
-    console.error('Execution failed:', e)
-    Message.error('执行失败: ' + (e.message || '未知错误'))
-    // 不要立即关闭弹窗，让用户看到报错信息（如果有步骤显示的话）
-    if (executionResults.value.length === 0) {
-      visible.value = false
-    }
+    resultTitle.value = `${tool.name} - 执行结果`
+    resultContent.value = res && res.message ? res.message : '执行完成'
+    resultVisible.value = true
+  } catch (error) {
+    Message.error('执行失败: ' + (error.response?.data?.detail || error.message))
   } finally {
-    executingId.value = null
+    loadingToolId.value = ''
   }
 }
 
-const handleClose = () => {
-  visible.value = false
+const handleDiagnose = async () => {
+  if (!aiForm.site_id || !aiForm.issue_type) {
+    Message.warning('请先选择网站和问题类型')
+    return
+  }
+  diagnosing.value = true
+  try {
+    const res = await request.post('/tools/ai/diagnose', {
+      site_id: aiForm.site_id,
+      issue_type: aiForm.issue_type
+    })
+    aiResult.value = res.report || ''
+    Message.success('诊断完成')
+  } catch (error) {
+    Message.error('诊断失败: ' + (error.response?.data?.detail || error.message))
+  } finally {
+    diagnosing.value = false
+  }
+}
+
+const handleFix = async () => {
+  if (!aiForm.site_id || !aiForm.issue_type) {
+    Message.warning('请先选择网站和问题类型')
+    return
+  }
+  fixing.value = true
+  try {
+    const res = await request.post('/tools/ai/fix', {
+      site_id: aiForm.site_id,
+      issue_type: aiForm.issue_type
+    })
+    aiResult.value = res.report || ''
+    Message.success('AI 修复方案已生成')
+  } catch (error) {
+    Message.error('修复失败: ' + (error.response?.data?.detail || error.message))
+  } finally {
+    fixing.value = false
+  }
 }
 
 onMounted(() => {
   fetchTools()
+  fetchSites()
 })
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 .tools-container {
-  padding: 0 0 20px 0;
-  .tool-card {
-    height: 100%;
-    .tool-desc {
-      color: var(--arco-color-text-3);
-      height: 40px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-    }
-  }
-  .execution-content {
-    padding: 20px;
-    max-height: 400px;
-    overflow-y: auto;
-  }
-  .finished-report {
-    margin-top: 20px;
-    border-top: 1px solid var(--arco-color-border);
-    padding-top: 20px;
-  }
+  padding: 4px;
+}
+.page-desc {
+  color: var(--color-text-3);
+  margin-bottom: 16px;
+}
+.tools-tabs {
+  margin-top: 8px;
+}
+.tool-card {
+  margin-bottom: 16px;
+  height: 100%;
+}
+.tool-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.tool-icon {
+  color: rgb(var(--primary-6));
+}
+.tool-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+.tool-desc {
+  color: var(--color-text-3);
+  min-height: 44px;
+  margin-bottom: 16px;
+}
+.ai-result {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre;
 }
 </style>
