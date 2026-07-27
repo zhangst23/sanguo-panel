@@ -185,10 +185,35 @@
             <a-card title="IP 封禁列表">
               <template #extra>
                 <a-space>
-                  <a-tag :color="fail2ban.active ? 'green' : 'red'">{{ fail2ban.active ? '运行中' : '已停止' }}</a-tag>
-                  <a-button size="small" :loading="restarting" @click="handleStartFail2ban">
+                  <a-tag :color="!fail2ban.installed ? 'orange' : (fail2ban.active ? 'green' : 'red')">
+                    {{ !fail2ban.installed ? '未安装' : (fail2ban.active ? '运行中' : '已停止') }}
+                  </a-tag>
+                  <a-button
+                    v-if="!fail2ban.installed"
+                    size="small"
+                    type="primary"
+                    :loading="installing"
+                    @click="handleInstallFail2ban"
+                  >
+                    <template #icon><icon-download /></template>
+                    安装 Fail2ban
+                  </a-button>
+                  <a-button
+                    v-else
+                    size="small"
+                    :loading="restarting"
+                    @click="handleStartFail2ban"
+                  >
                     <template #icon><icon-refresh /></template>
                     重新启动Fail2ban
+                  </a-button>
+                  <a-button size="small" :loading="testingConfig" @click="handleTestConfig">
+                    <template #icon><icon-settings /></template>
+                    测试配置
+                  </a-button>
+                  <a-button size="small" :loading="logLoading" @click="handleViewLogs">
+                    <template #icon><icon-file /></template>
+                    查看日志
                   </a-button>
                 </a-space>
               </template>
@@ -374,6 +399,33 @@
         </a-form-item>
       </a-form>
     </a-modal>
+
+    <!-- Fail2ban 配置测试弹窗 -->
+    <a-modal v-model:visible="showConfigModal" title="Fail2ban 配置测试" :footer="false" :width="620">
+      <a-alert v-if="configTestResult" :type="configTestResult.ok ? 'success' : 'error'" show-icon>
+        {{ configTestResult.ok ? '配置检查通过，未发现错误。' : '配置存在问题，请根据下方输出修正。' }}
+      </a-alert>
+      <a-typography-paragraph class="log-hint">执行命令：<code>fail2ban-client -t</code></a-typography-paragraph>
+      <a-textarea
+        :model-value="configTestResult ? configTestResult.output : ''"
+        :auto-size="{ minRows: 14, maxRows: 26 }"
+        readonly
+        class="log-box"
+      />
+    </a-modal>
+
+    <!-- Fail2ban 日志弹窗 -->
+    <a-modal v-model:visible="showLogModal" title="Fail2ban 运行日志" :footer="false" :width="700">
+      <a-typography-paragraph class="log-hint">
+        <code>journalctl -u fail2ban -n 200</code> / <code>/var/log/fail2ban.log</code>
+      </a-typography-paragraph>
+      <a-textarea
+        :model-value="fail2banLogs"
+        :auto-size="{ minRows: 16, maxRows: 28 }"
+        readonly
+        class="log-box"
+      />
+    </a-modal>
   </div>
 </template>
 
@@ -410,6 +462,13 @@ const manualBanIp = ref('')
 const manualBanLevel = ref('permanent')
 const manualBanLoading = ref(false)
 const restarting = ref(false)
+const installing = ref(false)
+const testingConfig = ref(false)
+const logLoading = ref(false)
+const showConfigModal = ref(false)
+const showLogModal = ref(false)
+const configTestResult = ref(null)
+const fail2banLogs = ref('')
 
 const levelMap = {
   permanent: { text: '永久封禁', color: 'red' },
@@ -706,9 +765,52 @@ const handleStartFail2ban = async () => {
     Message.success('Fail2ban 已启动')
     fetchData()
   } catch (error) {
-    Message.error('启动失败')
+    Message.error('启动失败：' + (error.response?.data?.detail || error.message))
   } finally {
     restarting.value = false
+  }
+}
+
+const handleInstallFail2ban = async () => {
+  installing.value = true
+  try {
+    const res = await request.post('/security/fail2ban/install')
+    if (res.active) {
+      Message.success('Fail2ban 安装并启动成功')
+    } else {
+      Message.success('Fail2ban 安装完成，请点击“重新启动”启动服务')
+    }
+    fetchData()
+  } catch (error) {
+    Message.error('安装失败：' + (error.response?.data?.detail || error.message))
+  } finally {
+    installing.value = false
+  }
+}
+
+const handleTestConfig = async () => {
+  testingConfig.value = true
+  try {
+    const res = await request.get('/security/fail2ban/config-test')
+    configTestResult.value = res
+    showConfigModal.value = true
+  } catch (error) {
+    Message.error('配置测试失败：' + (error.response?.data?.detail || error.message))
+  } finally {
+    testingConfig.value = false
+  }
+}
+
+const handleViewLogs = async () => {
+  logLoading.value = true
+  try {
+    const res = await request.get('/security/fail2ban/logs')
+    fail2banLogs.value = res.logs || ''
+    showLogModal.value = true
+  } catch (error) {
+    Message.error('获取日志失败：' + (error.response?.data?.detail || error.message))
+  } finally {
+    logLoading.value = false
   }
 }
 
@@ -728,6 +830,21 @@ onMounted(fetchData)
 <style scoped lang="scss">
 .security-container {
   padding: 0 0 20px 0;
+  .log-hint {
+    color: var(--color-text-3);
+    margin-bottom: 8px;
+    code {
+      background: var(--color-fill-2);
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+  }
+  .log-box {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    white-space: pre;
+  }
   .status-item {
     display: flex;
     justify-content: space-between;

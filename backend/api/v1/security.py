@@ -240,26 +240,47 @@ def _now_str():
     return datetime.now().strftime("%Y-%m-%d %H:%M")
 
 
+def _f2b_installed():
+    """检测 fail2ban 是否已安装。"""
+    if os.name == 'nt':
+        return False
+    res = run_shell("command -v fail2ban-client >/dev/null 2>&1 || command -v fail2ban-server >/dev/null 2>&1")
+    return bool(res.get("success"))
+
+
+def _query_f2b_active():
+    """查询 fail2ban 真实运行状态：True=运行中, False=已停止。"""
+    if os.name == 'nt':
+        return None
+    if not _f2b_installed():
+        return False
+    res = run_shell("systemctl is-active fail2ban")
+    return (res.get("stdout") or "").strip() == "active"
+
+
 @router.get("/fail2ban/status")
 def get_fail2ban_status(current_user=Depends(get_current_user)):
     if os.name == 'nt':
         active = F2B_ACTIVE_OVERRIDE if F2B_ACTIVE_OVERRIDE is not None else True
         return {
             "active": active,
+            "installed": False,
             "banned_ips": [r["ip"] for r in F2B_BAN_RECORDS],
             "config": {"bantime": 600, "findtime": 600, "maxretry": 5},
             "bans": F2B_BAN_RECORDS,
         }
 
-    if F2B_ACTIVE_OVERRIDE is not None:
-        active = F2B_ACTIVE_OVERRIDE
+    installed = _f2b_installed()
+    real = _query_f2b_active()
+    if real is None:
+        # systemctl 不可用时才回退到人工覆盖值，避免内存标志掩盖真实状态
+        active = F2B_ACTIVE_OVERRIDE if F2B_ACTIVE_OVERRIDE is not None else False
     else:
-        res = run_shell("systemctl is-active fail2ban")
-        active = res["stdout"].strip() == "active"
+        active = real
 
     config = {"bantime": 600, "findtime": 600, "maxretry": 5}
 
-    if active:
+    if installed and active:
         res_config = run_shell("fail2ban-client get sshd bantime")
         if res_config["success"]:
             try:
@@ -269,6 +290,7 @@ def get_fail2ban_status(current_user=Depends(get_current_user)):
 
     return {
         "active": active,
+        "installed": installed,
         "banned_ips": [r["ip"] for r in F2B_BAN_RECORDS],
         "config": config,
         "bans": F2B_BAN_RECORDS,
@@ -372,11 +394,29 @@ def update_fail2ban_config(config: dict, current_user=Depends(get_current_user))
 
 @router.post("/fail2ban/start")
 def start_fail2ban(current_user=Depends(get_current_user)):
-    """启动 / 重启 Fail2ban 服务（人工操作）。"""
+    """启动 / 重启 Fail2ban 服务，并校验其真实运行状态。"""
     global F2B_ACTIVE_OVERRIDE
-    if os.name != 'nt':
-        run_shell("systemctl start fail2ban || fail2ban-client start")
-    F2B_ACTIVE_OVERRIDE = True
+    if os.name == 'nt':
+        F2B_ACTIVE_OVERRIDE = True
+        return {"success": True, "active": True}
+
+    # 先清除历史 failed 状态，再从失败态恢复；优先 systemctl，回退 fail2ban-client
+    run_shell("systemctl reset-failed fail2ban 2>/dev/null")
+    run_shell(
+        "systemctl restart fail2ban 2>/dev/null || "
+        "systemctl start fail2ban 2>/dev/null || "
+        "fail2ban-client start 2>/dev/null"
+    )
+    # 设置开机自启，避免重启后不再运行
+    run_shell("systemctl enable fail2ban 2>/dev/null")
+    active = _query_f2b_active()
+    F2B_ACTIVE_OVERRIDE = active
+    if not active:
+        raise HTTPException(
+            status_code=500,
+            detail="Fail2ban 启动失败，可能 jail 配置有误，请运行 `fail2ban-client -t` 检查，"
+                   "或查看 `journalctl -u fail2ban` 日志。",
+        )
     return {"success": True, "active": True}
 
 
@@ -384,10 +424,106 @@ def start_fail2ban(current_user=Depends(get_current_user)):
 def stop_fail2ban(current_user=Depends(get_current_user)):
     """停止 Fail2ban 服务（人工操作）。"""
     global F2B_ACTIVE_OVERRIDE
-    if os.name != 'nt':
-        run_shell("systemctl stop fail2ban || fail2ban-client stop")
-    F2B_ACTIVE_OVERRIDE = False
-    return {"success": True, "active": False}
+    if os.name == 'nt':
+        F2B_ACTIVE_OVERRIDE = False
+        return {"success": True, "active": False}
+
+    run_shell("systemctl stop fail2ban 2>/dev/null || fail2ban-client stop 2>/dev/null")
+    active = _query_f2b_active()
+    F2B_ACTIVE_OVERRIDE = active
+    return {"success": True, "active": active}
+
+
+@router.get("/fail2ban/config-test")
+def test_fail2ban_config(current_user=Depends(get_current_user)):
+    """测试 fail2ban 配置是否有语法/配置错误（fail2ban-client -t）。"""
+    if os.name == 'nt':
+        return {"ok": True, "output": "Windows 环境不运行 fail2ban，跳过配置检测。"}
+    if not _f2b_installed():
+        return {
+            "ok": False,
+            "installed": False,
+            "output": "未检测到 fail2ban（fail2ban-client 不存在），请先在面板点击“安装 Fail2ban”。",
+        }
+    res = run_shell("fail2ban-client -t 2>&1")
+    output = (res.get("stdout") or "") + (res.get("stderr") or "")
+    # fail2ban-client -t 退出码 0 表示配置正常
+    return {"ok": bool(res.get("success")), "installed": True, "output": output.strip()}
+
+
+def _run_long(cmd, timeout=600):
+    """执行耗时命令（如安装），使用更长超时。"""
+    try:
+        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
+        return {"success": r.returncode == 0, "stdout": r.stdout, "stderr": r.stderr}
+    except Exception as e:
+        return {"success": False, "stdout": "", "stderr": str(e)}
+
+
+@router.post("/fail2ban/install")
+def install_fail2ban(current_user=Depends(get_current_user)):
+    """安装 Fail2ban（自动选择包管理器），安装完成后自动启用并启动。"""
+    global F2B_ACTIVE_OVERRIDE
+    if os.name == 'nt':
+        raise HTTPException(status_code=400, detail="Windows 环境不支持安装 fail2ban。")
+    if _f2b_installed():
+        run_shell("systemctl reset-failed fail2ban 2>/dev/null")
+        run_shell("systemctl restart fail2ban 2>/dev/null || fail2ban-client start 2>/dev/null")
+        run_shell("systemctl enable fail2ban 2>/dev/null")
+        active = _query_f2b_active()
+        F2B_ACTIVE_OVERRIDE = active
+        return {"success": True, "installed": True, "active": active}
+
+    pm = None
+    for cmd in ("apt-get", "dnf", "yum", "apk"):
+        if run_shell(f"command -v {cmd} >/dev/null 2>&1").get("success"):
+            pm = cmd
+            break
+    if not pm:
+        raise HTTPException(status_code=500, detail="未找到受支持的包管理器（apt-get/dnf/yum/apk）。")
+
+    update_cmd = {
+        "apt-get": "apt-get update",
+        "dnf": "dnf -y makecache",
+        "yum": "yum makecache",
+        "apk": "apk update",
+    }.get(pm, "")
+    install_cmd = {
+        "apt-get": "apt-get install -y fail2ban",
+        "dnf": "dnf -y install fail2ban",
+        "yum": "yum -y install fail2ban",
+        "apk": "apk add fail2ban",
+    }[pm]
+
+    if update_cmd:
+        _run_long(update_cmd)
+    res = _run_long(install_cmd)
+    if not _f2b_installed():
+        raise HTTPException(
+            status_code=500,
+            detail="fail2ban 安装失败：" + ((res.get("stderr") or res.get("stdout") or "")).strip(),
+        )
+
+    run_shell("systemctl enable fail2ban 2>/dev/null")
+    run_shell("systemctl restart fail2ban 2>/dev/null || fail2ban-client start 2>/dev/null")
+    active = _query_f2b_active()
+    F2B_ACTIVE_OVERRIDE = active
+    return {"success": True, "installed": True, "active": active}
+
+
+@router.get("/fail2ban/logs")
+def get_fail2ban_logs(current_user=Depends(get_current_user)):
+    """获取 fail2ban 近期日志，用于排查为何启动失败。"""
+    if os.name == 'nt':
+        return {"logs": "Windows 环境无 fail2ban 日志。"}
+    res = run_shell("journalctl -u fail2ban -n 200 --no-pager 2>/dev/null")
+    logs = res.get("stdout") or ""
+    if not logs.strip():
+        res = run_shell("tail -n 200 /var/log/fail2ban.log 2>/dev/null")
+        logs = res.get("stdout") or ""
+    if not logs.strip():
+        logs = "未找到 fail2ban 日志（journalctl 与 /var/log/fail2ban.log 均无内容）。"
+    return {"logs": logs}
 
 
 # --- 请求频率限制 (Rate Limit) ---

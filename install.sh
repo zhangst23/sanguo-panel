@@ -319,6 +319,43 @@ configure_firewall() {
     fi
 }
 
+configure_fail2ban() {
+    log_step "Configuring Fail2ban..."
+
+    if command -v fail2ban-client &>/dev/null; then
+        log_info "Fail2ban already installed, skipping install."
+    else
+        apt-get install -y fail2ban
+        log_info "Fail2ban installed."
+    fi
+
+    # 基础 jail 配置：启用 sshd 防护，避免面板/SSH 被暴力破解
+    if [ ! -f /etc/fail2ban/jail.local ]; then
+        mkdir -p /etc/fail2ban
+        cat > /etc/fail2ban/jail.local << 'EOF'
+[DEFAULT]
+bantime = 1h
+findtime = 10m
+maxretry = 5
+backend = systemd
+
+[sshd]
+enabled = true
+EOF
+        log_info "Default jail.local written (/etc/fail2ban/jail.local)."
+    fi
+
+    # 放行面板自身端口，避免误封本机回环（可选保险）
+    systemctl enable fail2ban 2>/dev/null || true
+    systemctl restart fail2ban 2>/dev/null || fail2ban-client start 2>/dev/null || true
+
+    if command -v fail2ban-client &>/dev/null && systemctl is-active --quiet fail2ban; then
+        log_info "Fail2ban is running."
+    else
+        log_warn "Fail2ban installed but not running. Check: journalctl -u fail2ban"
+    fi
+}
+
 start_services() {
     log_step "Starting services..."
 
@@ -427,6 +464,7 @@ main() {
     configure_redis
     create_systemd_services
     configure_firewall
+    configure_fail2ban
     start_services
     wait_for_services
     show_summary
