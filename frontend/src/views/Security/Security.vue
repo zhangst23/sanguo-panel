@@ -282,7 +282,13 @@
       <a-tab-pane key="system" title="UFW 防火墙">
         <a-card title="系统防火墙" hoverable>
           <template #extra>
-            <a-switch :model-value="firewall.active" @change="handleFirewallToggle" :loading="loading.firewall" />
+            <a-space>
+              <a-switch :model-value="firewall.active" @change="handleFirewallToggle" :loading="loading.firewall" />
+              <a-button type="primary" size="small" @click="showAddRuleModal = true">
+                <template #icon><icon-plus /></template>
+                添加规则
+              </a-button>
+            </a-space>
           </template>
           <a-table :data="firewall.rules" :pagination="false">
             <template #columns>
@@ -293,19 +299,14 @@
                   <a-tag color="green">允许</a-tag>
                 </template>
               </a-table-column>
-              <a-table-column title="操作">
+              <a-table-column title="备注" data-index="description" />
+              <a-table-column title="操作" :width="100">
                 <template #cell="{ record }">
-                  <a-button type="text" status="danger" size="small">删除</a-button>
+                  <a-button type="text" status="danger" size="small" @click="handleDeleteFirewallRule(record)">删除</a-button>
                 </template>
               </a-table-column>
             </template>
           </a-table>
-          <div style="margin-top: 15px;">
-            <a-button type="outline" size="small">
-              <template #icon><icon-plus /></template>
-              添加规则
-            </a-button>
-          </div>
         </a-card>
       </a-tab-pane>
 
@@ -354,6 +355,24 @@
         Googlebot / Bingbot 仅在来源 IP 属于官方段时豁免；假冒搜索爬虫会进入限速桶。
         普通浏览器 UA 不受此层限速影响。每个站点独立限速，同一站点内常见 Bot UA 共享该站点的限速桶。
       </a-typography-paragraph>
+    </a-modal>
+
+    <!-- 添加防火墙规则弹窗 -->
+    <a-modal v-model:visible="showAddRuleModal" title="添加防火墙规则" :ok-loading="addingRule" @ok="handleAddFirewallRule">
+      <a-form layout="vertical">
+        <a-form-item label="端口" help="需要开放的端口号，例如 8080">
+          <a-input-number v-model="addRulePort" :min="1" :max="65535" style="width: 100%;" />
+        </a-form-item>
+        <a-form-item label="协议">
+          <a-select v-model="addRuleProtocol" style="width: 100%;">
+            <a-option value="tcp">TCP</a-option>
+            <a-option value="udp">UDP</a-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="备注" help="给该端口规则添加一个备注说明（可选）">
+          <a-input v-model="addRuleComment" placeholder="例如：网站管理后台" allow-clear />
+        </a-form-item>
+      </a-form>
     </a-modal>
   </div>
 </template>
@@ -438,6 +457,12 @@ const firewall = reactive({
   active: false,
   rules: []
 })
+
+const showAddRuleModal = ref(false)
+const addRulePort = ref(80)
+const addRuleProtocol = ref('tcp')
+const addRuleComment = ref('')
+const addingRule = ref(false)
 
 const fail2ban = reactive({
   active: false,
@@ -563,6 +588,39 @@ const handleFirewallToggle = async (val) => {
     Message.error('操作失败')
   } finally {
     loading.firewall = false
+  }
+}
+
+const handleAddFirewallRule = async () => {
+  if (!addRulePort.value) {
+    Message.warning('请输入端口号')
+    return
+  }
+  addingRule.value = true
+  try {
+    await request.post('/security/firewall/rule', null, {
+      params: { port: addRulePort.value, protocol: addRuleProtocol.value, comment: addRuleComment.value || undefined }
+    })
+    Message.success(`已开放端口 ${addRulePort.value}/${addRuleProtocol.value}`)
+    showAddRuleModal.value = false
+    addRuleComment.value = ''
+    fetchData()
+  } catch (error) {
+    Message.error('添加失败')
+  } finally {
+    addingRule.value = false
+  }
+}
+
+const handleDeleteFirewallRule = async (record) => {
+  try {
+    await request.post('/security/firewall/rule/delete', null, {
+      params: { port: record.port, protocol: record.protocol }
+    })
+    Message.success(`已删除端口 ${record.port}/${record.protocol} 规则`)
+    fetchData()
+  } catch (error) {
+    Message.error('删除失败')
   }
 }
 

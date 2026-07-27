@@ -14,6 +14,7 @@ from backend.models.user import User
 from typing import List, Optional
 from datetime import datetime
 import subprocess
+import re
 import os
 import uuid
 
@@ -126,27 +127,58 @@ def run_shell(command):
 @router.get("/firewall/status")
 def get_firewall_status(current_user=Depends(get_current_user)):
     if os.name == 'nt':
-        return {"active": True, "rules": [{"port": "80", "protocol": "tcp", "description": "HTTP"}]}
-    
-    res = run_shell("systemctl is-active firewalld")
-    active = res["stdout"].strip() == "active"
-    
+        return {
+            "active": True,
+            "rules": [
+                {"port": "22", "protocol": "tcp", "description": "SSH"},
+                {"port": "80", "protocol": "tcp", "description": "HTTP"},
+                {"port": "443", "protocol": "tcp", "description": "HTTPS"},
+            ]
+        }
+
+    res = run_shell("ufw status")
+    stdout = res["stdout"]
+    active = "Status: active" in stdout
+
     rules = []
-    if active:
-        res = run_shell("firewall-cmd --list-ports")
-        ports = res["stdout"].strip().split()
-        for p in ports:
-            port, proto = p.split('/')
-            rules.append({"port": port, "protocol": proto})
-            
+    for line in stdout.splitlines():
+        line = line.strip()
+        # 形如 "22/tcp   ALLOW IN  Anywhere" 或 "22/tcp (v6)  ALLOW IN  Anywhere (v6)"
+        m = re.match(r"^(\d+)/(tcp|udp)\b.*ALLOW", line)
+        if m:
+            rules.append({
+                "port": m.group(1),
+                "protocol": m.group(2),
+                "description": "ALLOW",
+            })
     return {"active": active, "rules": rules}
 
 @router.post("/firewall/toggle")
 def toggle_firewall(enable: bool, current_user=Depends(get_current_user)):
-    if os.name == 'nt': return {"success": True}
-    action = "start" if enable else "stop"
-    run_shell(f"systemctl {action} firewalld")
-    run_shell(f"systemctl {'enable' if enable else 'disable'} firewalld")
+    if os.name == 'nt':
+        return {"success": True}
+    action = "enable" if enable else "disable"
+    run_shell(f"ufw {action}")
+    return {"success": True}
+
+@router.post("/firewall/rule")
+def add_firewall_rule(port: int, protocol: str = "tcp", comment: Optional[str] = None, current_user=Depends(get_current_user)):
+    """开放指定端口（UFW），可选备注。"""
+    if os.name == 'nt':
+        return {"success": True}
+    cmd = f"ufw allow {port}/{protocol}"
+    if comment:
+        safe = comment.replace('"', '')
+        cmd += f' comment "{safe}"'
+    run_shell(cmd)
+    return {"success": True}
+
+@router.post("/firewall/rule/delete")
+def delete_firewall_rule(port: int, protocol: str = "tcp", current_user=Depends(get_current_user)):
+    """删除指定端口规则（UFW）。"""
+    if os.name == 'nt':
+        return {"success": True}
+    run_shell(f"ufw delete allow {port}/{protocol}")
     return {"success": True}
 
 # 结构化封禁记录（内存存储，用于演示；真实环境由 fail2ban 客户端管理）
