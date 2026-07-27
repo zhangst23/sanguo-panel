@@ -1,5 +1,6 @@
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from backend.api import deps
 from backend.models.site import Site as SiteModel, SharedDatabase as SharedDatabaseModel
@@ -11,9 +12,11 @@ import subprocess
 import shutil
 import string
 import random
+import json
 import requests
 import mysql.connector
 from backend.utils.php_utils import get_php_path
+from backend.core.config import settings
 from backend.utils.ols_utils import (
     create_ols_vhost,
     remove_ols_vhost,
@@ -1275,6 +1278,292 @@ def delete_plugin(
     cmd = [php_path, wp_cli_path, "plugin", "delete", slug, f"--path={site.root_path}", "--allow-root"]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
     return {"success": True, "output": result.stdout}
+
+
+@router.post("/{id}/ai-repair")
+def ai_repair_site(
+    *,
+    db: Session = Depends(deps.get_db),
+    id: int,
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    site = db.query(SiteModel).filter(SiteModel.id == id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    if not settings.DEEPSEEK_API_KEY:
+        raise HTTPException(status_code=400, detail="请先在系统设置中配置 AI API Key")
+
+    process_log = []
+    php_path, wp_cli_path = _get_wp_cli(site)
+    base_cmd = [php_path, wp_cli_path, f"--path={site.root_path}", "--allow-root"]
+
+    def log(msg):
+        process_log.append(msg)
+
+    def run_cmd(cmd_args, timeout=30):
+        try:
+            r = subprocess.run(cmd_args, capture_output=True, text=True, timeout=timeout)
+            if r.returncode == 0:
+                return r.stdout.strip()
+            return r.stderr.strip() or r.stdout.strip()
+        except subprocess.TimeoutExpired:
+            return "命令执行超时"
+        except Exception as e:
+            return str(e)
+
+    # 1. Core info
+    log("正在检查 WordPress 核心版本...")
+    wp_version = run_cmd(base_cmd + ["core", "version"])
+    log(f"WordPress 版本: {wp_version}")
+
+    # 2. Plugin list
+    log("正在获取插件列表...")
+    plugins = run_cmd(base_cmd + ["plugin", "list", "--format=json"])
+    try:
+        plugin_data = json.loads(plugins)
+        plugin_summary = [f"{p['name']} ({p['status']}, v{p.get('version','?')})" for p in plugin_data]
+        log(f"已安装插件({len(plugin_data)}个): {', '.join(plugin_summary)}")
+    except (json.JSONDecodeError, KeyError):
+        plugin_data = plugins
+        log(f"插件列表: {plugins[:500]}")
+
+    # 3. Theme list
+    log("正在获取主题列表...")
+    themes = run_cmd(base_cmd + ["theme", "list", "--format=json"])
+    try:
+        theme_data = json.loads(themes)
+        theme_summary = [f"{t['name']} ({t['status']})" for t in theme_data]
+        log(f"已安装主题({len(theme_data)}个): {', '.join(theme_summary)}")
+    except (json.JSONDecodeError, KeyError):
+        theme_data = themes
+        log(f"主题列表: {themes[:300]}")
+
+    # 4. Check for updates
+    log("正在检查更新...")
+    core_update = run_cmd(base_cmd + ["core", "check-update"], timeout=60)
+    log(f"核心更新状态: {core_update}")
+
+    # 5. DB check
+    log("正在检查数据库...")
+    db_check = run_cmd(base_cmd + ["db", "check"])
+    log(f"数据库检查: {db_check}")
+
+    # 6. Option check (siteurl/home)
+    log("正在读取站点配置...")
+    siteurl = run_cmd(base_cmd + ["option", "get", "siteurl"])
+    homeurl = run_cmd(base_cmd + ["option", "get", "home"])
+    log(f"站点 URL: {siteurl}, 主页 URL: {homeurl}")
+
+    # 7. Disk usage
+    log("正在检查磁盘使用情况...")
+    if os.path.exists(site.root_path):
+        try:
+            du = subprocess.run(["du", "-sh", site.root_path], capture_output=True, text=True, timeout=10)
+            disk_usage = du.stdout.strip().split("\t")[0] if du.returncode == 0 else "未知"
+            log(f"站点目录大小: {disk_usage}")
+        except Exception:
+            log("无法获取目录大小")
+
+    # 8. Build diagnostic summary
+    log("正在调用 AI 模型进行分析...")
+
+    diagnostic_msg = f"""请对以下 WordPress 站点进行全面诊断并提供修复建议：
+
+**站点信息：**
+- 域名：{site.domain}
+- 根路径：{site.root_path}
+- PHP 版本：{site.php_version}
+- 已记录 WP 版本：{site.wp_version}
+- 当前 WP 版本：{wp_version}
+- SSL 状态：{site.ssl_status} (0=关闭,1=开启,2=强制)
+
+**插件状态：**
+{plugins[:3000] if isinstance(plugins, str) else json.dumps(plugin_data, ensure_ascii=False)}
+
+**主题状态：**
+{themes[:2000] if isinstance(themes, str) else json.dumps(theme_data, ensure_ascii=False)}
+
+**核心更新：** {core_update}
+**数据库检查：** {db_check}
+**站点 URL 配置：** siteurl={siteurl}, home={homeurl}
+
+请给出：
+1. 发现的问题列表（按严重程度排序）
+2. 每个问题的具体修复建议或命令
+3. 整体优化建议
+请用中文回答，使用 Markdown 格式。"""
+
+    ai_result = ""
+    try:
+        resp = requests.post(
+            "https://api.deepseek.com/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {settings.DEEPSEEK_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": settings.DEEPSEEK_MODEL or "deepseek-chat",
+                "messages": [
+                    {"role": "system", "content": "你是一个 WordPress 运维专家，擅长诊断和修复 WordPress 站点问题。"},
+                    {"role": "user", "content": diagnostic_msg},
+                ],
+                "temperature": 0.3,
+            },
+            timeout=180,
+        )
+        if resp.status_code == 200:
+            ai_result = resp.json()["choices"][0]["message"]["content"]
+            log("AI 分析完成")
+        else:
+            log(f"AI 调用失败: HTTP {resp.status_code} - {resp.text[:200]}")
+    except Exception as e:
+        log(f"AI 调用异常: {str(e)}")
+
+    return {
+        "success": True,
+        "site_id": id,
+        "domain": site.domain,
+        "process_log": process_log,
+        "ai_analysis": ai_result,
+    }
+
+
+class AIRepairExecute(BaseModel):
+    ai_analysis: str
+
+
+@router.post("/{id}/ai-repair/execute")
+def ai_repair_execute(
+    *,
+    db: Session = Depends(deps.get_db),
+    id: int,
+    data: AIRepairExecute,
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    site = db.query(SiteModel).filter(SiteModel.id == id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    if not settings.DEEPSEEK_API_KEY:
+        raise HTTPException(status_code=400, detail="请先在系统设置中配置 AI API Key")
+
+    process_log = []
+    php_path, wp_cli_path = _get_wp_cli(site)
+    base_cmd = [php_path, wp_cli_path, f"--path={site.root_path}", "--allow-root"]
+
+    def log(msg):
+        process_log.append(msg)
+
+    def run_cmd(cmd_args, timeout=60):
+        try:
+            r = subprocess.run(cmd_args, capture_output=True, text=True, timeout=timeout)
+            if r.returncode == 0:
+                return r.stdout.strip()
+            return r.stderr.strip() or r.stdout.strip()
+        except subprocess.TimeoutExpired:
+            return "命令执行超时"
+        except Exception as e:
+            return str(e)
+
+    log("正在请求 AI 生成修复命令...")
+
+    execute_prompt = f"""根据以下 WordPress 站点诊断分析结果，生成可执行的 WP-CLI 修复命令。
+
+**站点路径：** {site.root_path}
+**WordPress 版本：** {site.wp_version}
+
+**诊断分析：**
+{data.ai_analysis}
+
+请列出可以安全执行的 WP-CLI 命令来修复问题，命令格式要求：
+- 每行一个命令，以 `wp ` 开头
+- 只包含安全的操作（如 update, repair, optimize, rewrite, transient delete, cache flush, option update）
+- 不要包含破坏性操作（如 drop, reset, uninstall, delete site）
+- 不要使用 `--path=` 参数（系统会自动添加）
+
+请用以下格式输出：
+```commands
+wp core update
+wp plugin update --all
+wp theme update --all
+wp option update siteurl https://{site.domain}
+wp rewrite flush
+```
+
+如果某些问题无法通过 WP-CLI 自动修复，请在命令后添加注释说明（以 # 开头）。"""
+
+    commands_text = ""
+    try:
+        resp = requests.post(
+            "https://api.deepseek.com/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {settings.DEEPSEEK_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": settings.DEEPSEEK_MODEL or "deepseek-chat",
+                "messages": [
+                    {"role": "system", "content": "你是一个 WordPress 运维专家，负责根据诊断结果生成 WP-CLI 修复命令。"},
+                    {"role": "user", "content": execute_prompt},
+                ],
+                "temperature": 0.1,
+            },
+            timeout=180,
+        )
+        if resp.status_code == 200:
+            commands_text = resp.json()["choices"][0]["message"]["content"]
+            log("AI 命令生成完成")
+        else:
+            log(f"AI 调用失败: HTTP {resp.status_code} - {resp.text[:200]}")
+            return {"success": False, "process_log": process_log, "detail": "AI 命令生成失败"}
+    except Exception as e:
+        log(f"AI 调用异常: {str(e)}")
+        return {"success": False, "process_log": process_log, "detail": str(e)}
+
+    # Parse commands from AI response
+    commands = []
+    in_block = False
+    for line in commands_text.split("\n"):
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            in_block = not in_block
+            continue
+        if in_block and stripped.startswith("wp "):
+            # Remove inline comments
+            cmd_str = stripped.split("#")[0].strip()
+            if cmd_str:
+                commands.append(cmd_str)
+        elif not in_block and stripped.startswith("wp "):
+            cmd_str = stripped.split("#")[0].strip()
+            if cmd_str:
+                commands.append(cmd_str)
+
+    if not commands:
+        log("未找到可执行的修复命令")
+        log(f"AI 原始响应:\n{commands_text[:500]}")
+        return {"success": False, "process_log": process_log, "detail": "AI 未生成可执行的命令"}
+
+    log(f"共解析到 {len(commands)} 条修复命令，开始执行...")
+
+    cmd_results = []
+    for i, cmd_str in enumerate(commands):
+        log(f"[{i + 1}/{len(commands)}] 执行: {cmd_str}")
+        parts = cmd_str.split()
+        if parts[0] == "wp":
+            parts = parts[1:]
+        full_cmd = base_cmd + parts
+        output = run_cmd(full_cmd, timeout=120)
+        log(f"结果: {output[:300]}")
+        cmd_results.append({"command": cmd_str, "output": output})
+
+    log("全部修复命令执行完毕")
+
+    return {
+        "success": True,
+        "site_id": id,
+        "domain": site.domain,
+        "process_log": process_log,
+        "cmd_results": cmd_results,
+    }
 
 
 @router.get("/{id}/nginx-cloudflare")

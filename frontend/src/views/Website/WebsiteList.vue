@@ -142,7 +142,7 @@
               {{ formatDate(record.created_at) }}
             </template>
           </a-table-column>
-          <a-table-column title="操作" :width="300">
+          <a-table-column title="操作" :width="360">
             <template #cell="{ record }">
               <div class="action-btns">
                 <a-button type="text" size="small" @click="handleManage(record)">设置</a-button>
@@ -151,6 +151,9 @@
                 </a-button>
                 <a-button type="text" size="small" @click="handleOpenPMA(record)" style="color: #165dff">
                   数据库
+                </a-button>
+                <a-button type="text" size="small" @click="handleAIRepair(record)" style="color: #7b2ff7">
+                  AI修复
                 </a-button>
                 <a-button type="text" size="small" @click="openDomainChange(record)">更换域名</a-button>
                 <a-popconfirm content="确定要删除站点吗？此操作不可撤销！" @ok="handleDelete(record.id)" type="warning">
@@ -442,11 +445,67 @@
         </a-table>
       </div>
     </a-modal>
+
+    <!-- AI Repair Modal -->
+    <a-modal
+      v-model:visible="showAIRepairModal"
+      title="AI 一键修复"
+      :width="900"
+      :mask-closable="false"
+      @cancel="handleAIRepairClose"
+    >
+      <div class="ai-repair-body">
+        <div v-if="!aiAnalysis && !aiRepairLoading" class="ai-empty">
+          <p>点击下方按钮，AI 将对站点进行全面诊断分析。</p>
+        </div>
+        <a-row v-else :gutter="16">
+          <a-col :span="12">
+            <div class="ai-repair-log" ref="aiRepairLogRef">
+              <div v-if="(aiRepairLoading || aiExecLoading) && aiProcessLog.length === 0" class="ai-loading">
+                <a-spin />
+                <span style="margin-left: 8px">正在初始化...</span>
+              </div>
+              <div v-for="(item, i) in aiProcessLog" :key="i" class="ai-log-line">
+                <span v-if="item.startsWith('[★]')" class="ai-log-cmd">{{ item }}</span>
+                <span v-else>{{ item }}</span>
+              </div>
+            </div>
+          </a-col>
+          <a-col :span="12">
+            <div v-if="aiAnalysis" class="ai-analysis" v-html="aiAnalysisHtml" />
+          </a-col>
+        </a-row>
+      </div>
+      <template #footer>
+        <a-space>
+          <a-button @click="showAIRepairModal = false">关闭</a-button>
+          <a-button
+            v-if="!aiAnalysis"
+            type="primary"
+            @click="handleAIStartDiagnose"
+            :loading="aiRepairLoading"
+            :disabled="aiRepairLoading"
+          >
+            AI 一键检测
+          </a-button>
+          <a-button
+            v-if="aiAnalysis"
+            type="primary"
+            status="success"
+            @click="handleAIRepairExecute"
+            :loading="aiExecLoading"
+            :disabled="aiExecLoading"
+          >
+            执行修复
+          </a-button>
+        </a-space>
+      </template>
+    </a-modal>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import request from '@/utils/request'
 import { Message, Modal } from '@arco-design/web-vue'
@@ -477,6 +536,14 @@ const showBatchModal = ref(false)
 const csvContent = ref('')
 const batchLoading = ref(false)
 const batchWPUpdateLoading = ref(false)
+
+const showAIRepairModal = ref(false)
+const aiRepairLoading = ref(false)
+const aiExecLoading = ref(false)
+const aiProcessLog = ref([])
+const aiAnalysis = ref('')
+const aiRepairLogRef = ref(null)
+const aiCurrentSite = ref(null)
 
 const showMigrateModal = ref(false)
 const migrateLoading = ref(false)
@@ -563,6 +630,80 @@ const handleOpenPMA = async (record) => {
     Message.error('跳转失败: ' + (error.response?.data?.detail || error.message))
   }
 }
+
+const handleAIRepair = (record) => {
+  showAIRepairModal.value = true
+  aiProcessLog.value = []
+  aiAnalysis.value = ''
+  aiRepairLoading.value = false
+  aiExecLoading.value = false
+  aiCurrentSite.value = record
+}
+
+const handleAIStartDiagnose = async () => {
+  if (!aiCurrentSite.value) return
+  aiRepairLoading.value = true
+  aiProcessLog.value = []
+  aiAnalysis.value = ''
+  try {
+    const res = await request.post(`/sites/${aiCurrentSite.value.id}/ai-repair`, {}, { timeout: 300000 })
+    aiProcessLog.value = res.process_log || []
+    aiAnalysis.value = res.ai_analysis || ''
+  } catch (error) {
+    aiProcessLog.value.push('检测失败: ' + (error.response?.data?.detail || error.message))
+  } finally {
+    aiRepairLoading.value = false
+    nextTick(() => {
+      if (aiRepairLogRef.value) {
+        aiRepairLogRef.value.scrollTop = aiRepairLogRef.value.scrollHeight
+      }
+    })
+  }
+}
+
+const handleAIRepairExecute = async () => {
+  if (!aiCurrentSite.value || !aiAnalysis.value) return
+  aiExecLoading.value = true
+  aiProcessLog.value = []
+  try {
+    const res = await request.post(
+      `/sites/${aiCurrentSite.value.id}/ai-repair/execute`,
+      { ai_analysis: aiAnalysis.value },
+      { timeout: 300000 }
+    )
+    aiProcessLog.value = res.process_log || []
+  } catch (error) {
+    aiProcessLog.value.push('执行失败: ' + (error.response?.data?.detail || error.message))
+  } finally {
+    aiExecLoading.value = false
+    nextTick(() => {
+      if (aiRepairLogRef.value) {
+        aiRepairLogRef.value.scrollTop = aiRepairLogRef.value.scrollHeight
+      }
+    })
+  }
+}
+
+const handleAIRepairClose = () => {
+  showAIRepairModal.value = false
+  aiProcessLog.value = []
+  aiAnalysis.value = ''
+  aiCurrentSite.value = null
+}
+
+const aiAnalysisHtml = computed(() => {
+  if (!aiAnalysis.value) return ''
+  return aiAnalysis.value
+    .replace(/### (.+)/g, '<h3>$1</h3>')
+    .replace(/## (.+)/g, '<h2>$1</h2>')
+    .replace(/# (.+)/g, '<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/^- (.+)/gm, '<li>$1</li>')
+    .replace(/(<li>[\s\S]*?<\/li>)/g, (match) => `<ul>${match}</ul>`)
+    .replace(/\n/g, '<br>')
+})
 
 const handleDomainInput = () => {
   form.root_path = form.domain ? `/var/www/html/${form.domain}` : '/var/www/html/'
@@ -1105,5 +1246,65 @@ onMounted(() => {
   font-size: 11px;
   color: var(--color-text-3);
   word-break: break-all;
+}
+
+.ai-repair-body {
+  min-height: 320px;
+}
+
+.ai-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  color: #86909c;
+  font-size: 14px;
+}
+
+.ai-repair-log {
+  background: #1d2129;
+  border-radius: 4px;
+  padding: 12px;
+  height: 450px;
+  overflow-y: auto;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #a8c97e;
+}
+
+.ai-log-line {
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.ai-loading {
+  display: flex;
+  align-items: center;
+  color: #86909c;
+}
+
+.ai-analysis {
+  background: #f7f8fa;
+  border-radius: 4px;
+  padding: 16px;
+  height: 450px;
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 1.8;
+  color: #1d2129;
+}
+
+.ai-analysis :deep(h1) { font-size: 18px; margin: 8px 0; }
+.ai-analysis :deep(h2) { font-size: 16px; margin: 8px 0; }
+.ai-analysis :deep(h3) { font-size: 14px; margin: 6px 0; }
+.ai-analysis :deep(strong) { color: #1d2129; }
+.ai-analysis :deep(code) { background: #e5e6eb; padding: 1px 6px; border-radius: 3px; font-size: 12px; }
+.ai-analysis :deep(li) { margin-left: 16px; }
+.ai-analysis :deep(ul) { margin: 4px 0; }
+
+.ai-log-cmd {
+  color: #ffb020;
+  font-weight: bold;
 }
 </style>
