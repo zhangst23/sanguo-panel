@@ -50,7 +50,7 @@ import LogManager from '@/views/LiteSpeed/Log.vue'
 const route = useRoute()
 const router = useRouter()
 
-const TAB_KEYS = ['status', 'redis', 'php', 'linux', 'ols']
+const TAB_KEYS = ['status', 'redis', 'php', 'linux', 'ols', 'phpworker', 'lscache', 'rewrite', 'log']
 const activeTab = ref(getInitialTab())
 
 function getInitialTab() {
