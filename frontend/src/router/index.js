@@ -77,12 +77,6 @@ const routes = [
         meta: { requiresAuth: true, title: '终极配置' },
       },
       {
-        path: 'litespeed',
-        name: 'LiteSpeed',
-        component: () => import('@/views/LiteSpeed/LiteSpeed.vue'),
-        meta: { requiresAuth: true, title: 'LiteSpeed配置' },
-      },
-      {
         path: 'linux',
         name: 'Linux',
         component: () => import('@/views/System/SystemManage.vue'),
@@ -129,12 +123,6 @@ const routes = [
         name: 'TaskList',
         component: () => import('@/views/Task/TaskList.vue'),
         meta: { requiresAuth: true, title: '任务列表' },
-      },
-      {
-        path: 'nginx',
-        name: 'Nginx',
-        component: () => import('@/views/System/SystemManage.vue'),
-        meta: { requiresAuth: true, title: '系统管理', defaultTab: 'nginx' },
       },
       {
         path: 'system-manage',

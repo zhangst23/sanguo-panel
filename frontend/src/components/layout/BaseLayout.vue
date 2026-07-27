@@ -71,8 +71,6 @@
             <template #title>系统工具</template>
             <a-menu-item key="Linux">系统管理</a-menu-item>
             <a-menu-item key="Monitor">监控中心</a-menu-item>
-            <a-menu-item key="Nginx">OpenLiteSpeed 管理</a-menu-item>
-            <a-menu-item key="LiteSpeed">OpenLiteSpeed</a-menu-item>
             <a-menu-item key="ApiDocs">API 接口文档</a-menu-item>
             <a-menu-item key="SystemSettings">系统设置</a-menu-item>
           </a-sub-menu>
