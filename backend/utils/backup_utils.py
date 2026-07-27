@@ -98,7 +98,10 @@ def create_site_backup(
             include_files=include_files
         )
         db.add(new_backup)
-        
+
+        site.backup_count = db.query(Backup).filter(Backup.site_id == site_id).count()
+        db.add(site)
+
         task.status = TaskStatus.completed
         task.progress = 100
         task.message = "Backup completed successfully"

@@ -439,7 +439,7 @@
             <a-table-column title="操作">
               <template #cell="{ record }">
                 <a-space>
-                  <a-button type="text" size="small">下载</a-button>
+                  <a-button type="text" size="small" @click="handleDownloadBackup(record)">下载</a-button>
                   <a-popconfirm content="确定要删除该备份吗？" @ok="handleDeleteBackup(record)">
                     <a-button type="text" size="small" status="danger">删除</a-button>
                 </a-popconfirm>
@@ -1095,10 +1095,11 @@ const handleBackupList = (record) => {
 const fetchBackups = async (siteId) => {
   backupListLoading.value = true
   try {
-    backupList.value = [
-      { id: 1, created_at: '2024-08-13 10:00:00', size: '15.2 MB' },
-      { id: 2, created_at: '2024-08-12 10:00:00', size: '14.8 MB' }
-    ]
+    const res = await request.get(`/sites/${siteId}/backups`)
+    backupList.value = res.map(b => ({
+      ...b,
+      size: formatFileSize(b.file_size)
+    }))
   } catch (error) {
     Message.error('获取备份列表失败')
   } finally {
@@ -1110,7 +1111,7 @@ const handleCreateBackup = async () => {
   if (!currentSite.value) return
   backupLoading.value = true
   try {
-    await request.post(`/sites/${currentSite.value.id}/backup`)
+    await request.post(`/sites/${currentSite.value.id}/backup`, {}, { timeout: 300000 })
     Message.success('备份创建成功')
     fetchBackups(currentSite.value.id)
     fetchSites()
@@ -1123,12 +1124,37 @@ const handleCreateBackup = async () => {
 
 const handleDeleteBackup = async (backup) => {
   try {
+    await request.delete(`/sites/${currentSite.value.id}/backups/${backup.id}`)
     Message.success('备份已删除')
     fetchBackups(currentSite.value.id)
     fetchSites()
   } catch (error) {
     Message.error('删除备份失败')
   }
+}
+
+const handleDownloadBackup = async (backup) => {
+  try {
+    const blob = await request.get(`/sites/${currentSite.value.id}/backups/${backup.id}/download`, {
+      responseType: 'blob'
+    })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = backup.name
+    a.click()
+    window.URL.revokeObjectURL(url)
+  } catch (error) {
+    Message.error('下载失败')
+  }
+}
+
+const formatFileSize = (bytes) => {
+  if (!bytes || bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
 }
 
 const handleDelete = async (id) => {

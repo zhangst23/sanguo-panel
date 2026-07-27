@@ -595,17 +595,107 @@ def backup_site(
     *,
     db: Session = Depends(deps.get_db),
     id: int,
+    background_tasks: BackgroundTasks,
     current_user: Any = Depends(deps.get_current_active_user),
 ) -> Any:
-    """
-    Create a backup of the site (files + database).
-    """
+    """Create a backup of the site (files + database)."""
     site = db.query(SiteModel).filter(SiteModel.id == id).first()
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
 
-    # Logic to archive files and export database tables
-    return {"success": True, "message": f"Backup created for {site.domain}"}
+    from backend.models.task import Task, TaskStatus
+    import uuid as _uuid
+    from backend.utils.backup_utils import create_site_backup
+
+    task_uuid = str(_uuid.uuid4())
+    task = Task(
+        task_uuid=task_uuid,
+        type="site_backup",
+        status=TaskStatus.pending,
+        message=f"准备备份 {site.domain}...",
+        created_by=current_user.id,
+    )
+    db.add(task)
+    db.commit()
+
+    background_tasks.add_task(create_site_backup, db, site.id, task_uuid)
+    return {"success": True, "message": f"Backup started for {site.domain}", "task_uuid": task_uuid}
+
+
+@router.get("/{id}/backups")
+def list_site_backups(
+    *,
+    db: Session = Depends(deps.get_db),
+    id: int,
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    site = db.query(SiteModel).filter(SiteModel.id == id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+
+    from backend.models.backup import Backup as BackupModel
+    backups = db.query(BackupModel).filter(BackupModel.site_id == id).order_by(BackupModel.created_at.desc()).all()
+    return [
+        {
+            "id": b.id,
+            "name": b.name,
+            "file_size": b.file_size,
+            "type": b.type,
+            "status": b.status,
+            "created_at": b.created_at.isoformat() if b.created_at else None,
+        }
+        for b in backups
+    ]
+
+
+@router.delete("/{id}/backups/{backup_id}")
+def delete_site_backup(
+    *,
+    db: Session = Depends(deps.get_db),
+    id: int,
+    backup_id: int,
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    site = db.query(SiteModel).filter(SiteModel.id == id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+
+    from backend.models.backup import Backup as BackupModel
+    backup = db.query(BackupModel).filter(BackupModel.id == backup_id, BackupModel.site_id == id).first()
+    if not backup:
+        raise HTTPException(status_code=404, detail="Backup not found")
+
+    if os.path.exists(backup.file_path):
+        os.remove(backup.file_path)
+
+    db.delete(backup)
+    site.backup_count = db.query(BackupModel).filter(BackupModel.site_id == id).count()
+    db.add(site)
+    db.commit()
+    return {"success": True, "message": "Backup deleted"}
+
+
+@router.get("/{id}/backups/{backup_id}/download")
+def download_site_backup(
+    *,
+    db: Session = Depends(deps.get_db),
+    id: int,
+    backup_id: int,
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    site = db.query(SiteModel).filter(SiteModel.id == id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+
+    from backend.models.backup import Backup as BackupModel
+    from fastapi.responses import FileResponse
+    backup = db.query(BackupModel).filter(BackupModel.id == backup_id, BackupModel.site_id == id).first()
+    if not backup:
+        raise HTTPException(status_code=404, detail="Backup not found")
+    if not os.path.exists(backup.file_path):
+        raise HTTPException(status_code=404, detail="Backup file not found on disk")
+
+    return FileResponse(backup.file_path, filename=backup.name, media_type="application/zip")
 
 
 # Shared Database Endpoints
