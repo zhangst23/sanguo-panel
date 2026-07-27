@@ -54,6 +54,9 @@ pnpm-debug.log*
 *.temp
 .tmp/
 .temp/
+backend/phpmyadmin/tmp/
+backend/phpmyadmin/sessions/
+backend/phpmyadmin/*.log
 
 # Backup files (keep the directory but not the files)
 /backup/*.zip

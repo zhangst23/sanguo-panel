@@ -51,7 +51,7 @@
           <!-- 数据库列表 -->
           <a-col :span="24">
             <a-card title="WordPress 站点数据库列表">
-              <a-table :data="dbList" :loading="loading" :pagination="false">
+              <a-table :data="dbList" :loading="loading" :pagination="dbPagination" @page-change="handleDbPageChange" @page-size-change="handleDbPageSizeChange">
                 <template #columns>
                   <a-table-column title="站点域名" data-index="domain" />
                   <a-table-column title="数据库名" data-index="db_name" />
@@ -159,6 +159,23 @@ const slowQueries = ref([])
 const slowQueryEnabled = ref(true)
 const adminCreds = ref({ db_name: '', db_user: '', db_password: '' })
 const showAdminPass = ref(false)
+
+const dbPagination = reactive({
+  current: 1,
+  pageSize: 10,
+  pageSizeOptions: [10, 100, 500],
+  showTotal: (total) => `共 ${total} 数据库`,
+  showPageSize: true,
+})
+
+const handleDbPageChange = (page) => {
+  dbPagination.current = page
+}
+
+const handleDbPageSizeChange = (size) => {
+  dbPagination.pageSize = size
+  dbPagination.current = 1
+}
 
 const fetchAdminCreds = async () => {
   try {
