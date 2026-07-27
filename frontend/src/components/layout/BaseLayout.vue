@@ -56,7 +56,7 @@
           </a-menu-item>
           <a-menu-item key="Security">
             <template #icon><icon-safe /></template>
-            安全中心
+            安全防御
           </a-menu-item>
           <a-menu-item key="Backup">
             <template #icon><icon-cloud-download /></template>
