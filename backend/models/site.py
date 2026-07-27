@@ -5,6 +5,7 @@ from datetime import datetime
 from backend.models.base import Base
 
 class StatusEnum(str, enum.Enum):
+    creating = "creating"
     active = "active"
     suspended = "suspended"
     deleted = "deleted"

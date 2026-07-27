@@ -235,9 +235,11 @@ def create_ols_vhost(domain: str, root_path: str, php_version: str = None) -> di
 
     # 2) listener map (inside the Panel80 block)
     map_line = f"    map                      {domain} {domain}\n"
-    if map_line.strip() not in conf:
-        pat = re.compile(r"(listener " + re.escape(_PANEL_LISTENER) + r"\{.*?\n)\}", re.DOTALL)
-        m = pat.search(conf)
+    # Extract Panel80 block to check within it only (avoid false match with Panel443)
+    pat_p80 = re.compile(r"(listener " + re.escape(_PANEL_LISTENER) + r"\{.*?\n)\}", re.DOTALL)
+    m = pat_p80.search(conf)
+    panel80_block = m.group(0) if m else ""
+    if map_line.strip() not in panel80_block:
         if m:
             # insert just before the listener's closing brace
             conf = conf[: m.end() - 1] + map_line + conf[m.end() - 1 :]

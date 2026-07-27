@@ -63,6 +63,23 @@ def install_wordpress_task(site_id: int):
         if not os.path.exists(site.root_path):
             os.makedirs(site.root_path, exist_ok=True)
 
+        # Step 1: Download WordPress core files FIRST (before OLS vhost to avoid 404 window)
+        site.notes = "step1: WordPress 文件下载中..."
+        db.add(site)
+        db.commit()
+
+        try:
+            cmd = [php_path, wp_cli_path, "core", "download", f"--path={site.root_path}", "--locale=zh_CN", "--allow-root", "--force"]
+            subprocess.run(cmd, check=True, capture_output=True)
+            chown_site_root(site.root_path)
+        except subprocess.CalledProcessError as e:
+            err_msg = e.stderr.decode(errors='ignore') if e.stderr else str(e)
+            site.notes = f"failed: WordPress 文件下载失败 - {err_msg}"
+            db.add(site)
+            db.commit()
+            db.close()
+            return
+
         # 1.5 Resolve requested PHP version against installed lsphp builds
         installed = {v["version"] for v in get_installed_php_versions()}
         if site.php_version not in installed:
@@ -72,7 +89,14 @@ def install_wordpress_task(site_id: int):
         else:
             php_note = f"PHP {site.php_version}"
 
-        # 1.6 Register OpenLiteSpeed virtual host (LSAPI, per-vhost PHP version)
+        # 1.6 Register domain on SSL listener for HTTPS (cloudflare/letsencrypt)
+        # Must be before create_ols_vhost so both Panel80 & Panel443 changes are picked up by the single restart
+        try:
+            _register_ssl_listener(site.domain)
+        except Exception:
+            pass
+
+        # 1.7 Register OpenLiteSpeed virtual host (LSAPI, per-vhost PHP version) + restart OLS
         ols_res = create_ols_vhost(site.domain, site.root_path, site.php_version)
         if ols_res.get("success") and ols_res.get("php_used"):
             site.php_version = ols_res["php_used"]
@@ -82,26 +106,11 @@ def install_wordpress_task(site_id: int):
             else f"⚠️ OLS 虚拟主机创建失败: {ols_res.get('msg')}"
         )
 
-        # 1.7 Register domain on SSL listener for HTTPS (cloudflare/letsencrypt)
-        try:
-            _register_ssl_listener(site.domain)
-        except Exception:
-            pass
-
         db.add(site)
         db.commit()
 
-        # Step 1: Download Core
-        site.notes = f"step1: WordPress 文件下载中...\n{ols_note}"
-        db.add(site)
-        db.commit()
-
+        # Step 2: Database Creation
         try:
-            # Download Core
-            cmd = [php_path, wp_cli_path, "core", "download", f"--path={site.root_path}", "--locale=zh_CN", "--allow-root", "--force"]
-            subprocess.run(cmd, check=True, capture_output=True)
-
-            # 2. Database Creation
             db_name = None
             db_user = None
             db_pass = None
@@ -215,6 +224,7 @@ def install_wordpress_task(site_id: int):
                 chown_site_root(site.root_path)
                 site.notes = f"completed: 文件已安装(数据库配置需手动)\n{ols_note}"
 
+            site.status = "active"
             db.add(site)
             db.commit()
 
@@ -326,7 +336,7 @@ def create_site(
         "root_path": root_path,
         "shared_db_id": shared_db_id,
         "table_prefix": table_prefix,
-        "status": "active",
+        "status": "creating",
         "notes": "pending: 准备安装中..."
     })
 
@@ -870,13 +880,19 @@ def _register_ssl_listener(domain: str):
     with open(OLS_CONF, "r") as f:
         conf = f.read()
     map_line = f"    map                      {domain} {domain}"
-    if map_line not in conf:
-        idx = conf.find("listener Panel443{")
-        if idx != -1:
-            end = conf.find("}", idx)
-            conf = conf[:end] + map_line + "\n" + conf[end:]
-            with open(OLS_CONF, "w") as f:
-                f.write(conf)
+    # Only check inside the Panel443 block, not the whole config (Panel80 has same lines)
+    idx = conf.find("listener Panel443{")
+    if idx == -1:
+        return
+    end = conf.find("}", idx)
+    if end == -1:
+        return
+    block = conf[idx:end]
+    if map_line in block:
+        return
+    conf = conf[:end] + map_line + "\n" + conf[end:]
+    with open(OLS_CONF, "w") as f:
+        f.write(conf)
 
 
 def _update_ols_domain(old_domain: str, new_domain: str, new_root_path: str):
@@ -1052,8 +1068,8 @@ def migrate_site(
         php_version=req.php_version,
         shared_db_id=default_db.id,
         table_prefix=f"wp_mig_",
-        status="active",
-        notes="pending: 迁移中...",
+            status="creating",
+            notes="pending: 迁移中...",
     )
     db.add(site)
     db.commit()
@@ -1143,8 +1159,10 @@ def _migrate_task(site_id: int, req: MigrateRequest):
                 with open(config_path, "w") as f:
                     f.write(cfg)
             site.notes = "completed: 站点迁移完成 (SSH)"
+            site.status = "active"
         else:
             site.notes = "completed: 站点目录已创建，请手动导入文件与数据库"
+            site.status = "active"
         db.add(site)
         db.commit()
         create_ols_vhost(site.domain, site.root_path, site.php_version)
@@ -1194,7 +1212,7 @@ def batch_create_sites(
             php_version=item.php_version,
             shared_db_id=default_db.id,
             table_prefix=f"wp_tmp_",
-            status="active",
+            status="creating",
             notes="pending: 准备安装中...",
         )
         db.add(site)

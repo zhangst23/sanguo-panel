@@ -89,7 +89,7 @@
 
           <a-table-column title="状态" :width="100" >
             <template #cell="{ record }">
-              <a-badge :status="record.status === 'active' ? 'success' : 'danger'" :text="record.status === 'active' ? '运行中' : '已停止'" />
+              <a-badge :status="getStatusBadge(record.status)" :text="getStatusText(record.status)" />
             </template>
           </a-table-column>
           <a-table-column title="速度（PC/移动）" :width="100">
@@ -659,6 +659,18 @@ const getScoreColor = (score) => {
   if (score >= 90) return '#00b42a'
   if (score >= 60) return '#ff7d00'
   return '#f53f3f'
+}
+
+const getStatusBadge = (status) => {
+  if (status === 'active') return 'success'
+  if (status === 'creating') return 'processing'
+  return 'danger'
+}
+
+const getStatusText = (status) => {
+  if (status === 'active') return '运行中'
+  if (status === 'creating') return '创建中'
+  return '已停止'
 }
 
 const formatDate = (dateStr) => {
