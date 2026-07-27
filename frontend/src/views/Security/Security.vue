@@ -774,7 +774,7 @@ const handleStartFail2ban = async () => {
 const handleInstallFail2ban = async () => {
   installing.value = true
   try {
-    const res = await request.post('/security/fail2ban/install')
+    const res = await request.post('/security/fail2ban/install', {}, { timeout: 600000 })
     if (res.active) {
       Message.success('Fail2ban 安装并启动成功')
     } else {
