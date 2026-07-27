@@ -92,7 +92,12 @@
               <a-badge :status="getStatusBadge(record.status)" :text="getStatusText(record.status)" />
             </template>
           </a-table-column>
-          <a-table-column title="速度（PC/移动）" :width="100">
+          <a-table-column :width="100">
+            <template #title>
+              <a-tooltip content="PC / 移动端速度评分">
+                <span style="cursor: help; border-bottom: 1px dashed var(--color-text-3)">速度</span>
+              </a-tooltip>
+            </template>
             <template #cell="{ record }">
               <a-space :size="6">
                 <a-progress
@@ -135,12 +140,12 @@
               <a-tag v-else color="gray">未配置</a-tag>
             </template>
           </a-table-column>
-          <a-table-column title="WordPress版本" :width="90" >
+          <a-table-column title="WP版本" :width="90" >
             <template #cell="{ record }">
               <a-tag color="arcoblue">{{ record.wp_version || '未安装' }}</a-tag>
             </template>
           </a-table-column>
-          <a-table-column title="创建时间" :width="150">
+          <a-table-column title="创建时间" :width="130">
             <template #cell="{ record }">
               {{ formatDate(record.created_at) }}
             </template>
