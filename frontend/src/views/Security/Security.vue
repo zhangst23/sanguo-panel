@@ -229,22 +229,22 @@
               >
                 <template #columns>
                   <a-table-column title="IP 地址" data-index="ip" :width="140" />
-                  <a-table-column title="等级">
+                  <a-table-column title="等级" :width="100" >
                     <template #cell="{ record }">
                       <a-tag :color="levelMap[record.level] ? levelMap[record.level].color : 'gray'">
                         {{ levelMap[record.level] ? levelMap[record.level].text : record.level }}
                       </a-tag>
                     </template>
                   </a-table-column>
-                  <a-table-column title="原因" data-index="reason" />
-                  <a-table-column title="来源">
+                  <a-table-column title="原因" data-index="reason"  :width="170" />
+                  <a-table-column title="来源" :width="80" >
                     <template #cell="{ record }">
                       <a-tag :color="sourceMap[record.source] ? sourceMap[record.source].color : 'gray'">
                         {{ sourceMap[record.source] ? sourceMap[record.source].text : record.source }}
                       </a-tag>
                     </template>
                   </a-table-column>
-                  <a-table-column title="访问路径">
+                  <a-table-column title="访问路径" :width="240" >
                     <template #cell="{ record }">
                       <span v-if="!(record.paths && record.paths.length)">-</span>
                       <span v-else>
@@ -252,10 +252,10 @@
                       </span>
                     </template>
                   </a-table-column>
-                  <a-table-column title="封禁时间" data-index="banned_at" :width="150" />
-                  <a-table-column title="过期时间" data-index="expire_at" :width="150" />
-                  <a-table-column title="累计次数" data-index="count" :width="90" />
-                  <a-table-column title="操作" :width="130" fixed="right">
+                  <a-table-column title="封禁时间" data-index="banned_at" :width="110" />
+                  <a-table-column title="过期时间" data-index="expire_at" :width="110" />
+                  <a-table-column title="累计次数" data-index="count" :width="70" />
+                  <a-table-column title="操作" fixed="right" :width="140" >
                     <template #cell="{ record }">
                       <a-space>
                         <a-button type="text" size="small" @click="handleUnbanIp(record.ip)">解封</a-button>
