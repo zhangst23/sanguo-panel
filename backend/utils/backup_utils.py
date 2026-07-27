@@ -98,6 +98,7 @@ def create_site_backup(
             include_files=include_files
         )
         db.add(new_backup)
+        db.flush()
 
         site.backup_count = db.query(Backup).filter(Backup.site_id == site_id).count()
         db.add(site)

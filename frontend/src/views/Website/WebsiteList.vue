@@ -437,7 +437,11 @@
         </div>
         <a-table :data="backupList" :loading="backupListLoading" style="margin-top: 16px">
           <template #columns>
-            <a-table-column title="备份时间" data-index="created_at" />
+            <a-table-column title="备份时间" :width="180">
+              <template #cell="{ record }">
+                {{ formatBackupDate(record.created_at) }}
+              </template>
+            </a-table-column>
             <a-table-column title="文件大小" data-index="size" />
             <a-table-column title="操作">
               <template #cell="{ record }">
@@ -1181,6 +1185,11 @@ const formatFileSize = (bytes) => {
   const sizes = ['B', 'KB', 'MB', 'GB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
+}
+
+const formatBackupDate = (dateStr) => {
+  if (!dateStr) return '-'
+  return dateStr.replace('T', ' ').split('.')[0]
 }
 
 const handleDelete = async (id) => {
