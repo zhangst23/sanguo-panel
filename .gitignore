@@ -63,4 +63,5 @@ backend/phpmyadmin/*.log
 /backup/*.tar.gz
 /backup/*.sql
 
-
+# wordpress
+wordpress/
