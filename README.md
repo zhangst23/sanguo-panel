@@ -6,11 +6,12 @@ Sanguo Panel 是一款专为 WordPress 优化设计的轻量级托管面板，�
 ```
 sanguo-panel/
 ├── venv/                  # 虚拟环境（项目根目录）
-├── backend/               # FastAPI 后端
+├── backend/               # FastAPI 后端（同时托管构建后的前端）
 ├── frontend/              # Vue 前端
+├── deploy/                # 系统服务安装 / 卸载脚本（systemd）
 ├── requirements.txt       # Python 依赖（已包含 requests）
-├── start-all.py          # 一键启动脚本（跨平台）
-├── .gitignore            # 忽略 venv/ 等
+├── start.sh               # 服务启停 / 状态脚本
+├── .gitignore             # 忽略 venv/、运行时数据等
 ├── README.md
 └── AGENTS.md
 ```
@@ -33,31 +34,41 @@ sanguo-panel/
 
 ## 快速启动
 
-> `install.sh` 已经把依赖装好，并用 systemd 守护进程把服务跑起来了（断开 SSH 也不会停）。
-> 重新进入项目后，**只需下面这一条命令**即可确认状态或补启动，脚本**不会重新安装依赖**。
+> 面板以**单个系统级服务**运行（类似宝塔面板）：前端构建后由后端在同一端口提供，
+> 由 systemd 守护、开机自启，断开 SSH 也不会停。
 
-在项目根目录执行：
+首次安装 / 升级（安装依赖、构建前端、注册并启动服务）：
+
+```bash
+sudo ./deploy/install-service.sh              # 默认端口 8000
+sudo PANEL_PORT=8888 ./deploy/install-service.sh   # 自定义端口
+```
+
+日常管理：
 
 ```bash
 ./start.sh            # 启动全部服务（已运行的自动跳过）
 ./start.sh status     # 仅查看各服务状态与访问地址
-./start.sh stop       # 停止全部服务
-./start.sh restart    # 重启全部服务
+./start.sh stop       # 停止面板服务
+./start.sh restart    # 重启面板服务
+
+systemctl status sanguo-panel    # 或直接使用 systemctl
+journalctl -u sanguo-panel -f    # 查看实时日志
 ```
 
 脚本逻辑：
-- ✅ 优先复用 `install.sh` 创建的 systemd 服务（`sanguo-backend` / `sanguo-frontend` / `openlitespeed` / `mariadb` / `redis-server`），已运行的自动跳过
-- ✅ 没有 systemd 的环境（如容器）自动回退为后台进程方式启动，日志写入 `logs/`
+- ✅ 已安装 `sanguo-panel` 系统服务时，通过 systemd 管理（面板 + `openlitespeed` / `mariadb` / `redis-server`）
+- ✅ 未安装系统服务时，自动回退为 `venv + vite` 开发模式（前端 :5173，后端 :8000）
 - ✅ 自动等待服务就绪，并列出本机 / 外网访问地址
-- ❌ 不安装任何依赖、不初始化数据库，纯启动 / 检查
+- ❌ `start.sh` 不安装依赖、不构建前端；需要时请运行 `deploy/install-service.sh`
 
 启动成功后访问：
-- **前端界面（外网）**: http://217.69.2.217:5173
-- **前端界面（本机开发）**: http://localhost:5173
-- **后端 API**: http://localhost:8000
-- **API 文档**: http://217.69.2.217:8000/api-docs
+- **面板入口**: http://169.58.52.214:8000
+- **本机访问**: http://localhost:8000
+- **API 文档**: http://localhost:8000/api-docs
 
-> 若需重新安装依赖、初始化数据库或配置 OpenLiteSpeed / MariaDB，请重新运行 `install.sh`。
+> `169.58.52.214` 为本机公网 IP，其他服务器请替换为自己的公网 IP 或域名。
+> 若需卸载系统服务（保留数据）：`sudo ./deploy/uninstall-service.sh`。
 
 ### 前端界面默认账户
 
@@ -66,7 +77,7 @@ sanguo-panel/
 
 ## 技术栈
 
-- **Web 服务器**: OpenLiteSpeed (端口 80/443) — 服务前端静态文件、反代 API 到后端
+- **Web 服务器**: OpenLiteSpeed (端口 80/443) — 托管 WordPress 站点；面板前端由 FastAPI 在 8000 端口同源提供
 - **后端**: FastAPI, SQLAlchemy (SQLite), Pydantic, JWT, Psutil
 - **前端**: Vue 3, Vite, Arco Design, Pinia, Axios, ECharts
 - **数据库**: MariaDB (WordPress 站点), SQLite (面板配置)
@@ -84,15 +95,17 @@ sanguo-panel/
 
 ## 前端构建部署
 
-修改前端代码后需构建静态资源并重启 OpenLiteSpeed 生效：
+面板前端由后端在 8000 端口直接托管（`frontend/dist/`）。修改前端代码后重新构建并重启服务：
 
 ```bash
-cd /sanguo-panel/frontend
+cd frontend
+pnpm install     # 首次或依赖变更时
 pnpm build
-/usr/local/lsws/bin/lswsctrl restart
+sudo systemctl restart sanguo-panel
 ```
 
-构建产物输出到 `frontend/dist/`，由 OLS `sanguo-panel` 虚拟主机直接服务。
+或直接重新运行 `sudo ./deploy/install-service.sh`，脚本会自动完成依赖安装、构建与服务重启。
+构建产物输出到 `frontend/dist/`，不存在时后端仅提供 API（开发模式请用 Vite）。
 
 ## 文档参考
 
