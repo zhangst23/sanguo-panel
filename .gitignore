@@ -1,6 +1,6 @@
 # Root directory
 /venv/
-.env
+.env*
 
 
 # Python cache
