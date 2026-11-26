@@ -83,26 +83,26 @@
             </a-space>
           </a-card>
 
-          <a-card title="OLS 管理后台">
+          <a-card title="OLS 管理后台" v-if="!isOlsMissing">
             <template #extra>
-              <a-link href="http://217.69.2.217:7080" target="_blank" :hoverable="false">
+              <a-link :href="olsAdminUrl" target="_blank" :hoverable="false">
                 <icon-export /> 打开管理后台
               </a-link>
             </template>
             <a-space direction="vertical" size="medium">
               <div class="status-item">
                 <span>管理员地址:</span>
-                <a-link href="http://217.69.2.217:7080" target="_blank">
-                  http://217.69.2.217:7080 <icon-export />
+                <a-link :href="olsAdminUrl" target="_blank">
+                  {{ olsAdminUrl }} <icon-export />
                 </a-link>
               </div>
               <div class="status-item">
                 <span>用户名:</span>
-                <a-tag color="arcoblue">admin</a-tag>
+                <a-tag color="arcoblue">{{ olsAdmin.user }}</a-tag>
               </div>
               <div class="status-item">
                 <span>密&emsp;&emsp;码:</span>
-                <a-tag>yLQD50HwqCq4daR</a-tag>
+                <a-tag>{{ olsAdmin.password || '未设置' }}</a-tag>
               </div>
             </a-space>
           </a-card>
@@ -135,7 +135,8 @@ const olsStatus = ref({
   status: 'unknown',
   version: '',
   pid: '',
-  uptime: ''
+  uptime: '',
+  admin: { user: 'admin', password: '', port: 7080 }
 })
 const loading = ref(false)
 const isOlsMissing = computed(() => olsStatus.value.status === 'not_installed')
@@ -145,6 +146,8 @@ const olsTag = computed(() => {
   if (s === 'not_installed') return { color: 'gray', text: '未安装' }
   return { color: 'red', text: (s || 'unknown').toUpperCase() }
 })
+const olsAdmin = computed(() => olsStatus.value.admin || { user: 'admin', password: '', port: 7080 })
+const olsAdminUrl = computed(() => `http://${window.location.hostname}:${olsAdmin.value.port}`)
 const features = reactive({
   http2: true,
   http3: true,

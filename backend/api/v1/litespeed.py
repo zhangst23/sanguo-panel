@@ -19,6 +19,28 @@ class RewriteRules(BaseModel):
 # OLS Paths
 LSWS_HOME = "/usr/local/lsws"
 CONF_FILE = os.path.join(LSWS_HOME, "conf", "httpd_config.conf")
+ADMIN_PASSWD_FILE = "/usr/local/lsws/adminpasswd"
+ADMIN_CONF_FILE = os.path.join(LSWS_HOME, "admin", "conf", "admin_config.conf")
+
+
+def _get_admin_info():
+    """读取 OLS WebAdmin 的端口与账号（由安装脚本写入 adminpasswd）。"""
+    info = {"user": "admin", "password": "", "port": 7080}
+    try:
+        with open(ADMIN_PASSWD_FILE, "r") as f:
+            m = re.search(r"is\s+([^/\s]+)/(\S+)", f.read())
+            if m:
+                info["user"], info["password"] = m.group(1), m.group(2)
+    except OSError:
+        pass
+    try:
+        with open(ADMIN_CONF_FILE, "r") as f:
+            m = re.search(r"address\s+\*:(\d+)", f.read())
+            if m:
+                info["port"] = int(m.group(1))
+    except OSError:
+        pass
+    return info
 
 def run_shell(command: str):
     try:
@@ -60,6 +82,7 @@ def get_ols_status(
             "version": "未安装",
             "pid": "N/A",
             "uptime": "N/A",
+            "admin": _get_admin_info(),
             "raw": f"{ctrl} not found",
         }
 
@@ -77,6 +100,7 @@ def get_ols_status(
         "installed": True,
         "version": version,
         "pid": "N/A", # Can be parsed from pid file if needed
+        "admin": _get_admin_info(),
         "raw": res["stdout"].strip()
     }
 

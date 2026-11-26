@@ -115,9 +115,12 @@ npm run dev
 - OLS virtual host `vhRoot` points here
 
 ### OpenLiteSpeed Configuration
+- Installer: `install.sh` installs OLS from the official LiteSpeed repo and enables `lshttpd.service` (aliases: `openlitespeed`, `lsws`)
 - Main config: `/usr/local/lsws/conf/httpd_config.conf`
 - Virtual hosts: `/usr/local/lsws/conf/vhosts/{domain}/vhconf.conf`
 - Panel listener: `Panel80` on `*:80` (maps all panel domains)
+- Default ports: HTTP `8088`, WebAdmin `7080` (HTTPS)
+- WebAdmin credentials: written to `/usr/local/lsws/adminpasswd`, panel reads and displays them
 - PHP: Per-vhost LSAPI handler (`lsphp83`, `lsphp82`, `lsphp81`, `lsphp74`)
 - LSCache: Enabled via rewrite rules + WP plugin
 - SSL: Let's Encrypt via `acme.sh`, deployed to OLS 443 SNI
