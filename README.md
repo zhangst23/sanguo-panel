@@ -88,7 +88,7 @@ sanguo-panel/
 
 ```bash
 cd /sanguo-panel/frontend
-npm run build
+pnpm build
 /usr/local/lsws/bin/lswsctrl restart
 ```
 
