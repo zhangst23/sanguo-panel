@@ -30,6 +30,69 @@ OLS_GROUP = "nogroup"
 _VHOST_INSERT_MARKER = "listener Default{"
 _PANEL_LISTENER = "Panel80"
 
+# 部分安装环境只生成了 Example 默认监听器，缺少 Panel80，导致建站时
+# "未在 OLS 配置中找到 Panel80 监听器" 而无法映射域名（站点 521）。
+_PANEL80_LISTENER_BLOCK = (
+    "listener Panel80{\n"
+    "    address                  *:80\n"
+    "    secure                   0\n"
+    "}\n"
+)
+
+
+def _ensure_panel80_listener(conf: str) -> str:
+    """Ensure a ``Panel80`` (*:80) listener exists, creating it if missing."""
+    if re.search(r"listener\s+" + re.escape(_PANEL_LISTENER) + r"\s*\{", conf):
+        return conf
+    if _VHOST_INSERT_MARKER in conf:
+        return conf.replace(
+            _VHOST_INSERT_MARKER, _PANEL80_LISTENER_BLOCK + "\n" + _VHOST_INSERT_MARKER, 1
+        )
+    return conf + "\n" + _PANEL80_LISTENER_BLOCK
+
+
+# Cloudflare 以 Full/Strict 模式回源时访问的是 443 端口。若没有安全监听器，
+# 域名会报 521。为所有站点准备一个共享自签证书，Cloudflare 在前代管对外证书。
+_ORIGIN_CERT_DIR = os.path.join(LSWS_HOME, "conf", "certs")
+_ORIGIN_KEY = os.path.join(_ORIGIN_CERT_DIR, "origin.key")
+_ORIGIN_CERT = os.path.join(_ORIGIN_CERT_DIR, "origin.crt")
+
+
+def _ensure_panel443_listener(conf: str) -> str:
+    """Ensure a ``Panel443`` (*:443) secure listener with an origin cert."""
+    if re.search(r"listener\s+Panel443\s*\{", conf):
+        return conf
+    os.makedirs(_ORIGIN_CERT_DIR, exist_ok=True)
+    if not (os.path.exists(_ORIGIN_KEY) and os.path.exists(_ORIGIN_CERT)):
+        run_ols_shell(
+            "openssl req -x509 -nodes -newkey rsa:2048 -days 3650 "
+            f"-keyout {_ORIGIN_KEY} -out {_ORIGIN_CERT} "
+            "-subj '/CN=localhost' -addext 'subjectAltName=DNS:localhost' >/dev/null 2>&1"
+        )
+    block = (
+        "listener Panel443{\n"
+        "    address                  *:443\n"
+        "    secure                   1\n"
+        f"    keyFile                  {_ORIGIN_KEY}\n"
+        f"    certFile                 {_ORIGIN_CERT}\n"
+        "}\n"
+    )
+    if _VHOST_INSERT_MARKER in conf:
+        return conf.replace(_VHOST_INSERT_MARKER, block + "\n" + _VHOST_INSERT_MARKER, 1)
+    return conf + "\n" + block
+
+
+def _add_listener_map(conf: str, listener: str, domain: str) -> str:
+    """Add ``map <domain> <domain>`` inside the named listener block."""
+    pat = re.compile(r"(listener\s+" + re.escape(listener) + r"\s*\{.*?\n)\}", re.DOTALL)
+    m = pat.search(conf)
+    if not m:
+        return conf
+    line = f"    map                      {domain} {domain}\n"
+    if line.strip() in m.group(0):
+        return conf
+    return conf[: m.end() - 1] + line + conf[m.end() - 1 :]
+
 
 def run_ols_shell(command: str, timeout: int = 30) -> dict:
     try:
@@ -233,21 +296,13 @@ def create_ols_vhost(domain: str, root_path: str, php_version: str = None) -> di
             count=1,
         )
 
-    # 2) listener map (inside the Panel80 block)
-    map_line = f"    map                      {domain} {domain}\n"
-    # Extract Panel80 block to check within it only (avoid false match with Panel443)
-    pat_p80 = re.compile(r"(listener " + re.escape(_PANEL_LISTENER) + r"\{.*?\n)\}", re.DOTALL)
-    m = pat_p80.search(conf)
-    panel80_block = m.group(0) if m else ""
-    if map_line.strip() not in panel80_block:
-        if m:
-            # insert just before the listener's closing brace
-            conf = conf[: m.end() - 1] + map_line + conf[m.end() - 1 :]
-        else:
-            return {
-                "success": False,
-                "msg": f"未在 OLS 配置中找到 {_PANEL_LISTENER} 监听器，无法映射域名",
-            }
+    # 2) listener maps (auto-create listeners when missing)
+    #    Panel80  -> Cloudflare Flexible / 直接 HTTP 回源
+    #    Panel443 -> Cloudflare Full / Full(Strict) 回源，避免 521
+    conf = _ensure_panel80_listener(conf)
+    conf = _ensure_panel443_listener(conf)
+    conf = _add_listener_map(conf, _PANEL_LISTENER, domain)
+    conf = _add_listener_map(conf, "Panel443", domain)
 
     try:
         with open(OLS_CONF, "w") as f:

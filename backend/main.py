@@ -16,7 +16,40 @@ from pathlib import Path
 async def lifespan(app: FastAPI):
     # Startup logic
     print(f"--- {settings.PROJECT_NAME} is starting up ---")
-    
+
+    # Self-heal the panel database. If panel.db was removed or left empty
+    # (e.g. after a manual reset or a code pull), every API endpoint would fail
+    # with "no such table: users" and all pages would render without data.
+    # Recreate the schema + default admin account in that case.
+    try:
+        from sqlalchemy import inspect
+        from backend.core.database import engine
+        if 'users' not in inspect(engine).get_table_names():
+            from backend.init_db import init_db
+            init_db()
+            print("--- Database was empty: initialized schema and admin account ---")
+    except Exception as e:
+        print(f"--- Database auto-init failed: {e} ---")
+
+    # Ensure a dedicated MariaDB admin account exists (never use root for sites)
+    try:
+        from backend.core.database import SessionLocal
+        from backend.models.site import SharedDatabase
+        from backend.utils.db_admin import ensure_admin_account
+        session = SessionLocal()
+        shared_db = session.query(SharedDatabase).filter(
+            SharedDatabase.status == "active"
+        ).first()
+        if shared_db:
+            user, _password = ensure_admin_account(shared_db)
+            if user:
+                session.add(shared_db)
+                session.commit()
+                print(f"--- MariaDB admin account ready: {user} ---")
+        session.close()
+    except Exception as e:
+        print(f"--- MariaDB admin account setup failed: {e} ---")
+
     # Start PMA PHP Server in a separate thread to avoid blocking lifespan
     import threading
     pma = get_pma_manager()

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Dict, Any
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -61,21 +61,21 @@ async def get_redis_stats(current_user: User = Depends(deps.get_current_active_u
 
 @router.get("/traffic")
 async def get_traffic_stats(
-    range: str = "day",
+    range_: str = Query("day", alias="range"),
     site_id: int = None,
     current_user: User = Depends(deps.get_current_active_user)
 ):
     """获取站点流量统计（基于访问日志，当日访客写入 SQLite）。"""
     if not site_id:
-        return _mock_traffic(range)
+        return _mock_traffic(range_)
     log, _site = traffic_service.get_site_log(site_id)
     if not log:
-        data = _mock_traffic(range)
+        data = _mock_traffic(range_)
         data["source"] = "mock"
         data["has_data"] = False
         return data
     today = datetime.now().date()
-    if range == "month":
+    if range_ == "month":
         rows = traffic_service.get_daily_range(site_id, 30)
         if not rows:
             rows = traffic_service.analyze_all_days(log, site_id, 30)
@@ -94,7 +94,7 @@ async def get_traffic_stats(
         day["visitors"], day["requests"], day["bandwidth"],
     )
     return {
-        "range": "day",
+        "range": range_,
         "categories": [f"{h:02d}:00" for h in range(24)],
         "requests": day["hourly_requests"],
         "visitors": day["hourly_visitors"],
@@ -124,10 +124,10 @@ async def get_traffic_top_pages(
     }
 
 
-def _mock_traffic(range):
+def _mock_traffic(range_):
     import random
     now = datetime.now()
-    if range == "month":
+    if range_ == "month":
         points = 30
         categories, requests, visitors, bandwidth = [], [], [], []
         for i in range(points):
@@ -146,7 +146,7 @@ def _mock_traffic(range):
             visitors.append(random.randint(20, 400))
             bandwidth.append(round(random.uniform(2, 40), 1))
     return {
-        "range": range,
+        "range": range_,
         "categories": categories,
         "requests": requests,
         "visitors": visitors,

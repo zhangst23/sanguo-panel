@@ -86,7 +86,7 @@ const routes = [
         path: 'system/settings',
         name: 'SystemSettings',
         component: () => import('@/views/System/Settings.vue'),
-        meta: { requiresAuth: true, title: '系统设置' },
+        meta: { requiresAuth: true, title: '面板设置' },
       },
       {
         path: 'mariadb',

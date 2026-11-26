@@ -58,11 +58,8 @@ backend/phpmyadmin/tmp/
 backend/phpmyadmin/sessions/
 backend/phpmyadmin/*.log
 
-# Backup files (keep the directory but not the files)
-/backup/*.zip
-/backup/*.tar.gz
-/backup/*.sql
-/backup/*.json
+# Backup files (runtime data, never commit)
+/backup/
 
 # Runtime state (generated at runtime, never commit)
 /backend/panel.db

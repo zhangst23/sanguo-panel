@@ -31,7 +31,10 @@ service.interceptors.response.use(
       localStorage.removeItem('token')
       window.location.href = '/login'
     }
-    Message.error(response?.data?.detail || 'Request Error')
+    // 允许调用方静默处理错误（例如带本地缓存的状态检测请求）
+    if (!error.config?.silent) {
+      Message.error(response?.data?.detail || 'Request Error')
+    }
     return Promise.reject(error)
   }
 )

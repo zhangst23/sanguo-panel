@@ -2,7 +2,7 @@
   <div class="system-manage-container">
     <a-typography-title :heading="2">系统管理</a-typography-title>
 
-    <a-tabs v-model:active-key="activeTab" @change="onTabChange">
+    <a-tabs v-model:active-key="activeTab" lazy-load @change="onTabChange">
       <a-tab-pane key="status" title="系统状态">
         <SystemStatus />
       </a-tab-pane>    

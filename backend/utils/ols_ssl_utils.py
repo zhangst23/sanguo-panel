@@ -89,12 +89,17 @@ def _ensure_panel443_ssl(conf: str, domain: str) -> str:
     """Ensure a Panel443 secure listener exists with the domain's cert + map."""
     _, key, cert = _cert_paths(domain)
     if "listener Panel443{" in conf:
-        line = f"    map                      {domain} {domain}\n"
-        if line.strip() not in conf:
-            pat = re.compile(r"(listener " + re.escape(PANEL443) + r"\{.*?\n)\}", re.DOTALL)
-            m = pat.search(conf)
-            if m:
-                conf = conf[: m.end() - 1] + line + conf[m.end() - 1 :]
+        pat = re.compile(r"listener " + re.escape(PANEL443) + r"\{.*?\n\}", re.DOTALL)
+        m = pat.search(conf)
+        if m:
+            block = m.group(0)
+            # 若监听器当前使用自签证书，部署正式证书时替换路径
+            block = re.sub(r"(keyFile\s+)\S+", r"\g<1>" + key, block, count=1)
+            block = re.sub(r"(certFile\s+)\S+", r"\g<1>" + cert, block, count=1)
+            line = f"    map                      {domain} {domain}\n"
+            if line.strip() not in block:
+                block = block[:-1] + line + "}"
+            conf = conf[: m.start()] + block + conf[m.end() :]
         return conf
     block = (
         "\nlistener Panel443{\n"

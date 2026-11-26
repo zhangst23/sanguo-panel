@@ -1,10 +1,10 @@
 <template>
   <div class="system-settings-container">
-    <a-typography-title :heading="2">系统设置</a-typography-title>
+    <a-typography-title :heading="2">面板设置</a-typography-title>
 
     <a-tabs default-active-key="settings">
-      <!-- 系统设置 -->
-      <a-tab-pane key="settings" title="系统设置">
+      <!-- 面板设置 -->
+      <a-tab-pane key="settings" title="面板设置">
         <a-row :gutter="[20, 20]">
           <!-- 管理员密码修改 -->
           <a-col :span="8">

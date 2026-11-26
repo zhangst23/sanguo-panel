@@ -32,22 +32,22 @@ def init_db():
             db_host="localhost",
             db_port=3306,
             db_name="wp_db",
-            db_user="root",
+            # 面板不使用 root 建站；真实密码在启动时由 db_admin 自动生成并写入
+            db_user="sanguo_admin",
             db_password="",
             max_table_count=1000,
             status="active"
         )
         db.add(shared_db)
         db.commit()
-        print("Default shared database created.")
+        print("Default shared database created (admin account provisioned on startup).")
     else:
-        # Update existing default if it matches the old placeholder
-        if shared_db.db_user == "sanguo_user":
-            shared_db.db_user = "root"
-            shared_db.db_password = ""
+        # 升级旧数据：不再回退到 root / 空密码
+        if shared_db.db_user in ("sanguo_user", "root") and not shared_db.db_password:
+            shared_db.db_user = "sanguo_admin"
             db.add(shared_db)
             db.commit()
-            print("Default shared database updated to root (XAMPP default).")
+            print("Default shared database updated to dedicated admin account.")
         print("Default shared database already exists.")
     
     db.close()

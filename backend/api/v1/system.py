@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
 from datetime import datetime
 import threading
+import time
 import os
 import psutil
 import platform
 import socket
 import subprocess
+from concurrent.futures import ThreadPoolExecutor
 from sqlalchemy.orm import Session
 from backend.api import deps
 from backend.models.user import User
@@ -98,14 +100,39 @@ _PHP_FPM_UNITS = (
 )
 
 
+# systemctl list-unit-files 单次约 1.5s，并发调用会造成 D-Bus 争用，
+# 导致 /system/overview 耗时超过前端 10s 超时。缓存 10 秒即可。
+_unit_files_cache = {"at": 0.0, "names": set()}
+_unit_cache_lock = threading.Lock()
+
+
+def _unit_exists(unit: str) -> bool:
+    now = time.time()
+    if not _unit_files_cache["names"] or now - _unit_files_cache["at"] > 10:
+        with _unit_cache_lock:
+            if not _unit_files_cache["names"] or time.time() - _unit_files_cache["at"] > 10:
+                res = run_shell("systemctl list-unit-files --no-legend --no-pager 2>/dev/null")
+                names = set()
+                for line in res["stdout"].splitlines():
+                    parts = line.split()
+                    if parts:
+                        names.add(parts[0])
+                _unit_files_cache["names"] = names
+                _unit_files_cache["at"] = time.time()
+    return f"{unit}.service" in _unit_files_cache["names"]
+
+
 def _unit_state(unit: str):
     """返回 running / stopped / None(不存在)"""
     if run_shell(f"systemctl is-active --quiet {unit} 2>/dev/null")["success"]:
         return "running"
-    exists = run_shell(
-        f"systemctl list-unit-files 2>/dev/null | grep -q '^{unit}\\.service'"
-    )
-    return "stopped" if exists["success"] else None
+    return "stopped" if _unit_exists(unit) else None
+
+
+def _check_units_parallel(units):
+    """并行检查多个 systemd unit，避免逐个串行执行导致接口超时。"""
+    with ThreadPoolExecutor(max_workers=max(1, len(units))) as pool:
+        return list(pool.map(_unit_state, units))
 
 
 def _service_status(name: str) -> str:
@@ -118,7 +145,7 @@ def _service_status(name: str) -> str:
         # OpenLiteSpeed 使用 LSAPI（lsphp 进程），也兼容独立 php-fpm
         if run_shell("pgrep -x lsphp >/dev/null 2>&1")["success"]:
             return "running"
-        states = [_unit_state(u) for u in _PHP_FPM_UNITS]
+        states = _check_units_parallel(_PHP_FPM_UNITS)
         if "running" in states:
             return "running"
         if "stopped" in states:
@@ -126,7 +153,7 @@ def _service_status(name: str) -> str:
         return "not_installed"
 
     units = _SERVICE_UNITS.get(name, (name,))
-    states = [_unit_state(u) for u in units]
+    states = _check_units_parallel(units)
     if "running" in states:
         return "running"
     if "stopped" in states:
@@ -162,13 +189,13 @@ async def get_overview(current_user: User = Depends(deps.get_current_active_user
 
     boot_time = datetime.now().timestamp() - uptime_sec
 
-    services = []
-    for name, label in _SERVICE_DEFINITIONS:
-        services.append({
-            "name": name,
-            "label": label,
-            "status": _service_status(name),
-        })
+    # 各服务检测本身是独立的 shell 调用，并行执行以缩短响应时间
+    with ThreadPoolExecutor(max_workers=len(_SERVICE_DEFINITIONS)) as pool:
+        status_list = list(pool.map(lambda item: _service_status(item[0]), _SERVICE_DEFINITIONS))
+    services = [
+        {"name": name, "label": label, "status": status}
+        for (name, label), status in zip(_SERVICE_DEFINITIONS, status_list)
+    ]
 
     return {
         "system": {

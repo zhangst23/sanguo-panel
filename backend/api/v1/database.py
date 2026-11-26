@@ -42,9 +42,10 @@ def list_databases(db: Session = Depends(get_db), current_user=Depends(get_curre
         if shared_db:
             results.append({
                 "site_id": site.id, "domain": site.domain,
-                "db_name": site.db_name or shared_db.db_name,
-                "db_user": site.db_user or shared_db.db_user,
-                "db_password": site.db_password or shared_db.db_password,
+                # 站点未配置数据库时不能回退到管理员凭据（旧版本会显示 root/空密码）
+                "db_name": site.db_name or "未配置",
+                "db_user": site.db_user or "未配置",
+                "db_password": site.db_password or "",
                 "db_permission": site.db_permission or "site_only",
                 "created_at": site.created_at.strftime("%Y-%m-%d %H:%M:%S") if site.created_at else "N/A",
                 "table_prefix": site.table_prefix,

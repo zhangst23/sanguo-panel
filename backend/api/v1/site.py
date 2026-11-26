@@ -117,11 +117,19 @@ def install_wordpress_task(site_id: int):
 
             if shared_db:
                 try:
+                    # 使用专用管理员账号（不再使用 root），并持久化真实凭据
+                    from backend.utils.db_admin import ensure_admin_account
+                    admin_user, admin_pass = ensure_admin_account(shared_db)
+                    if not admin_user:
+                        raise RuntimeError("无法连接 MariaDB 或创建面板管理员账号")
+                    db.add(shared_db)
+                    db.commit()
+
                     conn = mysql.connector.connect(
                         host=shared_db.db_host,
                         port=shared_db.db_port,
-                        user=shared_db.db_user,
-                        password=shared_db.db_password,
+                        user=admin_user,
+                        password=admin_pass,
                         connect_timeout=5
                     )
                     cursor = conn.cursor()
@@ -252,7 +260,11 @@ def install_wordpress_task(site_id: int):
                 )
             else:
                 chown_site_root(site.root_path)
-                site.notes = f"completed: 文件已安装(数据库配置需手动)\n{ols_note}"
+                # 保留数据库失败的真实原因，避免误报为“已完成”
+                detail = site.notes or "未检测到可用的共享数据库配置"
+                if not detail.startswith("warning"):
+                    detail = f"数据库信息缺失（{detail}）"
+                site.notes = f"warning: 站点文件已安装，但数据库未配置 — {detail}\n{ols_note}"
 
             site.status = "active"
             db.add(site)
