@@ -70,15 +70,42 @@ async def get_status():
 # 需要展示状态的系统服务/库（名称 -> 中文标签）
 _SERVICE_DEFINITIONS = [
     ("sanguo-panel", "面板服务 (Uvicorn)"),
-    ("nginx", "Nginx"),
-    ("mysql", "MySQL / MariaDB"),
-    ("redis", "Redis"),
-    ("php-fpm", "PHP-FPM"),
+    ("openlitespeed", "OpenLiteSpeed"),
+    ("mariadb", "MySQL / MariaDB"),
+    ("redis-server", "Redis"),
+    ("php", "PHP-FPM / LSAPI"),
     ("fail2ban", "Fail2ban"),
-    ("sshd", "SSH"),
+    ("ssh", "SSH"),
     ("ufw", "UFW 防火墙"),
-    ("docker", "Docker"),
 ]
+
+# 不同发行版/安装方式的服务名不一致，这里做别名映射
+_SERVICE_UNITS = {
+    "openlitespeed": ("openlitespeed", "lsws"),
+    "mariadb": ("mariadb", "mysqld", "mysql"),
+    "redis-server": ("redis-server", "redis"),
+    "ssh": ("ssh", "sshd"),
+}
+
+_PHP_FPM_UNITS = (
+    "php-fpm",
+    "php8.4-fpm",
+    "php8.3-fpm",
+    "php8.2-fpm",
+    "php8.1-fpm",
+    "php8.0-fpm",
+    "php7.4-fpm",
+)
+
+
+def _unit_state(unit: str):
+    """返回 running / stopped / None(不存在)"""
+    if run_shell(f"systemctl is-active --quiet {unit} 2>/dev/null")["success"]:
+        return "running"
+    exists = run_shell(
+        f"systemctl list-unit-files 2>/dev/null | grep -q '^{unit}\\.service'"
+    )
+    return "stopped" if exists["success"] else None
 
 
 def _service_status(name: str) -> str:
@@ -86,15 +113,23 @@ def _service_status(name: str) -> str:
     if name == "sanguo-panel":
         # 面板自身始终在线（能响应请求即说明在运行）
         return "running"
-    if name == "php-worker":
-        # OpenLiteSpeed 使用 LSAPI，PHP 以 lsphp 进程方式运行
-        res = run_shell("pgrep -f lsphp >/dev/null 2>&1")
-        return "running" if res["success"] else "stopped"
-    res = run_shell(f"systemctl is-active {name} 2>/dev/null")
-    if res["success"]:
+
+    if name in ("php", "php-worker"):
+        # OpenLiteSpeed 使用 LSAPI（lsphp 进程），也兼容独立 php-fpm
+        if run_shell("pgrep -x lsphp >/dev/null 2>&1")["success"]:
+            return "running"
+        states = [_unit_state(u) for u in _PHP_FPM_UNITS]
+        if "running" in states:
+            return "running"
+        if "stopped" in states:
+            return "stopped"
+        return "not_installed"
+
+    units = _SERVICE_UNITS.get(name, (name,))
+    states = [_unit_state(u) for u in units]
+    if "running" in states:
         return "running"
-    exist = run_shell(f"systemctl list-unit-files 2>/dev/null | grep -q '^{name}\\.service'")
-    if exist["success"]:
+    if "stopped" in states:
         return "stopped"
     return "not_installed"
 

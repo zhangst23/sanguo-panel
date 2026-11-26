@@ -51,9 +51,20 @@ def get_ols_status(
             "pid": "1234",
             "uptime": "2 days, 4 hours"
         }
-    
+
+    ctrl = f"{LSWS_HOME}/bin/lswsctrl"
+    if not os.path.exists(ctrl):
+        return {
+            "status": "not_installed",
+            "installed": False,
+            "version": "未安装",
+            "pid": "N/A",
+            "uptime": "N/A",
+            "raw": f"{ctrl} not found",
+        }
+
     # Get status
-    res = run_shell(f"{LSWS_HOME}/bin/lswsctrl status")
+    res = run_shell(f"{ctrl} status")
     status = "running" if "is running" in res["stdout"] else "stopped"
     
     # Get version
@@ -63,6 +74,7 @@ def get_ols_status(
     
     return {
         "status": status,
+        "installed": True,
         "version": version,
         "pid": "N/A", # Can be parsed from pid file if needed
         "raw": res["stdout"].strip()
@@ -81,14 +93,24 @@ def ols_action(
     
     if os.name == 'nt':
         return {"success": True, "msg": f"OLS {action}ed (Mock)"}
-    
-    cmd = f"{LSWS_HOME}/bin/lswsctrl {action}"
+
+    ctrl = f"{LSWS_HOME}/bin/lswsctrl"
+    if not os.path.exists(ctrl):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"OpenLiteSpeed 未安装：未找到 {ctrl}。"
+                "请先安装 OpenLiteSpeed 后再执行该操作。"
+            ),
+        )
+
+    cmd = f"{ctrl} {action}"
     res = run_shell(cmd)
     
     if res["success"]:
         return {"success": True, "msg": f"OLS {action}ed successfully"}
-    else:
-        raise HTTPException(status_code=500, detail=f"Failed to {action} OLS: {res['stderr']}")
+    detail = (res["stderr"] or res["stdout"] or "未知错误").strip()
+    raise HTTPException(status_code=500, detail=f"Failed to {action} OLS: {detail}")
 
 @router.get("/vhosts")
 def list_vhosts(

@@ -23,9 +23,7 @@
         <a-space direction="vertical" fill :size="20">
           <a-card title="运行状态">
             <template #extra>
-              <a-tag :color="olsStatus.status === 'running' ? 'green' : 'red'">
-                {{ olsStatus.status?.toUpperCase() }}
-              </a-tag>
+              <a-tag :color="olsTag.color">{{ olsTag.text }}</a-tag>
             </template>
             <a-space direction="vertical" size="large" fill>
               <div class="status-item">
@@ -41,7 +39,11 @@
                 <span>{{ olsStatus.uptime || 'N/A' }}</span>
               </div>
               <a-divider />
-              <a-space>
+              <a-alert v-if="isOlsMissing" type="warning" show-icon>
+                OpenLiteSpeed 未安装（缺少 /usr/local/lsws/bin/lswsctrl），无法启动或重启。
+                请先安装 OLS。
+              </a-alert>
+              <a-space v-else>
                 <a-button type="primary" @click="handleAction('restart')" :loading="loading">
                   <template #icon><icon-refresh /></template>
                   重启
@@ -64,19 +66,19 @@
             <a-space direction="vertical" fill>
               <div class="config-item">
                 <span>HTTP/2 协议</span>
-                <a-switch v-model="features.http2" @change="toggleFeature('http2', $event)" />
+                <a-switch v-model="features.http2" :disabled="isOlsMissing" @change="toggleFeature('http2', $event)" />
               </div>
               <div class="config-item">
                 <span>HTTP/3 (QUIC) 协议</span>
-                <a-switch v-model="features.http3" @change="toggleFeature('http3', $event)" />
+                <a-switch v-model="features.http3" :disabled="isOlsMissing" @change="toggleFeature('http3', $event)" />
               </div>
               <div class="config-item">
                 <span>Brotli 压缩</span>
-                <a-switch v-model="features.brotli" @change="toggleFeature('brotli', $event)" />
+                <a-switch v-model="features.brotli" :disabled="isOlsMissing" @change="toggleFeature('brotli', $event)" />
               </div>
               <div class="config-item">
                 <span>LSCache 全局开关</span>
-                <a-switch v-model="features.lscache" @change="toggleFeature('lscache', $event)" />
+                <a-switch v-model="features.lscache" :disabled="isOlsMissing" @change="toggleFeature('lscache', $event)" />
               </div>
             </a-space>
           </a-card>
@@ -111,7 +113,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted } from 'vue'
+import { reactive, ref, computed, onMounted } from 'vue'
 import request from '@/utils/request'
 import { Message } from '@arco-design/web-vue'
 
@@ -136,6 +138,13 @@ const olsStatus = ref({
   uptime: ''
 })
 const loading = ref(false)
+const isOlsMissing = computed(() => olsStatus.value.status === 'not_installed')
+const olsTag = computed(() => {
+  const s = olsStatus.value.status
+  if (s === 'running') return { color: 'green', text: 'RUNNING' }
+  if (s === 'not_installed') return { color: 'gray', text: '未安装' }
+  return { color: 'red', text: (s || 'unknown').toUpperCase() }
+})
 const features = reactive({
   http2: true,
   http3: true,
