@@ -20,7 +20,7 @@ class SiteCreate(BaseModel):
     domain: str
     aliases: Optional[List[str]] = []
     root_path: Optional[str] = None
-    php_version: str = "8.2"
+    php_version: Optional[str] = None
     shared_db_id: Optional[int] = None
     table_prefix: Optional[str] = None
     performance_preset: str = "balanced"
@@ -83,7 +83,7 @@ class MigrateRequest(BaseModel):
 
 class BatchCreateItem(BaseModel):
     domain: str
-    php_version: str = "8.2"
+    php_version: Optional[str] = None
 
 class BatchCreateRequest(BaseModel):
     sites: List[BatchCreateItem]

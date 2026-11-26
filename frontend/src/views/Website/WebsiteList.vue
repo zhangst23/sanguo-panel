@@ -244,9 +244,9 @@
             <a-col :span="12">
               <a-form-item field="php_version" label="PHP 版本">
                 <a-select v-model="form.php_version">
-                  <a-option>8.2</a-option>
-                  <a-option>8.1</a-option>
-                  <a-option>7.4</a-option>
+                  <a-option v-for="v in phpVersions" :key="v" :value="v">
+                    {{ v }}<span v-if="v === defaultPhpVersion" style="color: var(--color-text-3)">（默认）</span>
+                  </a-option>
                 </a-select>
               </a-form-item>
             </a-col>
@@ -301,7 +301,7 @@
         </template>
       </a-upload>
       <div style="margin-top:12px;font-size:12px;color:var(--color-text-3)">
-        CSV 格式：domain,php_version（每行一个站点，php_version 可选，默认 8.2）
+        CSV 格式：domain,php_version（每行一个站点，php_version 可选，默认 {{ defaultPhpVersion }}）
       </div>
       <a-divider />
       <a-textarea v-model="csvContent" placeholder="或者直接粘贴 CSV 内容（每行：domain,php_version）" :auto-size="{ minRows: 4 }" />
@@ -602,7 +602,7 @@ const migrateForm = reactive({
   source_db_user: '',
   source_db_password: '',
   source_db_name: '',
-  php_version: '8.2'
+  php_version: '8.3'
 })
 
 const showDomainModal = ref(false)
@@ -651,11 +651,29 @@ const backupList = ref([])
 const backupListLoading = ref(false)
 const backupLoading = ref(false)
 
+// PHP 版本从本机真实安装情况读取（/php/versions），默认使用 OLS 全局默认版本
+const phpVersions = ref([])
+const defaultPhpVersion = ref('8.3')
+
+const fetchPhpVersions = async () => {
+  try {
+    const res = await request.get('/php/versions')
+    const installed = (res || []).filter((v) => v.status === 'installed').map((v) => v.version)
+    phpVersions.value = installed.length ? installed : ['8.3']
+    const def = (res || []).find((v) => v.is_default)?.version || phpVersions.value[0]
+    defaultPhpVersion.value = def
+    if (!phpVersions.value.includes(form.php_version)) form.php_version = def
+    if (!phpVersions.value.includes(migrateForm.php_version)) migrateForm.php_version = def
+  } catch (error) {
+    console.error(error)
+  }
+}
+
 const form = reactive({
   domain: '',
   aliases: [],
   root_path: '/var/www/html/',
-  php_version: '8.2',
+  php_version: '8.3',
   ssl_mode: 'cloudflare',
   performance_preset: 'performance',
   discourage_search_engines: true
@@ -901,7 +919,7 @@ const handleBatchCreateCSV = async () => {
   const lines = csvContent.value.split('\n').filter(l => l.trim())
   const items = lines.map(line => {
     const p = line.split(',')
-    return { domain: (p[0] || '').trim(), php_version: (p[1] || '8.2').trim() }
+    return { domain: (p[0] || '').trim(), php_version: (p[1] || defaultPhpVersion.value).trim() }
   }).filter(i => i.domain)
   if (!items.length) { Message.error('无有效数据'); batchLoading.value = false; return }
   try {
@@ -1247,7 +1265,7 @@ const resetForm = () => {
     domain: '',
     aliases: [],
     root_path: '/var/www/html/',
-    php_version: '8.2',
+    php_version: defaultPhpVersion.value,
     ssl_mode: 'cloudflare',
     performance_preset: 'performance',
     discourage_search_engines: true
@@ -1256,6 +1274,7 @@ const resetForm = () => {
 
 onMounted(() => {
   fetchSites()
+  fetchPhpVersions()
 })
 </script>
 

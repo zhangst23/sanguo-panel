@@ -136,28 +136,98 @@ def ols_action(
     detail = (res["stderr"] or res["stdout"] or "未知错误").strip()
     raise HTTPException(status_code=500, detail=f"Failed to {action} OLS: {detail}")
 
+def _vhost_config_path(name: str) -> str:
+    """Resolve a virtual host config file safely inside conf/vhosts/."""
+    if not re.match(r"^[A-Za-z0-9._-]+$", name) or name in (".", ".."):
+        raise HTTPException(status_code=400, detail="虚拟主机名称不合法")
+    vhosts_dir = os.path.realpath(os.path.join(LSWS_HOME, "conf", "vhosts"))
+    for filename in ("vhconf.conf", "vhost.conf"):
+        path = os.path.realpath(os.path.join(vhosts_dir, name, filename))
+        if path.startswith(vhosts_dir + os.sep) and os.path.isfile(path):
+            return path
+    return os.path.join(vhosts_dir, name, "vhconf.conf")
+
+
 @router.get("/vhosts")
 def list_vhosts(
     current_user: Any = Depends(deps.get_current_active_user),
 ) -> Any:
-    """
-    List OLS virtual hosts
-    """
+    """List OLS virtual hosts (domain and docRoot parsed from httpd_config.conf)."""
     vhosts_dir = os.path.join(LSWS_HOME, "conf", "vhosts")
     if not os.path.exists(vhosts_dir):
         if os.name == 'nt':
             return [{"name": "Example", "domain": "example.com", "root": "/var/www/example"}]
         return []
-    
+
+    info = {}
+    try:
+        with open(CONF_FILE) as f:
+            conf = f.read()
+        for m in re.finditer(r"virtualHost\s+(\S+)\s*\{(.*?)\n\}", conf, re.DOTALL):
+            block = m.group(2)
+            root = re.search(r"vhRoot\s+(\S+)", block)
+            info[m.group(1)] = {
+                "name": m.group(1),
+                "domain": m.group(1),
+                "root": root.group(1) if root else "",
+            }
+    except Exception:
+        pass
+
     vhosts = []
-    for d in os.listdir(vhosts_dir):
+    for d in sorted(os.listdir(vhosts_dir)):
         if os.path.isdir(os.path.join(vhosts_dir, d)):
-            vhosts.append({
+            vhosts.append(info.get(d, {
                 "name": d,
-                "domain": "N/A", # Need to parse config for domain
-                "root": f"$SERVER_ROOT/vhosts/{d}"
-            })
+                "domain": d,
+                "root": f"$SERVER_ROOT/vhosts/{d}",
+            }))
     return vhosts
+
+
+@router.get("/vhosts/{name}/config")
+def get_vhost_config(
+    name: str,
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    """Read the raw config file of a virtual host."""
+    path = _vhost_config_path(name)
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail="虚拟主机配置不存在")
+    try:
+        with open(path) as f:
+            return {"name": name, "path": path, "content": f.read()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"读取配置失败: {e}")
+
+
+@router.put("/vhosts/{name}/config")
+def save_vhost_config(
+    name: str,
+    data: dict,
+    current_user: Any = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """Save virtual host config (with backup) and reload OLS."""
+    path = _vhost_config_path(name)
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail="虚拟主机配置不存在")
+    content = data.get("content")
+    if not isinstance(content, str):
+        raise HTTPException(status_code=400, detail="content 必须为字符串")
+    try:
+        import shutil
+        shutil.copy2(path, path + ".bak")
+        with open(path, "w") as f:
+            f.write(content)
+        res = run_shell(f"{LSWS_HOME}/bin/lswsctrl restart")
+        if not res["success"]:
+            shutil.copy2(path + ".bak", path)
+            raise HTTPException(status_code=500, detail=f"OLS 重载失败，已回滚: {res['stderr']}")
+        return {"success": True, "msg": "配置已保存并重载 OLS"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"保存失败: {e}")
 
 @router.get("/config/features")
 def get_features_status(
@@ -241,13 +311,13 @@ def get_rewrite_rules(
     current_user: Any = Depends(deps.get_current_active_user),
 ) -> Any:
     """读取指定虚拟主机的重写规则"""
-    vhost_conf = os.path.join(LSWS_HOME, "conf", "vhosts", name, "vhost.conf")
+    vhost_conf = _vhost_config_path(name)
     if not os.path.exists(vhost_conf):
         return {"rules": ""}
     try:
         with open(vhost_conf) as f:
             conf = f.read()
-        m = re.search(r'rewrite\s*\{.*?rules\s+<<<END\s*(.*?)\s*END', conf, re.DOTALL)
+        m = re.search(r'rewrite\s*\{.*?rules\s+<<<END(?:_rules)?\s*(.*?)\s*END(?:_rules)?', conf, re.DOTALL)
         return {"rules": m.group(1) if m else ""}
     except Exception:
         return {"rules": ""}
@@ -260,14 +330,14 @@ def save_rewrite_rules(
     current_user: Any = Depends(deps.get_current_active_superuser),
 ) -> Any:
     """保存指定虚拟主机的重写规则并重载 OLS"""
-    vhost_conf = os.path.join(LSWS_HOME, "conf", "vhosts", name, "vhost.conf")
+    vhost_conf = _vhost_config_path(name)
     if not os.path.exists(vhost_conf):
         raise HTTPException(status_code=404, detail="虚拟主机配置不存在")
     try:
         with open(vhost_conf) as f:
             conf = f.read()
-        new_block = f"rewrite {{\n  rules <<<END\n{data.rules}\nEND\n}}"
-        conf = re.sub(r'rewrite\s*\{.*?END\s*\}', new_block, conf, flags=re.DOTALL)
+        new_block = f"rewrite {{\n  enable                1\n  rules                 <<<END_rules\n{data.rules}\nEND_rules\n}}"
+        conf = re.sub(r'rewrite\s*\{.*?END(?:_rules)?\s*\}', new_block, conf, flags=re.DOTALL)
         with open(vhost_conf, "w") as f:
             f.write(conf)
         run_shell(f"{LSWS_HOME}/bin/lswsctrl restart")

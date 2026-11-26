@@ -379,7 +379,9 @@ def create_site(
         "shared_db_id": shared_db_id,
         "table_prefix": table_prefix,
         "status": "creating",
-        "notes": "pending: 准备安装中..."
+        "notes": "pending: 准备安装中...",
+        # 未指定时使用本机 OLS 全局默认版本（当前为 8.3）
+        "php_version": site_data.get("php_version") or get_default_php_version(),
     })
 
     if "performance_preset" not in site_data:
@@ -1364,7 +1366,7 @@ def batch_create_sites(
         site = SiteModel(
             domain=item.domain,
             root_path=root_path,
-            php_version=item.php_version,
+            php_version=item.php_version or get_default_php_version(),
             shared_db_id=default_db.id,
             table_prefix=f"wp_tmp_",
             status="creating",

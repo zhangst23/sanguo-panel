@@ -256,7 +256,16 @@ if (FRONTEND_DIST / "index.html").is_file():
         ) and candidate.is_file():
             return FileResponse(candidate)
 
-        return FileResponse(FRONTEND_DIST / "index.html")
+        # index.html 必须每次重新校验：否则浏览器会缓存旧的主 JS bundle，
+        # 其动态 import 指向已被构建替换的 chunk 文件名，导致菜单点击后页面无反应。
+        return FileResponse(
+            FRONTEND_DIST / "index.html",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
 else:
     @app.get("/")
     async def root():
