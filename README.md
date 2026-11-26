@@ -83,6 +83,18 @@ grep 'DPT=8000' /var/log/ufw.log       # 4. 是否被 UFW 拦截
 
 云服务器还需在**云厂商安全组**中放行面板端口。若面板暴露在公网，请及时修改默认密码 `admin / admin123`。
 
+### 重置为空面板
+
+面板数据保存在 `backend/panel.db`（SQLite，运行时数据，**不在 git 中**）。
+`git pull` 更新代码不会覆盖它，所以新部署仍可能沿用旧面板的站点/数据库/备份记录。
+
+```bash
+sudo ./deploy/reset-panel.sh          # 清空站点、数据库记录、备份、任务（保留管理员与设置）
+sudo ./deploy/reset-panel.sh --full   # 完全重置（删除 panel.db，恢复 admin/admin123）
+```
+
+脚本会先把数据库备份到 `backup/panel.db.*.bak`，并把旧备份文件移动到 `backup/_reset_<时间戳>/`，可随时手动恢复。
+
 ### 前端界面默认账户
 
 - **用户名**: `admin`

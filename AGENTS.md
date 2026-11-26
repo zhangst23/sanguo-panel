@@ -138,6 +138,11 @@ npm run dev
 - WordPress install runs in FastAPI `BackgroundTasks`
 - WP-CLI uses OLS-bundled PHP (`/usr/local/lsws/lsphp83/bin/lsphp`)
 
+### Runtime data
+- `backend/panel.db` is local runtime state (sites, backups, tasks) and is **not tracked by git**
+- Pulling code never overwrites it; use `deploy/reset-panel.sh` to get an empty panel
+- Reset keeps the admin account by default; `--full` restores `admin/admin123`
+
 ## Notes
 
 - Only `main` branch exists; no CI/CD workflows
