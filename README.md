@@ -70,6 +70,19 @@ journalctl -u sanguo-panel -f    # 查看实时日志
 > `169.58.52.214` 为本机公网 IP，其他服务器请替换为自己的公网 IP 或域名。
 > 若需卸载系统服务（保留数据）：`sudo ./deploy/uninstall-service.sh`。
 
+### 打不开面板（502 / 连接超时）
+
+按顺序检查：
+
+```bash
+systemctl status sanguo-panel          # 1. 服务是否运行
+curl -I http://127.0.0.1:8000/         # 2. 本机是否正常
+ufw allow 8000/tcp                     # 3. 防火墙是否放行（安装脚本会自动处理）
+grep 'DPT=8000' /var/log/ufw.log       # 4. 是否被 UFW 拦截
+```
+
+云服务器还需在**云厂商安全组**中放行面板端口。若面板暴露在公网，请及时修改默认密码 `admin / admin123`。
+
 ### 前端界面默认账户
 
 - **用户名**: `admin`

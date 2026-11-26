@@ -112,7 +112,15 @@ systemctl daemon-reload
 systemctl enable "$SERVICE_NAME" >/dev/null
 systemctl restart "$SERVICE_NAME"
 
-# ---------- 6. 健康检查 ----------
+# ---------- 6. 防火墙放行 ----------
+step "检查防火墙"
+if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "^Status: active"; then
+  ufw allow "$PANEL_PORT/tcp" comment 'Sanguo Panel' >/dev/null && info "已放行 ${PANEL_PORT}/tcp"
+else
+  info "未启用 UFW，跳过防火墙配置（如有云安全组请手动放行 ${PANEL_PORT}）"
+fi
+
+# ---------- 7. 健康检查 ----------
 step "等待面板就绪"
 READY=false
 for _ in $(seq 1 60); do
