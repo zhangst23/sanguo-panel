@@ -433,13 +433,36 @@ def update_site(
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
 
+    old_aliases = list(site.aliases or [])
     update_data = site_in.dict(exclude_unset=True)
+
+    # 别名规范化：去空格/小写/去重，并排除主域名
+    if "aliases" in update_data:
+        import re as _re
+        normalized = []
+        for alias in update_data["aliases"] or []:
+            a = str(alias).strip().lower()
+            if not a or a == site.domain or a in normalized:
+                continue
+            if not _re.match(r"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$", a):
+                raise HTTPException(status_code=400, detail=f"别名域名格式不正确: {a}")
+            normalized.append(a)
+        update_data["aliases"] = normalized
+
     for field in update_data:
         setattr(site, field, update_data[field])
 
     db.add(site)
     db.commit()
     db.refresh(site)
+
+    # 别名变更：同步 OLS 监听器映射（主域名映射始终保留）
+    if "aliases" in update_data:
+        try:
+            from backend.utils.ols_utils import sync_ols_aliases
+            sync_ols_aliases(site.domain, old_aliases, site.aliases or [])
+        except Exception as e:
+            print(f"Error syncing OLS aliases for {site.domain}: {str(e)}")
 
     # PHP version change: regenerate the OLS vhost with the requested LSAPI handler
     if "php_version" in update_data:

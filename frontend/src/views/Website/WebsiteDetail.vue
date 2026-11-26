@@ -244,14 +244,30 @@
               <a-table-column title="域名" data-index="domain" />
               <a-table-column title="类型" data-index="type" />
               <a-table-column title="操作">
-                <template #cell>
-                  <a-button type="text" size="small">删除</a-button>
+                <template #cell="{ record }">
+                  <a-popconfirm
+                    v-if="record.type === '别名'"
+                    content="确定删除该别名吗？删除后将无法通过该域名访问站点。"
+                    @ok="handleDeleteAlias(record)"
+                  >
+                    <a-button type="text" size="small" status="danger">删除</a-button>
+                  </a-popconfirm>
+                  <span v-else style="color: var(--color-text-3)">—</span>
                 </template>
               </a-table-column>
             </template>
           </a-table>
-          <div style="margin-top: 16px">
-            <a-button type="outline" size="small">添加域名</a-button>
+          <div style="margin-top: 16px; display: flex; gap: 8px; align-items: center;">
+            <a-input
+              v-model="newAlias"
+              placeholder="输入别名域名，如 www.example.com"
+              allow-clear
+              style="width: 280px"
+              @press-enter="handleAddAlias"
+            />
+            <a-button type="outline" size="small" :loading="aliasLoading" @click="handleAddAlias">
+              添加域名
+            </a-button>
           </div>
 
           <a-divider />
@@ -471,8 +487,52 @@ const sslLoading = ref(false)
 
 const domainList = computed(() => [
   { domain: site.value.domain, type: '主域名' },
-  { domain: `www.${site.value.domain}`, type: '别名' }
+  ...(site.value.aliases || []).map((alias) => ({ domain: alias, type: '别名' }))
 ])
+
+const newAlias = ref('')
+const aliasLoading = ref(false)
+
+const handleAddAlias = async () => {
+  const alias = newAlias.value.trim().toLowerCase()
+  if (!alias) {
+    Message.warning('请输入要添加的域名')
+    return
+  }
+  const regex = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/
+  if (!regex.test(alias)) {
+    Message.warning('域名格式不正确')
+    return
+  }
+  if (alias === site.value.domain || (site.value.aliases || []).includes(alias)) {
+    Message.warning('该域名已存在')
+    return
+  }
+  aliasLoading.value = true
+  try {
+    const aliases = [...(site.value.aliases || []), alias]
+    const res = await request.put(`/sites/${siteId}`, { aliases })
+    site.value.aliases = res.aliases || []
+    newAlias.value = ''
+    Message.success('别名已添加')
+  } catch (error) {
+    console.error(error)
+  } finally {
+    aliasLoading.value = false
+  }
+}
+
+const handleDeleteAlias = async (record) => {
+  if (record.type !== '别名') return
+  try {
+    const aliases = (site.value.aliases || []).filter((a) => a !== record.domain)
+    const res = await request.put(`/sites/${siteId}`, { aliases })
+    site.value.aliases = res.aliases || []
+    Message.success('别名已删除')
+  } catch (error) {
+    console.error(error)
+  }
+}
 
 const wpConfigContent = ref('')
 const wpConfigLoading = ref(false)

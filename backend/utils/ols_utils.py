@@ -94,6 +94,44 @@ def _add_listener_map(conf: str, listener: str, domain: str) -> str:
     return conf[: m.end() - 1] + line + conf[m.end() - 1 :]
 
 
+def sync_ols_aliases(main_domain: str, old_aliases: list, new_aliases: list) -> dict:
+    """Add/remove OLS listener maps for site aliases, then restart OLS."""
+    try:
+        with open(OLS_CONF, "r") as f:
+            conf = f.read()
+    except Exception as e:
+        return {"success": False, "msg": f"无法读取 OLS 配置: {e}"}
+
+    removed = set(old_aliases or []) - set(new_aliases or [])
+    added = set(new_aliases or []) - set(old_aliases or [])
+
+    for alias in removed:
+        # 只删除别名自身的 map，不动主域名
+        conf = re.sub(
+            r"\n[ \t]*map[ \t]+\S+[ \t]+" + re.escape(alias) + r"[ \t]*\n",
+            "\n",
+            conf,
+        )
+
+    listeners = [_PANEL_LISTENER, "Panel443"]
+    if re.search(r"listener\s+Panel80v6\s*\{", conf):
+        listeners.append("Panel80v6")
+    for alias in added:
+        for listener in listeners:
+            conf = _add_listener_map(conf, listener, alias)
+
+    try:
+        with open(OLS_CONF, "w") as f:
+            f.write(conf)
+    except Exception as e:
+        return {"success": False, "msg": f"无法写入 OLS 配置: {e}"}
+
+    res = restart_ols()
+    if not res["success"]:
+        return {"success": False, "msg": f"OLS 重启失败: {res['stderr']}"}
+    return {"success": True, "added": sorted(added), "removed": sorted(removed)}
+
+
 def run_ols_shell(command: str, timeout: int = 30) -> dict:
     try:
         result = subprocess.run(

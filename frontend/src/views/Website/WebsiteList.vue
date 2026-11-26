@@ -821,9 +821,7 @@ const aiAnalysisHtml = computed(() => {
 
 const handleDomainInput = () => {
   form.root_path = form.domain ? `/var/www/html/${form.domain}` : '/var/www/html/'
-  if (form.domain && !form.aliases.length) {
-    form.aliases = [`www.${form.domain}`]
-  }
+  // 别名由用户自行填写，不再默认添加 www 域名
 }
 
 const fetchSites = async () => {
