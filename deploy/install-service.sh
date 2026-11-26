@@ -60,7 +60,16 @@ if [ "$NODE_MAJOR" -lt 20 ]; then
   err "Node.js 版本过低（当前 $(node -v)），Vite 7 需要 >= 20.19"
   exit 1
 fi
-( cd "$PROJECT_ROOT/frontend" && { [ -d node_modules ] || npm install --no-audit --no-fund; } && npm run build )
+cd "$PROJECT_ROOT/frontend"
+if [ -f pnpm-lock.yaml ]; then
+  command -v pnpm >/dev/null 2>&1 || npm install -g pnpm >/dev/null
+  pnpm install
+  pnpm run build
+else
+  [ -d node_modules ] || npm install --no-audit --no-fund
+  npm run build
+fi
+cd "$PROJECT_ROOT"
 [ -f "$PROJECT_ROOT/frontend/dist/index.html" ] || { err "前端构建失败：缺少 frontend/dist/index.html"; exit 1; }
 info "前端已构建到 frontend/dist"
 

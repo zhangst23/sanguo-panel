@@ -62,6 +62,13 @@ backend/phpmyadmin/*.log
 /backup/*.zip
 /backup/*.tar.gz
 /backup/*.sql
+/backup/*.json
+
+# Runtime state (generated at runtime, never commit)
+/backend/panel.db
+/backend/phpmyadmin/sessions/
+/backend/phpmyadmin/tmp/
+/backend/phpmyadmin/*.log
 
 # wordpress
 wordpress/
