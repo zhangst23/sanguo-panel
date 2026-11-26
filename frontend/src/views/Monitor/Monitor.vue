@@ -435,6 +435,31 @@
           </a-tab-pane>
         </a-tabs>
       </template>
+
+      <!-- 静态骨架：首屏立即渲染框架，动态数据到达后再替换 -->
+      <template v-else>
+        <div class="wp-static-shell">
+          <a-card class="wp-score-card" :bordered="false">
+            <a-skeleton :loading="true" active :rows="4">
+              <div style="height: 120px"></div>
+            </a-skeleton>
+          </a-card>
+          <a-card title="实时指标概览" :bordered="false" class="wp-card">
+            <a-row :gutter="16">
+              <a-col v-for="i in 5" :key="i" :span="5">
+                <a-skeleton :loading="true" active :rows="2">
+                  <div style="height: 60px"></div>
+                </a-skeleton>
+              </a-col>
+            </a-row>
+          </a-card>
+          <a-card title="详情分析" :bordered="false" class="wp-card">
+            <a-skeleton :loading="true" active :rows="10">
+              <div style="height: 300px"></div>
+            </a-skeleton>
+          </a-card>
+        </div>
+      </template>
     </a-spin>
   </div>
 </template>
@@ -701,6 +726,7 @@ onBeforeUnmount(stopTimer)
 .wp-controls { display: flex; align-items: center; gap: 12px; }
 
 .wp-score-card { background: #16171a; border-radius: 12px; }
+.wp-static-shell { display: flex; flex-direction: column; gap: 16px; }
 .wp-score-main { display: flex; align-items: center; gap: 24px; }
 .wp-score-ring { width: 110px; height: 110px; border-radius: 50%; display: flex; flex-direction: column;
   align-items: center; justify-content: center; border: 8px solid var(--c); position: relative; flex-shrink: 0; }

@@ -51,15 +51,51 @@
       </a-space>
     </a-card>
 
-    <!-- 站群功能 -->
-    <a-card class="action-row" :bordered="false" size="small" style="margin-top:0">
+    <!-- 站群功能（默认锁定，需授权码解锁） -->
+    <a-card class="action-row site-group-row" :bordered="false" size="small" style="margin-top:0">
       <a-space wrap>
         <span class="action-label">站群功能：</span>
-        <a-button size="small" @click="batchGenerateWooKeys" :disabled="selectedIds.length === 0">生成 Woo API</a-button>
-        <a-button size="small" @click="downloadWooKeysCSV">下载本页 Woo Key</a-button>
-        <a-button size="small" @click="handleShowNginx(selectedIds[0])" :disabled="selectedIds.length !== 1">修改 nginx（CF 反代版）</a-button>
+        <template v-if="siteGroupUnlocked">
+          <a-button size="small" @click="batchGenerateWooKeys" :disabled="selectedIds.length === 0">生成 Woo API</a-button>
+          <a-button size="small" @click="downloadWooKeysCSV">下载本页 Woo Key</a-button>
+          <a-button size="small" @click="handleShowNginx(selectedIds[0])" :disabled="selectedIds.length !== 1">修改 nginx（CF 反代版）</a-button>
+        </template>
+        <a-button v-else size="small" status="warning" @click="showUnlockModal = true">
+          <template #icon><icon-lock /></template>
+          请输入授权码解锁
+        </a-button>
       </a-space>
     </a-card>
+
+    <!-- 授权解锁弹窗 -->
+    <a-modal v-model:visible="showUnlockModal" title="解锁站群功能" :footer="false" :width="440">
+      <a-tabs v-model:active-key="unlockMode">
+        <a-tab-pane key="code" title="授权码解锁">
+          <a-input-password
+            v-model="unlockCode"
+            placeholder="请输入授权码"
+            allow-clear
+            @press-enter="confirmUnlock"
+            style="margin-top: 16px"
+          />
+          <div style="margin-top: 16px; text-align: right;">
+            <a-button type="primary" :loading="unlocking" @click="confirmUnlock">确认</a-button>
+          </div>
+        </a-tab-pane>
+        <a-tab-pane key="email" title="申请授权">
+          <a-input
+            v-model="applyEmail"
+            placeholder="请输入邮箱"
+            allow-clear
+            @press-enter="handleApplyAccess"
+            style="margin-top: 16px"
+          />
+          <div style="margin-top: 16px; text-align: right;">
+            <a-button type="primary" :loading="applying" @click="handleApplyAccess">申请</a-button>
+          </div>
+        </a-tab-pane>
+      </a-tabs>
+    </a-modal>
 
     <a-card class="list-card">
       <a-table
@@ -562,7 +598,8 @@ import {
   IconLoading,
   IconFolder,
   IconUpload,
-  IconSwap
+  IconSwap,
+  IconLock
 } from '@arco-design/web-vue/es/icon'
 
 const router = useRouter()
@@ -573,6 +610,52 @@ const showCreateModal = ref(false)
 const confirmLoading = ref(false)
 const installStep = ref(1)
 const formRef = ref(null)
+
+// 站群功能授权锁（授权码逻辑暂为演示，固定 123456）
+const SITE_GROUP_ACCESS_KEY = '123456'
+const siteGroupUnlocked = ref(sessionStorage.getItem('siteGroupUnlocked') === '1')
+const showUnlockModal = ref(false)
+const unlockMode = ref('code')
+const unlockCode = ref('')
+const unlocking = ref(false)
+const applyEmail = ref('')
+const applying = ref(false)
+
+const confirmUnlock = async () => {
+  if (unlockCode.value.trim() !== SITE_GROUP_ACCESS_KEY) {
+    Message.error('授权码错误，请重新输入')
+    return
+  }
+  unlocking.value = true
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    siteGroupUnlocked.value = true
+    sessionStorage.setItem('siteGroupUnlocked', '1')
+    showUnlockModal.value = false
+    unlockCode.value = ''
+    Message.success('已解锁站群功能')
+  } finally {
+    unlocking.value = false
+  }
+}
+
+const handleApplyAccess = async () => {
+  const email = applyEmail.value.trim()
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    Message.warning('请输入有效的邮箱地址')
+    return
+  }
+  applying.value = true
+  try {
+    // 申请流程暂为演示：未接入后端，仅提示
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    Message.info('申请已记录（演示模式），请联系管理员获取授权码')
+    showUnlockModal.value = false
+    applyEmail.value = ''
+  } finally {
+    applying.value = false
+  }
+}
 
 const showBatchModal = ref(false)
 const csvContent = ref('')

@@ -137,6 +137,12 @@ const routes = [
         meta: { requiresAuth: true, title: '系统信息' },
       },
       {
+        path: 'about',
+        name: 'About',
+        component: () => import('@/views/System/About.vue'),
+        meta: { requiresAuth: true, title: '关于' },
+      },
+      {
         path: 'monitor',
         name: 'Monitor',
         component: () => import('@/views/Monitor/Monitor.vue'),
