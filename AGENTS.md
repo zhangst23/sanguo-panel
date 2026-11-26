@@ -2,17 +2,34 @@
 
 ## Quick start
 
-### One-click startup (recommended)
+### System service (production, recommended)
+
+The panel runs as a single systemd unit — the built frontend is served by the
+backend on the same port, so there is one process to manage (BT-panel style).
 
 ```bash
-# From project root, starts both backend and frontend
-python start-all.py
+# Install/upgrade: installs deps, builds frontend, registers + enables service
+sudo ./deploy/install-service.sh          # default port 8000
+sudo PANEL_PORT=8888 ./deploy/install-service.sh
+
+# Daily management
+systemctl status sanguo-panel
+systemctl restart sanguo-panel
+./start.sh status                         # convenience wrapper
 ```
 
 Access URLs after startup:
-- Frontend: http://217.69.2.217:5173
-- Backend API: http://localhost:8000
+- Panel UI: http://localhost:8000
 - API Docs: http://localhost:8000/api-docs
+- Default login: `admin` / `admin123`
+
+Uninstall the service (keeps files/data): `sudo ./deploy/uninstall-service.sh`
+
+### Development startup
+
+```bash
+./start.sh          # falls back to venv + vite dev mode if the service isn't installed
+```
 
 ### Manual startup
 

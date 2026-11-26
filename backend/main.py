@@ -6,9 +6,11 @@ from backend.core.config import settings
 from backend.api.v1.api import api_router
 from fastapi.staticfiles import StaticFiles
 from fastapi import Request, Response
+from fastapi.responses import FileResponse
 from backend.utils.pma_server import get_pma_manager
 import httpx
 import os
+from pathlib import Path
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -191,9 +193,41 @@ async def pma_proxy(request: Request, path: str):
             
         return response
 
-@app.get("/")
-async def root():
-    return {"message": f"Welcome to {settings.PROJECT_NAME} API"}
+# ---------------------------------------------------------------------------
+# Frontend SPA (production)
+# When frontend/dist exists (built via `npm run build`), the backend serves the
+# built panel UI on the same origin as the API. This makes the whole panel a
+# single system service. In development the Vite dev server is used instead.
+# ---------------------------------------------------------------------------
+FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+_FRONTEND_DIST_RESOLVED = FRONTEND_DIST.resolve()
+
+if (FRONTEND_DIST / "index.html").is_file():
+    if (FRONTEND_DIST / "assets").is_dir():
+        app.mount(
+            "/assets",
+            StaticFiles(directory=str(FRONTEND_DIST / "assets")),
+            name="assets",
+        )
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def spa_fallback(full_path: str):
+        # Never swallow API / docs / proxy / websocket paths.
+        if full_path.startswith(("api/", "api-docs", "phpmyadmin", "ws/")):
+            return Response(status_code=404)
+
+        candidate = (_FRONTEND_DIST_RESOLVED / full_path).resolve()
+        if (
+            candidate == _FRONTEND_DIST_RESOLVED
+            or _FRONTEND_DIST_RESOLVED in candidate.parents
+        ) and candidate.is_file():
+            return FileResponse(candidate)
+
+        return FileResponse(FRONTEND_DIST / "index.html")
+else:
+    @app.get("/")
+    async def root():
+        return {"message": f"Welcome to {settings.PROJECT_NAME} API"}
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
