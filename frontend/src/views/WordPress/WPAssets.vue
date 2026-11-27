@@ -33,6 +33,7 @@
         <a-tab-pane key="theme" title="主题管理">
           <div class="toolbar">
             <a-button type="primary" @click="openUpload('theme')">上传主题包</a-button>
+            <a-button @click="openCliInstall('theme')">WP CLI 安装主题</a-button>
             <span class="toolbar-hint">设为默认的主题会在新建站点时自动安装并启用</span>
           </div>
           <a-table :columns="resourceColumns" :data="themeAssets" :loading="loading" :pagination="false" row-key="id">
@@ -61,6 +62,7 @@
         <a-tab-pane key="plugin" title="插件管理">
           <div class="toolbar">
             <a-button type="primary" @click="openUpload('plugin')">上传插件包</a-button>
+            <a-button @click="openCliInstall('plugin')">WP CLI 安装插件</a-button>
             <span class="toolbar-hint">设为默认的插件会在新建站点时自动安装并启用</span>
           </div>
           <a-table :columns="resourceColumns" :data="pluginAssets" :loading="loading" :pagination="false" row-key="id">
@@ -94,6 +96,32 @@
           <a-input v-model="fetchVersion" placeholder="6.5.5" />
         </a-form-item>
       </a-form>
+    </a-modal>
+
+    <a-modal
+      v-model:visible="cliVisible"
+      :title="cliTitle"
+      ok-text="安装"
+      @ok="handleCliInstall"
+      :confirm-loading="cliInstalling"
+      :closable="!cliInstalling"
+      :mask-closable="false"
+    >
+      <a-form layout="vertical">
+        <a-form-item
+          :label="cliKind === 'theme' ? '主题名称 / slug' : '插件名称 / slug'"
+          required
+          help="输入 WordPress 官方目录中的名称或 slug，例如：hello-dolly、woocommerce"
+        >
+          <a-input
+            v-model="cliInput"
+            placeholder="请输入名称或 slug"
+            allow-clear
+            @press-enter="handleCliInstall"
+          />
+        </a-form-item>
+      </a-form>
+      <div class="cli-hint">面板将通过 WP-CLI 下载该资源并加入本地资源库，可用于新建站点时自动安装。</div>
     </a-modal>
 
     <a-modal
@@ -162,6 +190,13 @@ const activeTab = ref('core')
 const fetchVisible = ref(false)
 const fetchVersion = ref('')
 const fetching = ref(false)
+
+// WP CLI 按名称安装主题 / 插件
+const cliVisible = ref(false)
+const cliKind = ref('theme')
+const cliInput = ref('')
+const cliInstalling = ref(false)
+const cliTitle = computed(() => cliKind.value === 'theme' ? '通过 WP CLI 安装主题' : '通过 WP CLI 安装插件')
 
 const uploadVisible = ref(false)
 const uploadTitle = ref('上传资源包')
@@ -259,6 +294,36 @@ const handleFetch = async () => {
     console.error(error)
   } finally {
     fetching.value = false
+  }
+}
+
+const openCliInstall = (kind) => {
+  cliKind.value = kind
+  cliInput.value = ''
+  cliInstalling.value = false
+  cliVisible.value = true
+}
+
+const handleCliInstall = async () => {
+  if (cliInstalling.value) return
+  const slug = toSlug(cliInput.value)
+  if (!slug) {
+    Message.warning('请输入主题名称或插件名称')
+    return
+  }
+  cliInstalling.value = true
+  try {
+    const asset = await request.post('/wp-assets/cli-install', {
+      kind: cliKind.value,
+      slug,
+    }, { timeout: 300000 })
+    Message.success(`已通过 WP CLI 安装：${asset?.name || slug}`)
+    cliVisible.value = false
+    await refresh()
+  } catch (error) {
+    console.error(error)
+  } finally {
+    cliInstalling.value = false
   }
 }
 
@@ -417,6 +482,11 @@ onMounted(refresh)
 }
 .toolbar-hint {
   margin-top: 12px;
+  font-size: 12px;
+  color: var(--color-text-3);
+}
+.cli-hint {
+  margin-top: 8px;
   font-size: 12px;
   color: var(--color-text-3);
 }

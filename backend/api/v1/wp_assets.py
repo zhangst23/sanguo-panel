@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from backend.api import deps
 from backend.models.wp_asset import WpAsset as WpAssetModel
 from backend.schemas.wp_asset import (
+    CliInstallRequest,
     DefaultsResponse,
     VersionRequest,
     WpAsset,
@@ -17,6 +18,7 @@ from backend.schemas.wp_asset import (
 from backend.utils.wp_asset_utils import (
     asset_filename,
     core_zip_path,
+    fetch_asset_with_wp_cli,
     fetch_core_package,
     get_default_wp_version,
     package_dir,
@@ -169,6 +171,21 @@ async def upload_asset(
     db.commit()
     db.refresh(asset)
     return asset
+
+
+@router.post("/cli-install", response_model=WpAsset)
+def cli_install_asset(
+    payload: CliInstallRequest,
+    db: Session = Depends(deps.get_db),
+    current_user=Depends(deps.get_current_active_user),
+):
+    """通过 WP-CLI 按主题/插件名称（slug）下载并加入本地资源库。"""
+    try:
+        return fetch_asset_with_wp_cli(db, payload.kind, payload.slug)
+    except (RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"WP-CLI 安装失败: {exc}")
 
 
 @router.put("/{asset_id}", response_model=WpAsset)

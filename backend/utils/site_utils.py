@@ -244,7 +244,8 @@ def get_wp_cli_paths():
     """Return (php_path, wp_cli_path) using the system CLI PHP."""
     from backend.utils.php_utils import get_php_path
     php_path = get_php_path()
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    # 本文件位于 backend/utils/，向上 3 级才是项目根目录
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     wp_cli_path = os.path.join(project_root, "backend", "bin", "wp-cli.phar")
     return php_path, wp_cli_path
 

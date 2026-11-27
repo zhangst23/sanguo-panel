@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 from typing import List, Literal, Optional
 
@@ -43,6 +44,19 @@ class VersionRequest(BaseModel):
     @classmethod
     def check_version(cls, v: str) -> str:
         return validate_version(v)
+
+
+class CliInstallRequest(BaseModel):
+    kind: Literal["theme", "plugin"]
+    slug: str
+
+    @field_validator("slug")
+    @classmethod
+    def check_slug(cls, v: str) -> str:
+        slug = v.strip().lower()
+        if not re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,99}", slug):
+            raise ValueError("名称/slug 只能包含字母、数字、点、下划线和连字符")
+        return slug
 
 
 class DefaultsResponse(BaseModel):

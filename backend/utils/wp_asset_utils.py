@@ -184,3 +184,141 @@ def install_default_assets(db, php_path: str, wp_cli_path: str, site_root: str,
     if failed:
         notes += "\n⚠️ 默认资源安装失败: " + ", ".join(failed)
     return notes
+
+
+def fetch_asset_with_wp_cli(db, kind: str, slug: str):
+    """通过 WP-CLI 按名称/slug 从官方目录下载主题或插件并加入本地资源库。
+
+    WP-CLI 的 ``plugin/theme install`` 需要完整的 WordPress 站点环境，因此这里
+    临时创建一套 WordPress + 临时数据库，安装成功后把目录打包进资源库，最后
+    清理临时文件与数据库。
+    """
+    import json
+    import random
+    import string
+    import tempfile
+
+    import mysql.connector
+
+    from backend.models.site import SharedDatabase
+    from backend.utils.db_admin import ensure_admin_account
+    from backend.utils.site_utils import get_wp_cli_paths
+
+    php_path, wp_cli_path = get_wp_cli_paths()
+    if not php_path or not os.path.isfile(wp_cli_path):
+        raise RuntimeError("WP-CLI 不可用，请检查 PHP 与 backend/bin/wp-cli.phar")
+
+    shared_db = db.query(SharedDatabase).filter(SharedDatabase.status == "active").first()
+    if not shared_db:
+        raise RuntimeError("未找到可用的 MariaDB 配置")
+    db_user, db_pass = ensure_admin_account(shared_db)
+    if not db_user:
+        raise RuntimeError("无法连接 MariaDB，请检查数据库配置")
+    db.add(shared_db)
+    db.commit()
+
+    db_host = shared_db.db_host or "localhost"
+    db_port = shared_db.db_port or 3306
+    tmp_root = tempfile.mkdtemp(prefix="wp-cli-asset-")
+    tmp_db = None
+
+    def _connect():
+        return mysql.connector.connect(
+            host=db_host, port=int(db_port), user=db_user,
+            password=db_pass or "", connect_timeout=10,
+        )
+
+    try:
+        tmp_db = "wp_cli_tmp_" + "".join(
+            random.choices(string.ascii_lowercase + string.digits, k=10))
+        conn = _connect()
+        cur = conn.cursor()
+        cur.execute(f"CREATE DATABASE `{tmp_db}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        # 用本地默认核心包搭建临时站点
+        zip_path = ensure_core_package(get_default_wp_version(db))
+        wp_root = os.path.join(tmp_root, "wordpress")
+        extract_core_package(zip_path, wp_root)
+
+        def wp(*args, timeout=300):
+            return subprocess.run(
+                [php_path, wp_cli_path, *args, f"--path={wp_root}", "--allow-root"],
+                capture_output=True, text=True, timeout=timeout,
+            )
+
+        def _failed(result):
+            detail = (result.stderr or result.stdout or "WP-CLI 执行失败").strip()
+            return RuntimeError(detail[-500:])
+
+        config = wp("config", "create", f"--dbname={tmp_db}", f"--dbuser={db_user}",
+                    f"--dbpass={db_pass}", f"--dbhost={db_host}", "--force")
+        if config.returncode != 0:
+            raise _failed(config)
+
+        core = wp("core", "install", "--url=http://wp-cli.local", "--title=WP CLI",
+                  "--admin_user=admin",
+                  f"--admin_password={'tmp' + ''.join(random.choices(string.ascii_letters + string.digits, k=12))}",
+                  "--admin_email=admin@wp-cli.local")
+        if core.returncode != 0:
+            raise _failed(core)
+
+        install = wp(kind, "install", slug)
+        if install.returncode != 0:
+            raise _failed(install)
+
+        info = {}
+        detail = wp(kind, "get", slug, "--format=json")
+        if detail.returncode == 0:
+            try:
+                info = json.loads(detail.stdout)
+            except (ValueError, TypeError):
+                pass
+
+        # 定位安装后的目录（插件主文件是单文件时也能取到所在目录）
+        path_args = ("plugin", "path", slug, "--dir") if kind == "plugin" else ("theme", "path", slug)
+        found = wp(*path_args)
+        source_dir = found.stdout.strip() if found.returncode == 0 else ""
+        if not source_dir or not os.path.isdir(source_dir):
+            base = os.path.join(wp_root, "wp-content", "themes" if kind == "theme" else "plugins")
+            fallback = os.path.join(base, slug)
+            source_dir = fallback if os.path.isdir(fallback) else ""
+        if not source_dir:
+            raise RuntimeError("下载成功但未找到资源目录")
+
+        name = (info.get("title") or info.get("name") or slug)[:128]
+        version = info.get("version")
+        filename = os.path.join(package_dir(kind), asset_filename(kind, slug, version))
+        shutil.make_archive(
+            os.path.splitext(filename)[0], "zip",
+            root_dir=os.path.dirname(source_dir), base_dir=os.path.basename(source_dir),
+        )
+
+        asset = (db.query(WpAsset)
+                 .filter(WpAsset.kind == kind, WpAsset.slug == slug).first())
+        if not asset:
+            asset = WpAsset(kind=kind, name=name, slug=slug, source="official")
+            db.add(asset)
+        else:
+            asset.name = name
+        asset.version = version
+        asset.file_path = to_relative_path(filename)
+        asset.file_size = os.path.getsize(filename)
+        asset.enabled = True
+        db.commit()
+        db.refresh(asset)
+        return asset
+    finally:
+        shutil.rmtree(tmp_root, ignore_errors=True)
+        if tmp_db:
+            try:
+                conn = _connect()
+                cur = conn.cursor()
+                cur.execute(f"DROP DATABASE IF EXISTS `{tmp_db}`")
+                conn.commit()
+                cur.close()
+                conn.close()
+            except Exception:
+                pass
