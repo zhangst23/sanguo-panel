@@ -99,15 +99,16 @@
     <a-modal
       v-model:visible="uploadVisible"
       :title="uploadTitle"
-      @ok="handleUpload"
+      :on-before-ok="handleUpload"
       :confirm-loading="uploading"
+      @ok="resetUploadState"
       @cancel="resetUploadState"
       :closable="!uploading"
       :mask-closable="false"
     >
       <a-form layout="vertical">
         <a-form-item label="zip 包" required>
-          <a-upload :custom-request="handlePickFile" :limit="1" accept=".zip" :show-file-list="false">
+          <a-upload :custom-request="handlePickFile" accept=".zip" :show-file-list="false">
             <template #upload-button>
               <a-button>选择 zip 文件</a-button>
             </template>
@@ -169,12 +170,23 @@ const uploadForm = reactive({ kind: 'core', name: '', slug: '', version: '' })
 const uploadPercent = ref(0)
 const uploadStatus = ref('idle') // idle | uploading | done | error
 const uploadError = ref('')
+const uploadOption = ref(null)
+let progressTimer = null
+
+const stopProgressTimer = () => {
+  if (progressTimer) {
+    clearInterval(progressTimer)
+    progressTimer = null
+  }
+}
 
 const resetUploadState = () => {
+  stopProgressTimer()
   uploadFile.value = null
   uploadPercent.value = 0
   uploadStatus.value = 'idle'
   uploadError.value = ''
+  uploadOption.value = null
 }
 
 const editVisible = ref(false)
@@ -264,6 +276,7 @@ const toSlug = (value) => value
 
 const handlePickFile = (option) => {
   const file = option.file || option.fileItem?.file
+  uploadOption.value = option
   uploadFile.value = file
   const baseName = (file?.name || '').replace(/\.zip$/i, '')
   if (uploadForm.kind === 'core') {
@@ -281,11 +294,11 @@ const handlePickFile = (option) => {
 const handleUpload = async () => {
   if (!uploadFile.value) {
     Message.warning('请选择 zip 文件')
-    return
+    return false
   }
   if (uploadForm.kind === 'core' && !uploadForm.version) {
     Message.warning('请填写核心包版本号')
-    return
+    return false
   }
   const data = new FormData()
   data.append('file', uploadFile.value)
@@ -297,27 +310,39 @@ const handleUpload = async () => {
   uploadStatus.value = 'uploading'
   uploadPercent.value = 0
   uploadError.value = ''
+  stopProgressTimer()
+  // 部分环境拿不到 Content-Length，用递增进度保证用户能看到上传过程
+  progressTimer = setInterval(() => {
+    if (uploadPercent.value < 95) uploadPercent.value += 3
+  }, 200)
   try {
     await request.post('/wp-assets/upload', data, {
       timeout: 180000,
       onUploadProgress: (event) => {
-        if (event.total) {
-          uploadPercent.value = Math.min(99, Math.round((event.loaded * 100) / event.total))
+        if (event.total > 0) {
+          const fraction = Math.min(1, event.loaded / event.total)
+          uploadPercent.value = Math.min(99, Math.round(fraction * 100))
+          uploadOption.value?.onProgress?.(fraction)
         }
       },
     })
+    stopProgressTimer()
     uploadPercent.value = 100
+    uploadOption.value?.onProgress?.(1)
+    uploadOption.value?.onSuccess?.({ success: true })
     uploadStatus.value = 'done'
     Message.success('上传成功')
     await refresh()
-    setTimeout(() => {
-      uploadVisible.value = false
-      resetUploadState()
-    }, 1200)
+    // 等用户看到 100% 后再关闭弹窗
+    await new Promise((resolve) => setTimeout(resolve, 700))
+    return true
   } catch (error) {
+    stopProgressTimer()
     uploadStatus.value = 'error'
     uploadError.value = error.response?.data?.detail || error.message || '未知错误'
+    uploadOption.value?.onError?.(error)
     console.error(error)
+    return false
   } finally {
     uploading.value = false
   }
