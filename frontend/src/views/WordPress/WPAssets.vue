@@ -1,25 +1,5 @@
 <template>
   <div class="wp-assets-page">
-    <a-card title="默认 WordPress 版本" class="setting-card">
-      <a-space wrap>
-        <a-select
-          v-model="versionInput"
-          allow-create
-          style="width: 240px"
-          placeholder="选择或输入版本号，如 6.5.5"
-        >
-          <a-option v-for="v in defaults.versions" :key="v" :value="v">
-            {{ v }}<span v-if="v === defaults.default_version" class="version-tag">（当前默认）</span>
-          </a-option>
-        </a-select>
-        <a-button type="primary" :loading="versionSaving" @click="handleSetVersion">设为默认版本</a-button>
-        <a-button @click="openFetchModal">从官网拉取版本</a-button>
-      </a-space>
-      <div class="hint">
-        新建站点时优先使用本地缓存包；本地没有该版本时，仅首次按默认版本从官方下载并缓存，之后离线复用。
-      </div>
-    </a-card>
-
     <a-card class="library-card">
       <a-tabs v-model:active-key="activeTab">
         <a-tab-pane key="core" title="WP 版本">
@@ -126,15 +106,6 @@
       :mask-closable="false"
     >
       <a-form layout="vertical">
-        <a-form-item label="名称">
-          <a-input v-model="uploadForm.name" placeholder="显示名称" />
-        </a-form-item>
-        <a-form-item v-if="uploadForm.kind !== 'core'" label="标识 (slug)">
-          <a-input v-model="uploadForm.slug" placeholder="例如 litespeed-cache" />
-        </a-form-item>
-        <a-form-item label="版本号" :required="uploadForm.kind === 'core'">
-          <a-input v-model="uploadForm.version" placeholder="例如 6.5.5 或 1.0.0" />
-        </a-form-item>
         <a-form-item label="zip 包" required>
           <a-upload :custom-request="handlePickFile" :limit="1" accept=".zip" :show-file-list="false">
             <template #upload-button>
@@ -152,6 +123,15 @@
             <div v-else-if="uploadStatus === 'done'" class="status-hint status-done">✓ 上传完成，资源已加入资源库</div>
             <div v-else-if="uploadStatus === 'error'" class="status-hint status-error">上传失败：{{ uploadError }}</div>
           </div>
+        </a-form-item>
+        <a-form-item label="名称">
+          <a-input v-model="uploadForm.name" placeholder="默认取文件名，可修改" />
+        </a-form-item>
+        <a-form-item v-if="uploadForm.kind !== 'core'" label="标识 (slug)">
+          <a-input v-model="uploadForm.slug" placeholder="默认取文件名，可修改" />
+        </a-form-item>
+        <a-form-item v-if="uploadForm.kind === 'core'" label="版本号" required>
+          <a-input v-model="uploadForm.version" placeholder="例如 6.5.5" />
         </a-form-item>
       </a-form>
     </a-modal>
@@ -176,8 +156,6 @@ const loading = ref(false)
 const assets = ref([])
 const defaults = reactive({ default_version: '6.5.5', versions: [], default_themes: [], default_plugins: [] })
 const activeTab = ref('core')
-const versionInput = ref('')
-const versionSaving = ref(false)
 
 const fetchVisible = ref(false)
 const fetchVersion = ref('')
@@ -241,28 +219,10 @@ const refresh = async () => {
     ])
     assets.value = list || []
     Object.assign(defaults, defs)
-    if (!versionInput.value) versionInput.value = defaults.default_version
   } catch (error) {
     console.error(error)
   } finally {
     loading.value = false
-  }
-}
-
-const handleSetVersion = async () => {
-  if (!versionInput.value) {
-    Message.warning('请选择或输入版本号')
-    return
-  }
-  versionSaving.value = true
-  try {
-    const res = await request.put('/wp-assets/default-version', { version: versionInput.value })
-    Message.success(`默认 WordPress 版本已设为 ${res.default_version}`)
-    await refresh()
-  } catch (error) {
-    console.error(error)
-  } finally {
-    versionSaving.value = false
   }
 }
 
@@ -296,8 +256,23 @@ const openUpload = (kind) => {
   uploadVisible.value = true
 }
 
+const toSlug = (value) => value
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, '-')
+  .replace(/^-+|-+$/g, '')
+  .slice(0, 80)
+
 const handlePickFile = (option) => {
-  uploadFile.value = option.file
+  const file = option.file || option.fileItem?.file
+  uploadFile.value = file
+  const baseName = (file?.name || '').replace(/\.zip$/i, '')
+  if (uploadForm.kind === 'core') {
+    if (!uploadForm.name) uploadForm.name = baseName
+  } else {
+    // 主题/插件的名称与标识自动取文件名，用户仍可修改
+    uploadForm.name = baseName
+    uploadForm.slug = toSlug(baseName) || 'package'
+  }
   uploadPercent.value = 0
   uploadStatus.value = 'idle'
   uploadError.value = ''
@@ -414,13 +389,9 @@ onMounted(refresh)
   flex-direction: column;
   gap: 16px;
 }
-.setting-card .hint,
 .toolbar-hint {
   margin-top: 12px;
   font-size: 12px;
-  color: var(--color-text-3);
-}
-.version-tag {
   color: var(--color-text-3);
 }
 .toolbar {
