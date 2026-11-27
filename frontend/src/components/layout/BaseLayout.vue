@@ -66,6 +66,7 @@
           <a-sub-menu key="System">
             <template #icon><icon-settings /></template>
             <template #title>系统工具</template>
+            <a-menu-item key="WPAssets">WP主题插件管理</a-menu-item>
             <a-menu-item key="Linux">系统管理</a-menu-item>
             <a-menu-item key="Monitor">监控中心</a-menu-item>
             <a-menu-item key="SystemSettings">面板设置</a-menu-item>

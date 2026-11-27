@@ -238,7 +238,7 @@
           <div class="step-item active">
             <icon-check-circle-fill v-if="installStep > 1" class="done-icon" />
             <icon-loading v-else class="spin-icon" />
-            WordPress 文件下载中...
+            WordPress 文件安装中...
           </div>
           <div class="step-item" :class="{ active: installStep >= 2 }">
             <icon-check-circle-fill v-if="installStep > 2" class="done-icon" />
@@ -292,6 +292,13 @@
               </a-form-item>
             </a-col>
           </a-row>
+          <a-form-item field="wp_version" label="WordPress 版本" :help="`当前默认版本：${defaultWpVersion}`">
+            <a-select v-model="form.wp_version" allow-clear placeholder="使用默认版本">
+              <a-option v-for="v in wpVersions" :key="v" :value="v">
+                {{ v }}<span v-if="v === defaultWpVersion" class="version-hint">（默认）</span>
+              </a-option>
+            </a-select>
+          </a-form-item>
           <a-form-item field="root_path" label="根目录">
             <a-input v-model="form.root_path" placeholder="/var/www/html/域名" />
           </a-form-item>
@@ -583,7 +590,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import request from '@/utils/request'
 import { Message, Modal } from '@arco-design/web-vue'
@@ -738,6 +745,25 @@ const backupLoading = ref(false)
 const phpVersions = ref([])
 const defaultPhpVersion = ref('8.3')
 
+// WordPress 版本来自本地资源库的默认配置，创建站点时不再固定拉取最新版
+const wpVersions = ref([])
+const defaultWpVersion = ref('6.5.5')
+
+const fetchWpVersions = async () => {
+  try {
+    const res = await request.get('/wp-assets/defaults')
+    wpVersions.value = res?.versions || []
+    defaultWpVersion.value = res?.default_version || '6.5.5'
+    if (!wpVersions.value.includes(form.wp_version)) form.wp_version = defaultWpVersion.value
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+watch(showCreateModal, (visible) => {
+  if (visible) fetchWpVersions()
+})
+
 const fetchPhpVersions = async () => {
   try {
     const res = await request.get('/php/versions')
@@ -757,6 +783,7 @@ const form = reactive({
   aliases: [],
   root_path: '/var/www/html/',
   php_version: '8.3',
+  wp_version: '6.5.5',
   ssl_mode: 'cloudflare',
   performance_preset: 'performance',
   discourage_search_engines: true
@@ -1349,6 +1376,7 @@ const resetForm = () => {
     aliases: [],
     root_path: '/var/www/html/',
     php_version: defaultPhpVersion.value,
+    wp_version: defaultWpVersion.value,
     ssl_mode: 'cloudflare',
     performance_preset: 'performance',
     discourage_search_engines: true
@@ -1358,6 +1386,7 @@ const resetForm = () => {
 onMounted(() => {
   fetchSites()
   fetchPhpVersions()
+  fetchWpVersions()
 })
 </script>
 
@@ -1624,5 +1653,9 @@ onMounted(() => {
 
 .ai-log-error {
   color: #f76965;
+}
+
+.version-hint {
+  color: var(--color-text-3);
 }
 </style>

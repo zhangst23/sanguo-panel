@@ -77,6 +77,12 @@ const routes = [
         meta: { requiresAuth: true, title: '终极配置' },
       },
       {
+        path: 'wp-assets',
+        name: 'WPAssets',
+        component: () => import('@/views/WordPress/WPAssets.vue'),
+        meta: { requiresAuth: true, title: 'WP主题插件管理' },
+      },
+      {
         path: 'linux',
         name: 'Linux',
         component: () => import('@/views/System/SystemManage.vue'),

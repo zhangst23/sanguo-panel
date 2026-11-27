@@ -26,7 +26,16 @@ class SiteCreate(BaseModel):
     performance_preset: str = "balanced"
     ssl_mode: str = "cloudflare"
     discourage_search_engines: bool = True
+    wp_version: Optional[str] = None
     notes: Optional[str] = None
+
+    @field_validator('wp_version')
+    @classmethod
+    def validate_wp_version(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            from backend.utils.wp_asset_utils import validate_version
+            return validate_version(v)
+        return v
 
     @field_validator('domain')
     @classmethod

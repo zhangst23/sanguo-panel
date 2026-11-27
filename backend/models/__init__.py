@@ -5,3 +5,4 @@ from backend.models.task import Task
 from backend.models.backup import Backup, BackupSchedule
 from backend.models.config import SiteOption, GlobalOption
 from backend.models.firewall import FirewallRule, IPList
+from backend.models.wp_asset import WpAsset

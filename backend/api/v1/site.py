@@ -25,6 +25,13 @@ from backend.utils.ols_utils import (
     get_default_php_version,
 )
 from backend.utils.site_utils import set_lscache_plugin, purge_site_lscache
+from backend.utils.wp_asset_utils import (
+    ensure_core_package,
+    extract_core_package,
+    get_default_wp_version,
+    install_default_assets,
+    validate_version,
+)
 
 router = APIRouter()
 
@@ -37,11 +44,11 @@ def install_wordpress_task(site_id: int):
     """
     from backend.core.database import SessionLocal
     db = SessionLocal()
+    ols_note = ""
     try:
         site = db.query(SiteModel).filter(SiteModel.id == site_id).first()
         if not site:
             return
-        ols_note = ""
 
         shared_db = db.query(SharedDatabaseModel).filter(SharedDatabaseModel.id == site.shared_db_id).first()
 
@@ -63,21 +70,34 @@ def install_wordpress_task(site_id: int):
         if not os.path.exists(site.root_path):
             os.makedirs(site.root_path, exist_ok=True)
 
-        # Step 1: Download WordPress core files FIRST (before OLS vhost to avoid 404 window)
-        site.notes = "step1: WordPress 文件下载中..."
+        # Step 1: Install WordPress core files FIRST (before OLS vhost to avoid a 404 window).
+        # The version comes from the site request or the configured default; the local
+        # package library is preferred and a missing version is fetched once and cached.
+        requested_version = site.wp_version
+        if requested_version and requested_version not in ("未安装", "已安装"):
+            try:
+                wp_version = validate_version(requested_version)
+            except ValueError as exc:
+                site.notes = f"failed: WordPress 版本号无效 - {exc}"
+                db.add(site)
+                db.commit()
+                return
+        else:
+            wp_version = get_default_wp_version(db)
+        site.wp_version = wp_version
+        site.notes = f"step1: WordPress {wp_version} 文件安装中..."
         db.add(site)
         db.commit()
 
         try:
-            cmd = [php_path, wp_cli_path, "core", "download", f"--path={site.root_path}", "--locale=zh_CN", "--allow-root", "--force"]
-            subprocess.run(cmd, check=True, capture_output=True)
+            zip_path = ensure_core_package(wp_version)
+            extract_core_package(zip_path, site.root_path)
             chown_site_root(site.root_path)
-        except subprocess.CalledProcessError as e:
-            err_msg = e.stderr.decode(errors='ignore') if e.stderr else str(e)
-            site.notes = f"failed: WordPress 文件下载失败 - {err_msg}"
+        except Exception as exc:
+            print(f"WordPress core install failed: {exc}")
+            site.notes = f"failed: WordPress {wp_version} 文件安装失败 - {exc}"
             db.add(site)
             db.commit()
-            db.close()
             return
 
         # 1.5 Resolve requested PHP version against installed lsphp builds
@@ -165,6 +185,7 @@ def install_wordpress_task(site_id: int):
                     db.commit()
 
             # Step 3: Config Create & Install
+            assets_note = ""
             if db_name and db_user and db_pass:
                 site.notes = "step3: 配置优化中..."
                 db.add(site)
@@ -222,6 +243,9 @@ def install_wordpress_task(site_id: int):
                     except Exception:
                         pass
 
+                # Install default themes/plugins from the local package library
+                assets_note = install_default_assets(db, php_path, wp_cli_path, site.root_path)
+
                 # Discourage search engines
                 if site.discourage_search_engines:
                     try:
@@ -243,7 +267,7 @@ def install_wordpress_task(site_id: int):
                     if result.returncode == 0 and result.stdout.strip():
                         site.wp_version = result.stdout.strip()
                 except Exception:
-                    site.wp_version = "已安装"
+                    pass  # Keep the requested/default version already stored above
 
                 # Hand the files to the LSAPI worker (nobody) for uploads/writes
                 chown_site_root(site.root_path)
@@ -256,7 +280,7 @@ def install_wordpress_task(site_id: int):
 
                 site.notes = (
                     f"completed: WordPress 站点创建完成。管理员: {admin_user} 密码: {admin_pass}"
-                    f"\n{ols_note}{cache_note}"
+                    f"\n{ols_note}{assets_note}{cache_note}"
                 )
             else:
                 chown_site_root(site.root_path)

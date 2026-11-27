@@ -69,3 +69,6 @@ backend/phpmyadmin/*.log
 
 # wordpress
 wordpress/
+
+# Local WordPress package library (runtime data, never commit)
+/backend/assets/packages/

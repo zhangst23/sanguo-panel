@@ -3,6 +3,9 @@ from backend.models.base import Base
 # Import all models to ensure they are registered with Base.metadata
 from backend.models.user import User
 from backend.models.site import SharedDatabase, Site
+from backend.models.config import GlobalOption
+from backend.models.wp_asset import WpAsset
+from backend.utils.wp_asset_utils import DEFAULT_OPTION_KEY, DEFAULT_WP_VERSION
 from backend.core.security import get_password_hash
 from sqlalchemy import inspect, text
 
@@ -49,7 +52,17 @@ def init_db():
             db.commit()
             print("Default shared database updated to dedicated admin account.")
         print("Default shared database already exists.")
-    
+
+    # Default WordPress version used when creating new sites
+    if not db.query(GlobalOption).filter(GlobalOption.option_key == DEFAULT_OPTION_KEY).first():
+        db.add(GlobalOption(
+            option_key=DEFAULT_OPTION_KEY,
+            option_value=DEFAULT_WP_VERSION,
+            description="新建站点使用的 WordPress 默认版本",
+        ))
+        db.commit()
+        print(f"Default WordPress version set to {DEFAULT_WP_VERSION}.")
+
     db.close()
 
     # Migrate: add columns that may not exist in older DBs
