@@ -128,7 +128,7 @@ const routes = [
         path: 'tasks',
         name: 'TaskList',
         component: () => import('@/views/Task/TaskList.vue'),
-        meta: { requiresAuth: true, title: '任务列表' },
+        meta: { requiresAuth: true, title: '操作日志' },
       },
       {
         path: 'system-manage',

@@ -145,12 +145,24 @@ def extract_core_package(zip_path: str, target_dir: str) -> None:
                 shutil.copyfileobj(source, out)
 
 
-def install_default_assets(db, php_path: str, wp_cli_path: str, site_root: str) -> str:
-    """Install all enabled default themes/plugins from local zips into a new site."""
-    defaults = (db.query(WpAsset)
-                  .filter(WpAsset.is_default.is_(True), WpAsset.enabled.is_(True),
-                          WpAsset.kind.in_(["theme", "plugin"]))
-                  .order_by(WpAsset.kind, WpAsset.id).all())
+def install_default_assets(db, php_path: str, wp_cli_path: str, site_root: str,
+                           theme_id=None, plugin_ids=None) -> str:
+    """Install themes/plugins into a new site from the local package library.
+
+    When no explicit selection is provided, install everything flagged as a
+    default (legacy behaviour). Otherwise install exactly the selected assets;
+    an empty selection means "install nothing".
+    """
+    query = db.query(WpAsset).filter(
+        WpAsset.enabled.is_(True), WpAsset.kind.in_(["theme", "plugin"]))
+    if theme_id is None and plugin_ids is None:
+        query = query.filter(WpAsset.is_default.is_(True))
+    else:
+        selected_ids = ([theme_id] if theme_id is not None else []) + list(plugin_ids or [])
+        if not selected_ids:
+            return ""
+        query = query.filter(WpAsset.id.in_(selected_ids))
+    defaults = query.order_by(WpAsset.kind, WpAsset.id).all()
     installed, failed = [], []
     for asset in defaults:
         try:

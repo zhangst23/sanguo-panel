@@ -70,8 +70,7 @@
             <a-menu-item key="Linux">系统管理</a-menu-item>
             <a-menu-item key="Monitor">监控中心</a-menu-item>
             <a-menu-item key="SystemSettings">面板设置</a-menu-item>
-            <a-menu-item key="TaskList">任务列表</a-menu-item>
-            <a-menu-item key="ApiDocs">API 接口文档</a-menu-item>
+            <a-menu-item key="TaskList">操作日志</a-menu-item>
             <a-menu-item key="About">关于</a-menu-item>
             
           </a-sub-menu>
@@ -267,10 +266,6 @@ onUnmounted(() => {
 })
 
 const handleMenuClick = (key) => {
-  if (key === 'ApiDocs') {
-    window.open('/api-docs', '_blank')
-    return
-  }
   router.push({ name: key })
 }
 </script>

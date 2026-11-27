@@ -1,10 +1,10 @@
 <template>
   <div class="task-container">
-    <a-typography-title :heading="2">任务列表</a-typography-title>
+    <a-typography-title :heading="2">操作日志</a-typography-title>
     
     <a-card>
       <template #extra>
-        <a-button type="outline" @click="fetchTasks">
+        <a-button type="outline" @click="fetchTasks" :loading="loading">
           <template #icon><icon-refresh /></template>
           刷新
         </a-button>
@@ -12,8 +12,12 @@
       
       <a-table :data="tasks" :loading="loading">
         <template #columns>
-          <a-table-column title="任务ID" data-index="task_uuid" :width="120" />
-          <a-table-column title="类型" data-index="type">
+          <a-table-column title="记录ID" :width="90">
+            <template #cell="{ record }">
+              <span class="record-id">{{ record.id }}</span>
+            </template>
+          </a-table-column>
+          <a-table-column title="操作类型" data-index="type">
             <template #cell="{ record }">
               <a-tag color="arcoblue">{{ record.type }}</a-tag>
             </template>
@@ -30,9 +34,17 @@
               <a-progress :percent="record.progress / 100" />
             </template>
           </a-table-column>
-          <a-table-column title="消息" data-index="message" />
-          <a-table-column title="开始时间" data-index="started_at" />
-          <a-table-column title="完成时间" data-index="completed_at" />
+          <a-table-column title="详情" data-index="message" ellipsis />
+          <a-table-column title="开始时间" :width="150">
+            <template #cell="{ record }">
+              {{ formatDateTime(record.started_at) }}
+            </template>
+          </a-table-column>
+          <a-table-column title="完成时间" :width="150">
+            <template #cell="{ record }">
+              {{ formatDateTime(record.completed_at) }}
+            </template>
+          </a-table-column>
           <a-table-column title="操作">
             <template #cell="{ record }">
               <a-space>
@@ -49,14 +61,14 @@
       </a-table>
     </a-card>
 
-    <a-modal v-model:visible="errorVisible" title="任务错误详情" :footer="false">
+    <a-modal v-model:visible="errorVisible" title="操作错误详情" :footer="false">
       <a-alert type="error">{{ errorMessage }}</a-alert>
     </a-modal>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { Message } from '@arco-design/web-vue'
 import { IconRefresh } from '@arco-design/web-vue/es/icon'
 import request from '@/utils/request'
@@ -65,7 +77,18 @@ const tasks = ref([])
 const loading = ref(false)
 const errorVisible = ref(false)
 const errorMessage = ref('')
-let pollTimer = null
+
+// 时间统一显示为 YYYY-MM-DD HH:mm
+const formatDateTime = (value) => {
+  if (!value) return '-'
+  // 后端返回的是不带时区的 UTC 时间，补上 Z 后再按浏览器本地时区显示
+  const raw = String(value).replace(' ', 'T')
+  const iso = /(?:Z|[+-]\d{2}:?\d{2})$/.test(raw) ? raw : `${raw}Z`
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return value
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
 
 const fetchTasks = async () => {
   loading.value = true
@@ -106,17 +129,16 @@ const handleDelete = async (record) => {
 }
 
 onMounted(() => {
+  // 仅在打开页面时加载一次，之后由“刷新”按钮手动触发
   fetchTasks()
-  pollTimer = setInterval(fetchTasks, 5000)
-})
-
-onUnmounted(() => {
-  if (pollTimer) clearInterval(pollTimer)
 })
 </script>
 
 <style scoped>
 .task-container {
   padding: 0;
+}
+.record-id {
+  white-space: nowrap;
 }
 </style>

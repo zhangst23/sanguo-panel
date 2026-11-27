@@ -65,16 +65,30 @@ def init_db():
 
     db.close()
 
-    # Migrate: add columns that may not exist in older DBs
+    ensure_schema()
+    print("Database initialized successfully.")
+
+
+def ensure_schema():
+    """Add columns introduced in later versions to an existing panel.db.
+
+    ``create_all`` never alters existing tables, so upgrade existing installs
+    explicitly. Safe to call on every startup.
+    """
     with engine.connect() as conn:
         inspector = inspect(engine)
         site_cols = [c['name'] for c in inspector.get_columns('sites')]
         if 'discourage_search_engines' not in site_cols:
             conn.execute(text("ALTER TABLE sites ADD COLUMN discourage_search_engines BOOLEAN DEFAULT 1"))
-            conn.commit()
             print("Added column 'discourage_search_engines' to sites table.")
+        if 'default_theme' not in site_cols:
+            conn.execute(text("ALTER TABLE sites ADD COLUMN default_theme INTEGER"))
+            print("Added column 'default_theme' to sites table.")
+        if 'default_plugins' not in site_cols:
+            conn.execute(text("ALTER TABLE sites ADD COLUMN default_plugins JSON"))
+            print("Added column 'default_plugins' to sites table.")
+        conn.commit()
 
-    print("Database initialized successfully.")
 
 if __name__ == "__main__":
     init_db()

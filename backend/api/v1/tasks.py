@@ -17,7 +17,7 @@ def read_tasks(
     """
     Retrieve tasks.
     """
-    tasks = db.query(TaskModel).order_by(TaskModel.created_at.desc()).offset(skip).limit(limit).all()
+    tasks = db.query(TaskModel).order_by(TaskModel.id.desc()).offset(skip).limit(limit).all()
     return tasks
 
 @router.get("/{task_uuid}", response_model=Task)

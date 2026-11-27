@@ -121,9 +121,6 @@
                     <icon-launch />
                   </a>
                 </div>
-                <div class="aliases" v-if="record.aliases?.length">
-                  <a-tag v-for="alias in record.aliases" :key="alias" size="mini">{{ alias }}</a-tag>
-                </div>
               </div>
             </template>
           </a-table-column>
@@ -219,7 +216,7 @@
     <a-modal
       v-model:visible="showCreateModal"
       title="创建站点"
-      :width="550"
+      :width="825"
       @cancel="resetForm"
       :footer="!confirmLoading"
       :mask-closable="false"
@@ -267,17 +264,17 @@
             ]"
             help="输入主域名，系统将自动配置根目录及数据库"
           >
-            <a-row :gutter="12">
-              <a-col :span="14">
-                <a-input v-model="form.domain" placeholder="例如: example.com" @input="handleDomainInput" />
+            <a-row :gutter="16">
+              <a-col :span="13">
+                <a-input v-model="form.domain" placeholder="例如: example.com" />
               </a-col>
-              <a-col :span="10">
+              <a-col :span="11">
                 <a-input-tag v-model="form.aliases" placeholder="别名: www.domain.com" allow-clear />
               </a-col>
             </a-row>
           </a-form-item>
-          <a-row :gutter="12">
-            <a-col :span="12">
+          <a-row :gutter="16">
+            <a-col :span="8">
               <a-form-item field="php_version" label="PHP 版本">
                 <a-select v-model="form.php_version">
                   <a-option v-for="v in phpVersions" :key="v" :value="v">
@@ -286,22 +283,52 @@
                 </a-select>
               </a-form-item>
             </a-col>
-            <a-col :span="12">
+            <a-col :span="8">
               <a-form-item label="数据库类型">
                 <a-input placeholder="MariaDB" disabled />
               </a-form-item>
             </a-col>
+            <a-col :span="8">
+              <a-form-item field="wp_version" label="WordPress 版本" :help="`当前默认版本：${defaultWpVersion}`">
+                <a-select v-model="form.wp_version" allow-clear placeholder="使用默认版本">
+                  <a-option v-for="v in wpVersions" :key="v" :value="v">
+                    {{ v }}<span v-if="v === defaultWpVersion" class="version-hint">（默认）</span>
+                  </a-option>
+                </a-select>
+              </a-form-item>
+            </a-col>
           </a-row>
-          <a-form-item field="wp_version" label="WordPress 版本" :help="`当前默认版本：${defaultWpVersion}`">
-            <a-select v-model="form.wp_version" allow-clear placeholder="使用默认版本">
-              <a-option v-for="v in wpVersions" :key="v" :value="v">
-                {{ v }}<span v-if="v === defaultWpVersion" class="version-hint">（默认）</span>
-              </a-option>
-            </a-select>
-          </a-form-item>
-          <a-form-item field="root_path" label="根目录">
-            <a-input v-model="form.root_path" placeholder="/var/www/html/域名" />
-          </a-form-item>
+          <a-row :gutter="16">
+            <a-col :span="12">
+              <a-form-item field="default_theme" label="默认主题">
+                <a-select
+                  v-model="form.default_theme"
+                  allow-clear
+                  placeholder="使用系统默认主题"
+                  :loading="assetOptionsLoading"
+                >
+                  <a-option v-for="t in themeOptions" :key="t.id" :value="t.id">
+                    {{ t.name }}<span v-if="t.is_default" class="version-hint">（默认）</span>
+                  </a-option>
+                </a-select>
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item field="default_plugins" label="默认插件（可多选）">
+                <a-select
+                  v-model="form.default_plugins"
+                  multiple
+                  allow-clear
+                  placeholder="使用系统默认插件"
+                  :loading="assetOptionsLoading"
+                >
+                  <a-option v-for="p in pluginOptions" :key="p.id" :value="p.id">
+                    {{ p.name }}<span v-if="p.is_default" class="version-hint">（默认）</span>
+                  </a-option>
+                </a-select>
+              </a-form-item>
+            </a-col>
+          </a-row>
           <a-form-item field="ssl_mode" label="SSL 模式">
             <a-radio-group v-model="form.ssl_mode" type="button">
               <a-radio value="cloudflare">Cloudflare</a-radio>
@@ -749,6 +776,11 @@ const defaultPhpVersion = ref('8.3')
 const wpVersions = ref([])
 const defaultWpVersion = ref('6.5.5')
 
+// 创建站点时可选的主题 / 插件（均来自本地资源库）
+const themeOptions = ref([])
+const pluginOptions = ref([])
+const assetOptionsLoading = ref(false)
+
 const fetchWpVersions = async () => {
   try {
     const res = await request.get('/wp-assets/defaults')
@@ -760,8 +792,29 @@ const fetchWpVersions = async () => {
   }
 }
 
+const fetchAssetOptions = async () => {
+  assetOptionsLoading.value = true
+  try {
+    const [themes, plugins] = await Promise.all([
+      request.get('/wp-assets', { params: { kind: 'theme' } }),
+      request.get('/wp-assets', { params: { kind: 'plugin' } })
+    ])
+    themeOptions.value = (themes || []).filter((a) => a.enabled)
+    pluginOptions.value = (plugins || []).filter((a) => a.enabled)
+    form.default_theme = themeOptions.value.find((a) => a.is_default)?.id ?? null
+    form.default_plugins = pluginOptions.value.filter((a) => a.is_default).map((a) => a.id)
+  } catch (error) {
+    console.error(error)
+  } finally {
+    assetOptionsLoading.value = false
+  }
+}
+
 watch(showCreateModal, (visible) => {
-  if (visible) fetchWpVersions()
+  if (visible) {
+    fetchWpVersions()
+    fetchAssetOptions()
+  }
 })
 
 const fetchPhpVersions = async () => {
@@ -781,9 +834,10 @@ const fetchPhpVersions = async () => {
 const form = reactive({
   domain: '',
   aliases: [],
-  root_path: '/var/www/html/',
   php_version: '8.3',
   wp_version: '6.5.5',
+  default_theme: null,
+  default_plugins: [],
   ssl_mode: 'cloudflare',
   performance_preset: 'performance',
   discourage_search_engines: true
@@ -946,11 +1000,6 @@ const aiAnalysisHtml = computed(() => {
     .replace(/(<li>[\s\S]*?<\/li>)/g, (match) => `<ul>${match}</ul>`)
     .replace(/\n/g, '<br>')
 })
-
-const handleDomainInput = () => {
-  form.root_path = form.domain ? `/var/www/html/${form.domain}` : '/var/www/html/'
-  // 别名由用户自行填写，不再默认添加 www 域名
-}
 
 const fetchSites = async () => {
   loading.value = true
@@ -1374,9 +1423,10 @@ const resetForm = () => {
   Object.assign(form, {
     domain: '',
     aliases: [],
-    root_path: '/var/www/html/',
     php_version: defaultPhpVersion.value,
     wp_version: defaultWpVersion.value,
+    default_theme: themeOptions.value.find((a) => a.is_default)?.id ?? null,
+    default_plugins: pluginOptions.value.filter((a) => a.is_default).map((a) => a.id),
     ssl_mode: 'cloudflare',
     performance_preset: 'performance',
     discourage_search_engines: true
@@ -1477,9 +1527,6 @@ onMounted(() => {
 }
 .done-icon {
   color: #00b42a;
-}
-.aliases {
-  margin-top: 4px;
 }
 .form-section {
   margin-bottom: 24px;

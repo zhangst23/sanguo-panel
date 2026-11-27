@@ -200,7 +200,7 @@ def install_wordpress_task(site_id: int):
                     f"--dbpass={db_pass}",
                     f"--dbhost={shared_db.db_host}",
                     f"--dbprefix={site.table_prefix}",
-                    "--locale=zh_CN",
+                    "--locale=en_US",
                     "--allow-root",
                     "--force"
                 ]
@@ -223,6 +223,16 @@ def install_wordpress_task(site_id: int):
                 ]
                 subprocess.run(cmd_install, check=True, capture_output=True)
 
+                # 新建站点默认使用英文后台（WPLANG 留空即 en_US）
+                try:
+                    subprocess.run(
+                        [php_path, wp_cli_path, "option", "update", "WPLANG", "",
+                         f"--path={site.root_path}", "--allow-root"],
+                        check=True, capture_output=True
+                    )
+                except Exception:
+                    pass
+
                 # Clean up default plugins
                 for plugin in ['akismet', 'hello']:
                     try:
@@ -243,8 +253,11 @@ def install_wordpress_task(site_id: int):
                     except Exception:
                         pass
 
-                # Install default themes/plugins from the local package library
-                assets_note = install_default_assets(db, php_path, wp_cli_path, site.root_path)
+                # Install selected (or system default) themes/plugins from the local library
+                assets_note = install_default_assets(
+                    db, php_path, wp_cli_path, site.root_path,
+                    theme_id=site.default_theme, plugin_ids=site.default_plugins
+                )
 
                 # Discourage search engines
                 if site.discourage_search_engines:

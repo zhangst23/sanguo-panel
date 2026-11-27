@@ -27,6 +27,8 @@ class SiteCreate(BaseModel):
     ssl_mode: str = "cloudflare"
     discourage_search_engines: bool = True
     wp_version: Optional[str] = None
+    default_theme: Optional[int] = None
+    default_plugins: Optional[List[int]] = None
     notes: Optional[str] = None
 
     @field_validator('wp_version')

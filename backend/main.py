@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse
 from backend.utils.pma_server import get_pma_manager
 import httpx
 import os
+import re
 from pathlib import Path
 
 @asynccontextmanager
@@ -30,6 +31,13 @@ async def lifespan(app: FastAPI):
             print("--- Database was empty: initialized schema and admin account ---")
     except Exception as e:
         print(f"--- Database auto-init failed: {e} ---")
+
+    # Upgrade older panel.db files with columns added in newer versions.
+    try:
+        from backend.init_db import ensure_schema
+        ensure_schema()
+    except Exception as e:
+        print(f"--- Database schema upgrade failed: {e} ---")
 
     # Ensure a dedicated MariaDB admin account exists (never use root for sites)
     try:
@@ -100,6 +108,101 @@ else:
     )
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+
+# ---------------------------------------------------------------------------
+# 操作日志：统一记录面板上的写操作（POST/PUT/PATCH/DELETE）。
+# 此前只有少数几个接口会写入 tasks 表，导致“操作日志”页面长期为空。
+# ---------------------------------------------------------------------------
+def _operation_label(method: str, path: str) -> str:
+    prefix = settings.API_V1_STR
+    p = (path[len(prefix):] if path.startswith(prefix) else path).rstrip("/") or "/"
+    exact = {
+        ("POST", "/sites"): "创建站点",
+        ("POST", "/sites/batch"): "批量建站",
+        ("POST", "/sites/migrate"): "迁移站点",
+        ("DELETE", "/sites"): "删除站点",
+        ("POST", "/security/backup"): "创建备份",
+        ("POST", "/system/update"): "面板更新",
+        ("POST", "/system/restart"): "面板重启",
+    }
+    if (method, p) in exact:
+        return exact[(method, p)]
+    if p.startswith("/sites/") and re.match(r"^/sites/\d+$", p):
+        return {"PUT": "修改站点", "DELETE": "删除站点"}.get(method, "站点操作")
+    segment = p.strip("/").split("/")[0] if p.strip("/") else "panel"
+    names = {
+        "sites": "站点", "backup": "备份", "database": "数据库", "files": "文件",
+        "php": "PHP", "system": "系统", "tools": "工具", "security": "安全",
+        "ssl": "SSL", "cache": "缓存", "litespeed": "OpenLiteSpeed",
+        "wp-assets": "WP资源", "monitor": "监控", "image": "图片", "cdn": "CDN",
+        "ultimate": "极致优化", "assets": "资源", "linux": "系统",
+    }
+    actions = {"POST": "执行", "PUT": "修改", "PATCH": "更新", "DELETE": "删除"}
+    return f"{actions.get(method, method)}{names.get(segment, segment)}"
+
+
+def _record_operation(request: Request, response: Response, path: str, method: str) -> None:
+    import uuid
+    from jose import jwt
+    from datetime import datetime
+    from backend.core.database import SessionLocal
+    from backend.models.task import Task, TaskStatus
+    from backend.models.user import User
+    from backend.schemas.token import TokenPayload
+
+    auth = request.headers.get("authorization", "")
+    if not auth.lower().startswith("bearer "):
+        return
+    try:
+        payload = jwt.decode(
+            auth.split(None, 1)[1], settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
+        user_id = TokenPayload(**payload).sub
+    except Exception:
+        return
+
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return
+        succeeded = response.status_code < 400
+        now = datetime.utcnow()
+        db.add(Task(
+            task_uuid=str(uuid.uuid4()),
+            type=_operation_label(method, path)[:50],
+            status=TaskStatus.completed if succeeded else TaskStatus.failed,
+            progress=100 if succeeded else 0,
+            message=f"{user.username} · {method} {path}",
+            error=None if succeeded else f"HTTP {response.status_code}",
+            created_by=user.id,
+            started_at=now,
+            completed_at=now,
+        ))
+        db.commit()
+    finally:
+        db.close()
+
+
+@app.middleware("http")
+async def operation_log_middleware(request: Request, call_next):
+    response = await call_next(request)
+    try:
+        path = request.url.path
+        method = request.method.upper()
+        if (
+            path.startswith(settings.API_V1_STR + "/")
+            and method in ("POST", "PUT", "PATCH", "DELETE")
+            and not path.startswith(settings.API_V1_STR + "/login")
+            and not path.startswith(settings.API_V1_STR + "/tasks")
+        ):
+            _record_operation(request, response, path, method)
+    except Exception as exc:
+        # 日志失败绝不影响业务请求
+        print(f"--- 操作日志记录失败: {exc} ---")
+    return response
+
 
 # phpMyAdmin Proxy
 @app.api_route("/phpmyadmin/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"])

@@ -26,32 +26,6 @@
             </a-card>
           </a-col>
 
-          <!-- AI 设置 -->
-          <a-col :span="8">
-            <a-card title="AI 设置" hoverable>
-              <a-form :model="aiForm" layout="vertical" @submit="handleAISave">
-                <a-form-item label="模型" required>
-                  <a-input v-model="aiForm.model" placeholder="请输入模型名称" />
-                </a-form-item>
-                <a-form-item label="API Key" required>
-                  <a-input
-                    v-model="aiForm.api_key"
-                    :type="aiKeyVisible ? 'text' : 'password'"
-                    placeholder="请输入 DeepSeek API Key"
-                  >
-                    <template #suffix>
-                      <icon-eye v-if="!aiKeyVisible" @click="aiKeyVisible = true" style="cursor:pointer" />
-                      <icon-eye-invisible v-else @click="aiKeyVisible = false" style="cursor:pointer" />
-                    </template>
-                  </a-input>
-                </a-form-item>
-                <a-button type="primary" html-type="submit" :loading="loading.ai">
-                  保存
-                </a-button>
-              </a-form>
-            </a-card>
-          </a-col>
-
           <!-- 面板端口修改 -->
           <a-col :span="8">
             <a-card title="面板端口设置" hoverable>
@@ -143,8 +117,7 @@
 import { ref, reactive, onMounted, nextTick } from 'vue'
 import { Message } from '@arco-design/web-vue'
 import {
-  IconRefresh, IconDownload, IconDelete, IconEye, IconEyeInvisible,
-  IconUpCircle
+  IconRefresh, IconDownload, IconDelete, IconUpCircle
 } from '@arco-design/web-vue/es/icon'
 import request from '@/utils/request'
 
@@ -152,8 +125,7 @@ const loading = reactive({
   password: false,
   port: false,
   secret: false,
-  logs: false,
-  ai: false
+  logs: false
 })
 
 const passwordForm = reactive({
@@ -166,14 +138,8 @@ const portForm = reactive({
   port: 8000
 })
 
-const aiForm = reactive({
-  model: 'DeepSeek-V4-Pro',
-  api_key: ''
-})
-
 const logs = ref('')
 const logContainer = ref(null)
-const aiKeyVisible = ref(false)
 const updating = ref(false)
 const restarting = ref(false)
 
@@ -193,7 +159,6 @@ const overview = reactive({
 
 const fetchData = async () => {
   fetchLogs()
-  fetchAIConfig()
   fetchOverview()
 }
 
@@ -281,29 +246,6 @@ const handleRestart = async () => {
     Message.error('重启失败')
   } finally {
     restarting.value = false
-  }
-}
-
-const fetchAIConfig = async () => {
-  try {
-    const res = await request.get('/system/ai-config')
-    aiForm.model = res.model || 'DeepSeek-V4-Pro'
-    aiForm.api_key = res.has_key ? '••••••••' : ''
-  } catch (error) {
-    console.error(error)
-  }
-}
-
-const handleAISave = async () => {
-  loading.ai = true
-  try {
-    await request.post('/system/ai-config', { model: aiForm.model, api_key: aiForm.api_key })
-    Message.success('AI 配置已保存')
-    aiForm.api_key = '••••••••'
-  } catch (error) {
-    Message.error(error.response?.data?.detail || '保存失败')
-  } finally {
-    loading.ai = false
   }
 }
 

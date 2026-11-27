@@ -67,6 +67,10 @@ class Site(Base):
     wp_version = Column(String(20), default="未安装")  # WordPress 版本
     monitor_enabled = Column(Boolean, default=False)   # 监控状态
     created_at = Column(DateTime, default=datetime.utcnow)  # 创建时间
+
+    # 建站时选择的默认主题 / 插件（资源库 ID，为空表示沿用系统默认配置）
+    default_theme = Column(Integer)
+    default_plugins = Column(JSON)
     
     # SSL Extended Config
     ssl_mode = Column(String(20), default="cloudflare") # none, cloudflare, letsencrypt
