@@ -99,6 +99,7 @@
     <a-modal
       v-model:visible="uploadVisible"
       :title="uploadTitle"
+      ok-text="上传"
       :on-before-ok="handleUpload"
       :confirm-loading="uploading"
       @ok="resetUploadState"
