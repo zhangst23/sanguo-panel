@@ -91,6 +91,10 @@
         <a-tab-pane key="speedTools" title="一键提速工具">
           <QuickSpeedTools />
         </a-tab-pane>
+
+        <a-tab-pane key="hardening" title="WordPress 安全加固">
+          <WordPressHardening />
+        </a-tab-pane>
       </a-tabs>
     </a-card>
 
@@ -186,6 +190,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import request from '@/utils/request'
 import { Message } from '@arco-design/web-vue'
 import QuickSpeedTools from '@/views/Tools/QuickSpeedTools.vue'
+import WordPressHardening from '@/views/Security/WordPressHardening.vue'
 
 const loading = ref(false)
 const assets = ref([])
