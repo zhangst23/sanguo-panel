@@ -87,6 +87,10 @@ def ensure_schema():
         if 'default_plugins' not in site_cols:
             conn.execute(text("ALTER TABLE sites ADD COLUMN default_plugins JSON"))
             print("Added column 'default_plugins' to sites table.")
+        user_cols = [c['name'] for c in inspector.get_columns('users')]
+        if 'token_version' not in user_cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 0"))
+            print("Added column 'token_version' to users table.")
         conn.commit()
 
 

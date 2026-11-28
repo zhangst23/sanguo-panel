@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     
     SECRET_KEY: str = "secret"  # Should be changed in production
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 1 day
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 0  # 0 表示 Token 永久有效
     
     # CORS
     BACKEND_CORS_ORIGINS: List[AnyHttpUrl] = []

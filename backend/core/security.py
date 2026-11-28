@@ -6,14 +6,17 @@ from backend.core.config import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-def create_access_token(subject: Union[str, Any], expires_delta: timedelta = None) -> str:
+def create_access_token(
+    subject: Union[str, Any],
+    expires_delta: timedelta = None,
+    token_version: int = 0,
+) -> str:
+    # ACCESS_TOKEN_EXPIRE_MINUTES 为 0 时不写 exp，Token 永久有效
+    if expires_delta is None and settings.ACCESS_TOKEN_EXPIRE_MINUTES > 0:
+        expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode = {"sub": str(subject), "token_ver": int(token_version or 0)}
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(
-            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
-        )
-    to_encode = {"exp": expire, "sub": str(subject)}
+        to_encode["exp"] = datetime.utcnow() + expires_delta
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 

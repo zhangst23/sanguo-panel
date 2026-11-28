@@ -80,6 +80,35 @@
               </a-space>
             </a-card>
           </a-col>
+
+          <!-- 面板 Token 管理 -->
+          <a-col :span="8">
+            <a-card title="面板 Token" hoverable>
+              <div class="security-item">
+                <div class="label">当前 Token（永久有效）</div>
+                <div class="desc">用于 Agent MCP / Skill 接入，请勿泄露给他人。</div>
+              </div>
+              <a-input
+                :type="tokenVisible ? 'text' : 'password'"
+                :model-value="panelToken"
+                readonly
+                size="small"
+              >
+                <template #suffix>
+                  <a-link @click="tokenVisible = !tokenVisible">
+                    <icon-eye v-if="!tokenVisible" />
+                    <icon-eye-invisible v-else />
+                  </a-link>
+                </template>
+              </a-input>
+              <a-space style="margin-top: 12px">
+                <a-button size="small" @click="copyPanelToken">复制 Token</a-button>
+                <a-popconfirm content="重新生成后旧 Token 立即失效，确定继续吗？" @ok="regenerateToken">
+                  <a-button size="small" :loading="tokenRegenerating">重新生成</a-button>
+                </a-popconfirm>
+              </a-space>
+            </a-card>
+          </a-col>
         </a-row>
       </a-tab-pane>
 
@@ -122,7 +151,7 @@
 import { ref, reactive, onMounted, nextTick } from 'vue'
 import { Message } from '@arco-design/web-vue'
 import {
-  IconRefresh, IconDownload, IconDelete, IconUpCircle
+  IconRefresh, IconDownload, IconDelete, IconUpCircle, IconEye, IconEyeInvisible
 } from '@arco-design/web-vue/es/icon'
 import request from '@/utils/request'
 import NotificationSettings from './NotificationSettings.vue'
@@ -143,6 +172,10 @@ const passwordForm = reactive({
 const portForm = reactive({
   port: 8000
 })
+
+const panelToken = ref('')
+const tokenVisible = ref(false)
+const tokenRegenerating = ref(false)
 
 const logs = ref('')
 const logContainer = ref(null)
@@ -166,6 +199,7 @@ const overview = reactive({
 const fetchData = async () => {
   fetchLogs()
   fetchOverview()
+  fetchPanelToken()
 }
 
 const fetchOverview = async () => {
@@ -175,6 +209,54 @@ const fetchOverview = async () => {
     if (ov.services) overview.services = ov.services
   } catch (error) {
     console.error(error)
+  }
+}
+
+const fetchPanelToken = async () => {
+  try {
+    const res = await request.get('/system/token')
+    panelToken.value = res.token || ''
+    if (res.token) localStorage.setItem('token', res.token)
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+const copyPanelToken = async () => {
+  if (!panelToken.value) {
+    Message.warning('Token 尚未加载')
+    return
+  }
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(panelToken.value)
+    } else {
+      const textarea = document.createElement('textarea')
+      textarea.value = panelToken.value
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+    }
+    Message.success('面板 Token 已复制')
+  } catch (error) {
+    Message.error('复制失败，请手动复制')
+  }
+}
+
+const regenerateToken = async () => {
+  tokenRegenerating.value = true
+  try {
+    const res = await request.post('/system/token/regenerate')
+    panelToken.value = res.token || ''
+    if (res.token) localStorage.setItem('token', res.token)
+    Message.success(res.message || '面板 Token 已重新生成')
+  } catch (error) {
+    Message.error(error.response?.data?.detail || '重新生成失败')
+  } finally {
+    tokenRegenerating.value = false
   }
 }
 

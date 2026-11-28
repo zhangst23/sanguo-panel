@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, DateTime
+from sqlalchemy import Column, String, Boolean, DateTime, Integer
 from backend.models.base import Base
 
 class User(Base):
@@ -11,3 +11,4 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     is_superuser = Column(Boolean, default=False)
     last_login_at = Column(DateTime)
+    token_version = Column(Integer, default=0)

@@ -11,12 +11,22 @@
       <div class="code-block">
         <div class="code-head">
           <span>客户端配置（mcpServers）</span>
-          <a-button size="small" type="text" @click="copyText(mcpConfig, '配置已复制')">
-            <template #icon><icon-copy /></template>
-            复制
-          </a-button>
+          <a-space>
+            <a-button size="small" type="primary" @click="copyPanelToken">
+              <template #icon><icon-copy /></template>
+              复制面板 Token
+            </a-button>
+            <a-button size="small" type="text" @click="copyText(mcpConfig, '配置已复制')">
+              <template #icon><icon-copy /></template>
+              复制配置
+            </a-button>
+          </a-space>
         </div>
         <pre>{{ mcpConfig }}</pre>
+      </div>
+      <div class="agent-hint" style="margin-top: 8px">
+        点击「复制面板 Token」会自动把当前登录的 Token 填入上方配置并复制到剪贴板。Token 永久有效，可在
+        <a-link @click="openSettings">面板设置</a-link> 中管理。
       </div>
 
       <a-table
@@ -67,12 +77,15 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { Message } from '@arco-design/web-vue'
 import { IconCopy } from '@arco-design/web-vue/es/icon'
 import request from '@/utils/request'
 
+const router = useRouter()
 const info = ref({ mcp_url: '', skill_url: '', tools: [] })
 const prompt = ref('')
+const panelToken = ref(localStorage.getItem('token') || '')
 
 const toolColumns = [
   { title: '工具名', dataIndex: 'name', width: 160 },
@@ -84,7 +97,7 @@ const mcpConfig = computed(() => JSON.stringify({
     'sanguo-panel': {
       type: 'http',
       url: info.value.mcp_url || `${window.location.origin}/api/v1/agent/mcp`,
-      headers: { Authorization: 'Bearer <你的面板 Token>' },
+      headers: { Authorization: `Bearer ${panelToken.value || '<你的面板 Token>'}` },
     },
   },
 }, null, 2))
@@ -108,6 +121,20 @@ const copyText = async (text, successText) => {
   } catch (error) {
     Message.error('复制失败，请手动复制')
   }
+}
+
+const copyPanelToken = async () => {
+  const token = localStorage.getItem('token') || ''
+  if (!token) {
+    Message.warning('当前未登录，请先登录面板')
+    return
+  }
+  panelToken.value = token
+  await copyText(token, '面板 Token 已复制并填入配置')
+}
+
+const openSettings = () => {
+  router.push({ name: 'SystemSettings' })
 }
 
 const fetchInfo = async () => {

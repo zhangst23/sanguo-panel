@@ -24,10 +24,17 @@ def login_access_token(
     elif not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    # 永久有效（ACCESS_TOKEN_EXPIRE_MINUTES=0）时不传过期时间
+    access_token_expires = (
+        timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        if settings.ACCESS_TOKEN_EXPIRE_MINUTES > 0
+        else None
+    )
     return {
         "access_token": security.create_access_token(
-            user.id, expires_delta=access_token_expires
+            user.id,
+            expires_delta=access_token_expires,
+            token_version=user.token_version or 0,
         ),
         "token_type": "bearer",
     }

@@ -319,6 +319,37 @@ async def regenerate_secret(current_user: User = Depends(deps.get_current_active
     return {"message": "安全密钥已更新，请重新登录"}
 
 
+@router.get("/token")
+async def get_panel_token(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+):
+    """获取/刷新当前账号的面板 Token（永久有效）。"""
+    token = security.create_access_token(
+        current_user.id, token_version=current_user.token_version or 0
+    )
+    return {"token": token, "token_type": "bearer", "permanent": True}
+
+
+@router.post("/token/regenerate")
+async def regenerate_panel_token(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+):
+    """重新生成面板 Token，旧 Token 立即失效。"""
+    current_user.token_version = (current_user.token_version or 0) + 1
+    db.commit()
+    token = security.create_access_token(
+        current_user.id, token_version=current_user.token_version
+    )
+    return {
+        "token": token,
+        "token_type": "bearer",
+        "permanent": True,
+        "message": "已生成新 Token，旧 Token 已失效",
+    }
+
+
 def _get_env_path():
     return os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), ".env")
 
