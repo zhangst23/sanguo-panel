@@ -41,7 +41,7 @@
           @menu-item-click="handleMenuClick"
           :collapsed="collapsed"
           mode="vertical"
-          theme="dark"
+          :theme="theme === 'dark' ? 'dark' : 'light'"
         >
           <a-menu-item key="Dashboard">
             <template #icon><icon-dashboard /></template>
@@ -321,15 +321,15 @@ const handleMenuClick = (key) => {
 <style scoped lang="scss">
 .layout-container {
   height: 100vh;
-  background-color: var(--arco-color-bg-1);
+  background-color: var(--color-bg-1);
 }
 
 .arco-layout-sider {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: var(--arco-color-bg-2);
-  border-right: 1px solid var(--arco-color-border-1);
+  background: var(--color-bg-2);
+  border-right: 1px solid var(--color-border-2);
   overflow: hidden;
 }
 
@@ -356,8 +356,8 @@ const handleMenuClick = (key) => {
   justify-content: space-between;
   height: 64px;
   padding: 0 16px;
-  background: var(--arco-color-bg-2);
-  border-bottom: 1px solid var(--arco-color-border-1);
+  background: var(--color-bg-2);
+  border-bottom: 1px solid var(--color-border-2);
 
   /* 折叠时隐藏 logo，折叠按钮居中 */
   &:has(.collapse-btn-collapsed) {
@@ -366,7 +366,7 @@ const handleMenuClick = (key) => {
 }
 
 .logo {
-  color: #fff;
+  color: var(--color-text-1);
   font-size: 18px;
   font-weight: 600;
   white-space: nowrap;
@@ -415,12 +415,12 @@ const handleMenuClick = (key) => {
   align-items: center;
   justify-content: center;
   border-radius: 6px;
-  color: #86909c;
+  color: var(--color-text-3);
   flex-shrink: 0;
 
   &:hover {
-    background-color: var(--arco-color-fill-2);
-    color: #c9cdd4;
+    background-color: var(--color-fill-2);
+    color: var(--color-text-1);
   }
 }
 
@@ -429,8 +429,8 @@ const handleMenuClick = (key) => {
   bottom: 0;
   left: 0;
   right: 0;
-  border-top: 1px solid var(--arco-color-border-1);
-  background: var(--arco-color-bg-2);
+  border-top: 1px solid var(--color-border-2);
+  background: var(--color-bg-2);
 }
 
 .user-trigger {
@@ -441,7 +441,7 @@ const handleMenuClick = (key) => {
   transition: background-color 0.2s;
 
   &:hover {
-    background-color: var(--arco-color-fill-2);
+    background-color: var(--color-fill-2);
   }
 
   &.collapsed {
@@ -460,7 +460,7 @@ const handleMenuClick = (key) => {
   display: block;
   font-size: 13px;
   font-weight: 500;
-  color: #ffffff !important;
+  color: var(--color-text-1);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -469,7 +469,7 @@ const handleMenuClick = (key) => {
 .content {
   padding: 16px 20px;
   overflow-y: auto;
-  background-color: var(--arco-color-bg-1);
+  background-color: var(--color-bg-1);
   flex: 1;
 }
 
@@ -483,8 +483,8 @@ const handleMenuClick = (key) => {
 .user-popover-content {
   padding: 0 !important;
   min-width: 180px;
-  background: var(--arco-color-bg-4) !important;
-  border: 1px solid var(--arco-color-border-2) !important;
+  background: var(--color-bg-4) !important;
+  border: 1px solid var(--color-border-2) !important;
   border-radius: 6px;
   box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.35) !important;
 }
@@ -500,11 +500,11 @@ const handleMenuClick = (key) => {
   padding: 9px 14px;
   cursor: pointer;
   font-size: 13px;
-  color: var(--arco-color-text-1);
+  color: var(--color-text-1);
   transition: background-color 0.15s;
 
   &:hover {
-    background-color: var(--arco-color-fill-2);
+    background-color: var(--color-fill-2);
   }
 
   &.logout-row {
@@ -524,28 +524,28 @@ const handleMenuClick = (key) => {
   display: flex;
   align-items: center;
   gap: 2px;
-  color: var(--arco-color-text-3);
+  color: var(--color-text-3);
   font-size: 12px;
 }
 
 .menu-arrow {
   font-size: 11px;
-  color: var(--arco-color-text-3);
+  color: var(--color-text-3);
 }
 
 .menu-sub {
-  background: var(--arco-color-fill-1);
+  background: var(--color-fill-1);
 }
 
 .menu-sub-item {
   padding: 9px 14px 9px 28px;
   cursor: pointer;
   font-size: 13px;
-  color: var(--arco-color-text-1);
+  color: var(--color-text-1);
   transition: background-color 0.15s;
 
   &:hover {
-    background-color: var(--arco-color-fill-2);
+    background-color: var(--color-fill-2);
   }
 
   &.selected {
@@ -558,5 +558,5 @@ const handleMenuClick = (key) => {
 .menu-divider {
   height: 1px;
   margin: 4px 10px;
-  background-color: var(--arco-color-border-1);
+  background-color: var(--color-border-1);
 }</style>
