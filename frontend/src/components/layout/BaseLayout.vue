@@ -64,7 +64,7 @@
           </a-menu-item>
           <a-menu-item key="OneClickTools">
             <template #icon><icon-thunderbolt /></template>
-            AI工具
+            AI管理
           </a-menu-item>
           <a-menu-item key="WPAssets">
             <template #icon><icon-apps /></template>

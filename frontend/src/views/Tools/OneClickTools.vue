@@ -1,6 +1,6 @@
 <template>
   <div class="tools-container">
-    <a-typography-title :heading="2">AI工具</a-typography-title>
+    <a-typography-title :heading="2">AI管理</a-typography-title>
    
 
     <a-tabs v-model:active-key="activeTab" class="tools-tabs">
@@ -93,6 +93,11 @@
           </a-col>
         </a-row>
       </a-tab-pane>
+
+      <!-- Agent 接入 -->
+      <a-tab-pane key="agent" title="Agent接入">
+        <AgentAccess />
+      </a-tab-pane>
     </a-tabs>
   </div>
 </template>
@@ -100,6 +105,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { Message } from '@arco-design/web-vue'
+import AgentAccess from './AgentAccess.vue'
 import {
   IconSearch,
   IconBulb,
