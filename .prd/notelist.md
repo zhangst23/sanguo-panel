@@ -105,3 +105,38 @@
 ### 注意事项
 - 后端启动命令已更新，建议使用 `README.md` 中提供的最新启动方式。
 - 如果之前已创建数据库，建议删除 `panel.db` 并运行 `python backend/init_db.py` 重新初始化以应用最新的 Schema。
+
+## 2026-11-28: 界面重构、通知提醒与 Agent 接入（阶段收尾）
+
+### 已完成功能
+1. **明亮主题对比度与侧边栏**:
+    - 修正 Arco 主题变量误用（`--arco-color-*` → `--color-*`，并保留兼容别名）。
+    - 侧边栏菜单重排；「WP 管理」换成灰色 WordPress 内嵌 SVG 小图标；「AI 管理」更名。
+    - IP 展示去掉「IP」文字与上方横线，复制图标紧邻地址。
+2. **文件与系统**:
+    - `chmod` 支持文件/目录分别设权限；文件管理权限列可读化，提供「放开读写 / 一键只读」。
+    - `/system/status` 返回服务器 IP。
+3. **页面与标签整合**:
+    - PHP 管理改为 9 个纯中文二级标签；LSCache 改名「LS缓存管理」。
+    - 「一键提速工具」与「WordPress 安全加固」从原页面迁入 `/wp-assets`，默认打开「WP一键提速」。
+    - AI 管理新增「模型」与「Agent接入」标签。
+    - 安全页「IP 封禁列表」置顶，新增手动解禁卡片。
+4. **通知提醒**（新模块）:
+    - SMTP 配置/测试/诊断/配置码导入导出，Webhook（企业微信/钉钉/飞书），13 条告警规则，最近 100 条告警记录。
+    - 配置存 `GlobalOption`，记录存 `backup/notification_records.json`。
+5. **Agent 接入**（新模块）:
+    - MCP JSON-RPC 端点（`initialize`/`tools/list`/`tools/call`），只读工具 `panel_status`、`list_sites`、`list_tasks`。
+    - Skill 说明文件与一键安装提示词；页面提供「复制面板 Token」自动填入配置。
+6. **Token 体系**:
+    - Token 改为永久有效（`ACCESS_TOKEN_EXPIRE_MINUTES=0`，无 `exp`）。
+    - 新增 `users.token_version`（自动迁移）与 `POST /system/token/regenerate`，重新生成后旧 Token 失效。
+    - 面板设置页新增 Token 管理卡片。
+
+### 技术要点
+- 生产环境服务的是 `frontend/dist/` 静态产物，改前端源码后必须 `npm run build`，否则刷新看不到变化。
+- systemd 服务未开 reload，后端改动需 `systemctl restart sanguo-panel`。
+- JWT 携带 `token_ver` 与 `users.token_version` 配合实现定向撤销，无需改 SECRET_KEY。
+- 为避免改动数据库表结构，通知配置沿用 `GlobalOption`，告警记录沿用 JSON 文件（与面板备份一致）。
+
+### 状态
+- 本轮开发暂告一段落，全部改动已提交并推送至 `origin/main`；README 与 AGENTS.md 已同步更新。

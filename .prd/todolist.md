@@ -46,6 +46,19 @@
 - [x] 多 PHP 版本切换与 PHP 扩展管理可视化
 - [x] 一键部署: WordPress, Typecho 等
 
+## P3 本轮迭代（2026-11-28，阶段收尾）
+
+- [x] 明亮主题对比度优化（侧边栏 / Logo / 用户名 / 按钮 / 菜单）
+- [x] 侧边栏菜单重排与文案调整（WP 管理 / AI 管理 / WordPress 小图标）
+- [x] 文件管理权限显示与文件/目录分别 chmod、一键只读
+- [x] PHP 管理改为纯中文二级标签；LSCache 改名 LS缓存管理
+- [x] 一键提速工具、WordPress 安全加固迁入 WP 管理页，默认打开 WP一键提速
+- [x] AI 管理新增「模型」与「Agent接入（MCP / Skill）」标签
+- [x] 通知提醒：SMTP、Webhook、告警规则、告警记录（最近 100 条）
+- [x] 面板 Token 永久化、Token 管理卡片与版本化撤销
+- [x] IP 封禁列表置顶与手动解禁卡片
+- [x] README.md / AGENTS.md / notelist.md 文档同步
+
 ---
 ## 规范说明
 1. 每个功能开发前需更新此 Todolist。

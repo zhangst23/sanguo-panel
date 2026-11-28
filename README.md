@@ -1,22 +1,28 @@
 # Sanguo Panel 三国面板
 
-Sanguo Panel 是一款专为 WordPress 优化设计的轻量级托管面板，基于 **OpenLiteSpeed**、**MariaDB**、**Redis** 构建。
+Sanguo Panel 是一款专为 WordPress 优化设计的轻量级托管面板，基于 **OpenLiteSpeed**、**MariaDB**、**Redis** 构建。面板以单个 systemd 服务运行，构建后的前端由 FastAPI 在 8000 端口同源提供。
 
 ## 项目结构
+
 ```
 sanguo-panel/
 ├── venv/                  # 虚拟环境（项目根目录）
-├── backend/               # FastAPI 后端（同时托管构建后的前端）
-├── frontend/              # Vue 前端
-├── deploy/                # 系统服务安装 / 卸载脚本（systemd）
-├── requirements.txt       # Python 依赖（已包含 requests）
+├── backend/               # FastAPI 后端（API + 托管 frontend/dist）
+│   ├── api/v1/            # 业务路由（system / sites / security / notifications / agent ...）
+│   ├── models/            # SQLAlchemy 模型
+│   ├── utils/             # 工具函数（含 notification_utils.py、panel_ops.py 等）
+│   └── panel.db           # SQLite 面板库（运行时数据，不入库）
+├── frontend/              # Vue 3 + Vite SPA，构建产物在 dist/
+├── deploy/                # systemd 服务安装 / 卸载 / 重置脚本
+├── .prd/                  # 设计文档、PRD、测试用例、任务清单、开发记录
+├── requirements.txt
 ├── start.sh               # 服务启停 / 状态脚本
-├── .gitignore             # 忽略 venv/、运行时数据等
 ├── README.md
 └── AGENTS.md
 ```
 
 **运行时目录（不在代码仓库中）：**
+
 ```
 /var/www/html/            # WordPress 站点文件（每个站点一个子目录）
 ├── site1.com/
@@ -26,11 +32,28 @@ sanguo-panel/
 
 ## 核心特性
 
-- **极致性能**: 集成 LSCache、Redis、OPcache 和浏览器四层缓存控制。
-- **一键优化**: 支持图片批量压缩 (WebP/AVIF)、前端资源合并、数据库碎片整理。
-- **运维便捷**: 包含 SSL 自动管理 (Let's Encrypt)、全站备份与恢复、多版本 PHP 切换。
-- **安全可靠**: 隐藏登录路径、JWT 安全验证、系统防火墙集成。
-- **OpenLiteSpeed 技术底座**: 采用 LSAPI (lsphp) 运行 PHP，性能卓越，原生支持 LSCache。
+- **极致性能**：集成 LSCache、Redis、OPcache 和浏览器四层缓存控制；提供 WP 一键提速工具。
+- **一键优化**：图片批量压缩 (WebP/AVIF)、前端资源合并、数据库碎片整理。
+- **运维便捷**：SSL 自动管理 (Let's Encrypt)、全站备份与恢复、多版本 PHP 切换。
+- **安全可靠**：隐藏登录路径、JWT 鉴权（Token 永久有效且可重置）、Fail2ban IP 封禁、系统防火墙。
+- **通知提醒**：SMTP 邮件、企业微信/钉钉/飞书 Webhook、13 条告警规则与最近 100 条告警记录。
+- **Agent 接入**：内置 MCP（JSON-RPC over HTTP）与 Agent Skill，可让 Claude/Cursor/OpenCode 等直接管理面板。
+- **OpenLiteSpeed 技术底座**：LSAPI (lsphp) 运行 PHP，多版本共存，原生支持 LSCache。
+
+## 面板功能地图
+
+侧边栏（自上而下）：仪表盘、网站管理、文件管理、数据库管理、**WP 管理**、安全防御、**AI 管理**、备份迁移、系统工具（系统管理 / 监控中心 / 面板设置 / 操作日志 / 关于）。
+
+| 页面 | 主要标签 |
+|------|----------|
+| WP 管理 (`/wp-assets`) | **WP一键提速**（默认）、WP安全加固、WP 版本、主题管理、插件管理 |
+| AI 管理 (`/tools`) | AI 修复、**模型**、Agent接入 |
+| 系统管理 (`/linux`) | 系统状态、**PHP 管理**、OLS 虚拟主机管理、**LS缓存管理**、Rewrite、Redis 管理、Linux 管理、Log |
+| 安全防御 (`/security`) | **IP 封禁列表**（默认）、Fail2ban 设置、UFW 防火墙 |
+| 面板设置 (`/system/settings`) | 面板设置（含**面板 Token** 管理）、通知提醒、面板运行日志 |
+| 文件管理 (`/file-manager`) | 权限列可读化，支持「放开读写 / 一键只读」切换 |
+
+> 亮色主题下侧边栏、IP、菜单与按钮均已做过对比度优化。
 
 ## 快速启动
 
@@ -100,9 +123,42 @@ sudo ./deploy/reset-panel.sh --full   # 完全重置（删除 panel.db，恢复 
 - **用户名**: `admin`
 - **密码**: `admin123`
 
+## 面板 Token
+
+面板使用 JWT 鉴权，登录时签发，当前配置为**永久有效**（`ACCESS_TOKEN_EXPIRE_MINUTES=0`）。
+
+- 获取：登录后浏览器控制台执行 `localStorage.getItem('token')`，或调用 `POST /api/v1/login/access-token`
+- 管理：`面板设置 → 面板 Token` 卡片，可查看（明文切换）、复制、重新生成
+- 重新生成会递增用户 `token_version`，**旧 Token 立即失效**；其他地方使用的 Token 需同步更新
+- 请勿把 Token 泄露给不可信人员
+
+## Agent 接入（MCP / Skill）
+
+`AI 管理 → Agent接入` 提供两种接入方式，均复用面板 Bearer Token：
+
+| 能力 | 地址 | 说明 |
+|------|------|------|
+| MCP | `POST /api/v1/agent/mcp` | JSON-RPC（Streamable HTTP 风格），支持 `initialize` / `tools/list` / `tools/call` |
+| Skill 说明 | `GET /api/v1/agent/skill.md` | 可直接交给 Agent 阅读的 Markdown |
+| 接入信息 | `GET /api/v1/agent/info` | 返回实际 MCP / Skill 地址与工具列表 |
+| 安装提示词 | `GET /api/v1/agent/skill/prompt` | 生成带本机地址的安装提示词 |
+
+当前 MCP 工具（只读）：`panel_status`、`list_sites`、`list_tasks`。页面上的「复制面板 Token」按钮会把当前登录 Token 自动填入 MCP 配置模板。
+
+## 通知提醒
+
+`面板设置 → 通知提醒`：
+
+- **SMTP 邮件配置**：服务器 / 端口 / 加密方式 / 用户名 / 授权码 / 发件邮箱 / 管理员邮箱；保存、测试发送、诊断 SMTP、复制配置码、导入配置码
+- **Webhook 推送**：企业微信 / 钉钉 / 飞书，保存即启用、清空 URL 即停用，支持测试发送
+- **告警规则**：13 条开关（资源 / 可用性 / 运维 / 安全），阈值与统计窗口
+- **告警记录**：最近 100 条，最新在前
+
+配置以 `GlobalOption` 存入 SQLite，记录写入 `backup/notification_records.json`。后端接口位于 `/api/v1/notifications/*`。
+
 ## 技术栈
 
-- **Web 服务器**: OpenLiteSpeed (端口 80/443) — 托管 WordPress 站点；面板前端由 FastAPI 在 8000 端口同源提供
+- **Web 服务器**: OpenLiteSpeed (80/443) — 托管 WordPress 站点；面板前端由 FastAPI 在 8000 端口同源提供
 - **后端**: FastAPI, SQLAlchemy (SQLite), Pydantic, JWT, Psutil
 - **前端**: Vue 3, Vite, Arco Design, Pinia, Axios, ECharts
 - **数据库**: MariaDB (WordPress 站点), SQLite (面板配置)
@@ -120,18 +176,22 @@ sudo ./deploy/reset-panel.sh --full   # 完全重置（删除 panel.db，恢复 
 
 ## 前端构建部署
 
-面板前端由后端在 8000 端口直接托管（`frontend/dist/`）。修改前端代码后重新构建并重启服务：
+面板前端由后端在 8000 端口直接托管（`frontend/dist/`）。**修改前端源码后必须重新构建，否则刷新页面看不到变化**：
 
 ```bash
 cd frontend
-pnpm install     # 首次或依赖变更时
-pnpm build
+pnpm install     # 首次或依赖变更时（npm install 亦可）
+pnpm build       # 或 npm run build
 sudo systemctl restart sanguo-panel
 ```
 
-或直接重新运行 `sudo ./deploy/install-service.sh`，脚本会自动完成依赖安装、构建与服务重启。
+后端代码改动同样需要 `sudo systemctl restart sanguo-panel` 才会生效（systemd 服务未开启 reload）。
+
 构建产物输出到 `frontend/dist/`，不存在时后端仅提供 API（开发模式请用 Vite）。
 
 ## 文档参考
 
-详细的设计文档、测试用例和任务清单请参考 `.prd/` 目录。
+设计与开发文档在 `.prd/`：PRD、前端 PRD、技术架构、SQL、测试用例、任务清单、开发记录、OpenLiteSpeed / phpMyAdmin / WP-CLI 指南。
+Agent 协作约定见 `AGENTS.md`。
+
+> 当前状态：开发暂告一段落，功能已提交并推送至 `origin/main`；后续如需继续，请从 `.prd/notelist.md` 的开发记录接续。
