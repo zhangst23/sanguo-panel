@@ -1,7 +1,7 @@
 <template>
   <div class="tools-container">
-    <a-typography-title :heading="2">AI管理</a-typography-title>
-   
+    <a-typography-title :heading="2">AI 管理</a-typography-title>
+
 
     <a-tabs v-model:active-key="activeTab" class="tools-tabs">
       <!-- AI 修复 -->

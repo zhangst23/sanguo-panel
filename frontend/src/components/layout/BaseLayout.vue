@@ -1,557 +1,583 @@
 <template>
-  <a-layout class="layout-container">
-    <a-layout-sider
-      breakpoint="lg"
-      :width="220"
-      collapsible
-      :collapsed="collapsed"
-      @collapse="onCollapse"
-      :trigger="null"
-    >
-      <!-- Logo + 折叠 < -->
-      <div class="logo-wrapper">
-        <div v-if="!collapsed" class="logo">SanGuo WP面板</div>
-        <a-button
-          type="text"
-          size="small"
-          @click="onCollapse(!collapsed)"
-          class="collapse-btn"
-          :class="{ 'collapse-btn-collapsed': collapsed }"
-          :aria-label="collapsed ? '展开' : '折叠'"
+    <a-layout class="layout-container">
+        <a-layout-sider
+            breakpoint="lg"
+            :width="220"
+            collapsible
+            :collapsed="collapsed"
+            @collapse="onCollapse"
+            :trigger="null"
         >
-          <icon-left v-if="!collapsed" />
-          <icon-right v-else />
-        </a-button>
-      </div>
+            <!-- Logo + 折叠 < -->
+            <div class="logo-wrapper">
+                <div v-if="!collapsed" class="logo">SanGuo WP面板</div>
+                <a-button
+                    type="text"
+                    size="small"
+                    @click="onCollapse(!collapsed)"
+                    class="collapse-btn"
+                    :class="{ 'collapse-btn-collapsed': collapsed }"
+                    :aria-label="collapsed ? '展开' : '折叠'"
+                >
+                    <icon-left v-if="!collapsed" />
+                    <icon-right v-else />
+                </a-button>
+            </div>
 
-      <!-- 服务器 IP（点击复制） -->
-      <a-tooltip v-if="!collapsed && serverIp" content="点击复制 IP" position="bottom">
-        <div class="ip-wrapper" @click="copyServerIp">
-          <span class="ip-text">{{ serverIp }}</span>
-          <icon-copy class="ip-copy" />
-        </div>
-      </a-tooltip>
-
-      <!-- 菜单 -->
-      <div class="sider-content">
-        <a-menu
-          :selected-keys="[selectedKey]"
-          :auto-open-selected="true"
-          @menu-item-click="handleMenuClick"
-          :collapsed="collapsed"
-          mode="vertical"
-          :theme="theme === 'dark' ? 'dark' : 'light'"
-        >
-          <a-menu-item key="Dashboard">
-            <template #icon><icon-dashboard /></template>
-            仪表盘
-          </a-menu-item>
-          <a-menu-item key="Website">
-            <template #icon><icon-common /></template>
-            网站管理
-          </a-menu-item>
-          <a-menu-item key="FileManager">
-            <template #icon><icon-folder /></template>
-            文件管理
-          </a-menu-item>
-          <a-menu-item key="MariaDB">
-            <template #icon><icon-storage /></template>
-            数据库管理
-          </a-menu-item>
-          <a-menu-item key="Security">
-            <template #icon><icon-safe /></template>
-            安全防御
-          </a-menu-item>
-          <a-menu-item key="OneClickTools">
-            <template #icon><icon-thunderbolt /></template>
-            AI管理
-          </a-menu-item>
-          <a-menu-item key="WPAssets">
-            <template #icon><icon-apps /></template>
-            WP管理
-          </a-menu-item>
-          <a-menu-item key="Backup">
-            <template #icon><icon-cloud-download /></template>
-            备份迁移
-          </a-menu-item>
-
-          <a-sub-menu key="System">
-            <template #icon><icon-settings /></template>
-            <template #title>系统工具</template>
-            <a-menu-item key="Linux">系统管理</a-menu-item>
-            <a-menu-item key="Monitor">监控中心</a-menu-item>
-            <a-menu-item key="SystemSettings">面板设置</a-menu-item>
-            <a-menu-item key="TaskList">操作日志</a-menu-item>
-            <a-menu-item key="About">关于</a-menu-item>
-          </a-sub-menu>
-        </a-menu>
-      </div>
-
-      <!-- 底部用户区域 -->
-      <div class="user-area-wrapper">
-        <a-popover
-          trigger="click"
-          position="top"
-          :popup-visible="userPopupVisible"
-          @popup-visible-change="onPopupVisibleChange"
-          content-class="user-popover-content"
-          :arrow-style="{ display: 'none' }"
-          :content-style="{ padding: 0 }"
-        >
-          <div class="user-trigger" :class="{ collapsed }">
-            <a-avatar
-              :size="collapsed ? 32 : 36"
-              style="background-color: var(--arco-blue-6); flex-shrink: 0;"
+            <!-- 服务器 IP（点击复制） -->
+            <a-tooltip
+                v-if="!collapsed && serverIp"
+                content="点击复制 IP"
+                position="bottom"
             >
-              {{ userInitial }}
-            </a-avatar>
-            <div v-if="!collapsed" class="user-info">
-              <span class="username">{{ username }}</span>
+                <div class="ip-wrapper" @click="copyServerIp">
+                    <span class="ip-text">{{ serverIp }}</span>
+                    <icon-copy class="ip-copy" />
+                </div>
+            </a-tooltip>
+
+            <!-- 菜单 -->
+            <div class="sider-content">
+                <a-menu
+                    :selected-keys="[selectedKey]"
+                    :auto-open-selected="true"
+                    @menu-item-click="handleMenuClick"
+                    :collapsed="collapsed"
+                    mode="vertical"
+                    :theme="theme === 'dark' ? 'dark' : 'light'"
+                >
+                    <a-menu-item key="Dashboard">
+                        <template #icon><icon-dashboard /></template>
+                        仪表盘
+                    </a-menu-item>
+                    <a-menu-item key="Website">
+                        <template #icon><icon-common /></template>
+                        网站管理
+                    </a-menu-item>
+                    <a-menu-item key="FileManager">
+                        <template #icon><icon-folder /></template>
+                        文件管理
+                    </a-menu-item>
+                    <a-menu-item key="MariaDB">
+                        <template #icon><icon-storage /></template>
+                        数据库管理
+                    </a-menu-item>
+                    <a-menu-item key="Security">
+                        <template #icon><icon-safe /></template>
+                        安全防御
+                    </a-menu-item>
+                    <a-menu-item key="OneClickTools">
+                        <template #icon><icon-thunderbolt /></template>
+                        AI 管理
+                    </a-menu-item>
+                    <a-menu-item key="WPAssets">
+                        <template #icon><icon-apps /></template>
+                        WP 管理
+                    </a-menu-item>
+                    <a-menu-item key="Backup">
+                        <template #icon><icon-cloud-download /></template>
+                        备份迁移
+                    </a-menu-item>
+
+                    <a-sub-menu key="System">
+                        <template #icon><icon-settings /></template>
+                        <template #title>系统工具</template>
+                        <a-menu-item key="Linux">系统管理</a-menu-item>
+                        <a-menu-item key="Monitor">监控中心</a-menu-item>
+                        <a-menu-item key="SystemSettings">面板设置</a-menu-item>
+                        <a-menu-item key="TaskList">操作日志</a-menu-item>
+                        <a-menu-item key="About">关于</a-menu-item>
+                    </a-sub-menu>
+                </a-menu>
             </div>
-          </div>
-          <template #content>
-            <div class="popover-menu">
-              <!-- 语言行 -->
-              <div class="menu-row" @click="toggleLangOptions">
-                <span class="menu-label">语言</span>
-                <span class="menu-value">
-                  {{ languageLabel }}
-                  <icon-right class="menu-arrow" />
-                </span>
-              </div>
-              <div v-if="showLangOptions" class="menu-sub">
-                <div
-                  class="menu-sub-item"
-                  :class="{ selected: currentLanguage === 'zh' }"
-                  @click="changeLanguage('zh')"
-                >中文</div>
-                <div
-                  class="menu-sub-item"
-                  :class="{ selected: currentLanguage === 'en' }"
-                  @click="changeLanguage('en')"
-                >English</div>
-              </div>
 
-              <div class="menu-divider" />
+            <!-- 底部用户区域 -->
+            <div class="user-area-wrapper">
+                <a-popover
+                    trigger="click"
+                    position="top"
+                    :popup-visible="userPopupVisible"
+                    @popup-visible-change="onPopupVisibleChange"
+                    content-class="user-popover-content"
+                    :arrow-style="{ display: 'none' }"
+                    :content-style="{ padding: 0 }"
+                >
+                    <div class="user-trigger" :class="{ collapsed }">
+                        <a-avatar
+                            :size="collapsed ? 32 : 36"
+                            style="
+                                background-color: var(--arco-blue-6);
+                                flex-shrink: 0;
+                            "
+                        >
+                            {{ userInitial }}
+                        </a-avatar>
+                        <div v-if="!collapsed" class="user-info">
+                            <span class="username">{{ username }}</span>
+                        </div>
+                    </div>
+                    <template #content>
+                        <div class="popover-menu">
+                            <!-- 语言行 -->
+                            <div class="menu-row" @click="toggleLangOptions">
+                                <span class="menu-label">语言</span>
+                                <span class="menu-value">
+                                    {{ languageLabel }}
+                                    <icon-right class="menu-arrow" />
+                                </span>
+                            </div>
+                            <div v-if="showLangOptions" class="menu-sub">
+                                <div
+                                    class="menu-sub-item"
+                                    :class="{
+                                        selected: currentLanguage === 'zh',
+                                    }"
+                                    @click="changeLanguage('zh')"
+                                >
+                                    中文
+                                </div>
+                                <div
+                                    class="menu-sub-item"
+                                    :class="{
+                                        selected: currentLanguage === 'en',
+                                    }"
+                                    @click="changeLanguage('en')"
+                                >
+                                    English
+                                </div>
+                            </div>
 
-              <!-- 主题行 -->
-              <div class="menu-row" @click="toggleThemeOptions">
-                <span class="menu-label">主题</span>
-                <span class="menu-value">
-                  {{ themeLabel }}
-                  <icon-right class="menu-arrow" />
-                </span>
-              </div>
-              <div v-if="showThemeOptions" class="menu-sub">
-                <div
-                  class="menu-sub-item"
-                  :class="{ selected: theme === 'dark' }"
-                  @click="changeTheme('dark')"
-                >暗色</div>
-                <div
-                  class="menu-sub-item"
-                  :class="{ selected: theme === 'light' }"
-                  @click="changeTheme('light')"
-                >明亮</div>
-              </div>
+                            <div class="menu-divider" />
 
-              <div class="menu-divider" />
+                            <!-- 主题行 -->
+                            <div class="menu-row" @click="toggleThemeOptions">
+                                <span class="menu-label">主题</span>
+                                <span class="menu-value">
+                                    {{ themeLabel }}
+                                    <icon-right class="menu-arrow" />
+                                </span>
+                            </div>
+                            <div v-if="showThemeOptions" class="menu-sub">
+                                <div
+                                    class="menu-sub-item"
+                                    :class="{ selected: theme === 'dark' }"
+                                    @click="changeTheme('dark')"
+                                >
+                                    暗色
+                                </div>
+                                <div
+                                    class="menu-sub-item"
+                                    :class="{ selected: theme === 'light' }"
+                                    @click="changeTheme('light')"
+                                >
+                                    明亮
+                                </div>
+                            </div>
 
-              <!-- 退出行 -->
-              <div class="menu-row logout-row" @click="handleLogout">
-                <span class="menu-label">退出登录</span>
-              </div>
+                            <div class="menu-divider" />
+
+                            <!-- 退出行 -->
+                            <div
+                                class="menu-row logout-row"
+                                @click="handleLogout"
+                            >
+                                <span class="menu-label">退出登录</span>
+                            </div>
+                        </div>
+                    </template>
+                </a-popover>
             </div>
-          </template>
-        </a-popover>
-      </div>
-    </a-layout-sider>
-    <a-layout-content class="content">
-      <router-view />
-    </a-layout-content>
-  </a-layout>
+        </a-layout-sider>
+        <a-layout-content class="content">
+            <router-view />
+        </a-layout-content>
+    </a-layout>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { ref, computed, watch } from "vue";
+import { useRouter, useRoute } from "vue-router";
 import {
-  IconDashboard,
-  IconCommon,
-  IconStorage,
-  IconFolder,
-  IconThunderbolt,
-  IconSafe,
-  IconCloudDownload,
-  IconSettings,
-  IconApps,
-  IconLeft,
-  IconRight,
-  IconCopy,
-} from '@arco-design/web-vue/es/icon'
-import { Message } from '@arco-design/web-vue'
-import request from '@/utils/request'
-import { onMounted, onUnmounted } from 'vue'
+    IconDashboard,
+    IconCommon,
+    IconStorage,
+    IconFolder,
+    IconThunderbolt,
+    IconSafe,
+    IconCloudDownload,
+    IconSettings,
+    IconApps,
+    IconLeft,
+    IconRight,
+    IconCopy,
+} from "@arco-design/web-vue/es/icon";
+import { Message } from "@arco-design/web-vue";
+import request from "@/utils/request";
+import { onMounted, onUnmounted } from "vue";
 
-const router = useRouter()
-const route = useRoute()
-const collapsed = ref(false)
-const theme = ref(localStorage.getItem('theme') || 'dark')
-const currentLanguage = ref(localStorage.getItem('language') || 'zh')
-const userPopupVisible = ref(false)
-const showLangOptions = ref(false)
-const showThemeOptions = ref(false)
-const username = ref('Admin')
-const userInitial = ref('A')
+const router = useRouter();
+const route = useRoute();
+const collapsed = ref(false);
+const theme = ref(localStorage.getItem("theme") || "dark");
+const currentLanguage = ref(localStorage.getItem("language") || "zh");
+const userPopupVisible = ref(false);
+const showLangOptions = ref(false);
+const showThemeOptions = ref(false);
+const username = ref("Admin");
+const userInitial = ref("A");
 
-const selectedKey = computed(() => route.name)
-const languageLabel = computed(() => currentLanguage.value === 'zh' ? '中文' : 'English')
-const themeLabel = computed(() => theme.value === 'dark' ? '暗色' : '明亮')
+const selectedKey = computed(() => route.name);
+const languageLabel = computed(() =>
+    currentLanguage.value === "zh" ? "中文" : "English",
+);
+const themeLabel = computed(() => (theme.value === "dark" ? "暗色" : "明亮"));
 
 // 服务器 IP（进入面板时获取一次）
-const serverIp = ref('')
+const serverIp = ref("");
 const fetchServerIp = async () => {
-  try {
-    const res = await request.get('/system/status')
-    serverIp.value = res?.ip || ''
-  } catch (error) {
-    console.error(error)
-  }
-}
+    try {
+        const res = await request.get("/system/status");
+        serverIp.value = res?.ip || "";
+    } catch (error) {
+        console.error(error);
+    }
+};
 
 const copyServerIp = async () => {
-  if (!serverIp.value) return
-  try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(serverIp.value)
-    } else {
-      // 非 HTTPS 环境下 navigator.clipboard 不可用，使用兼容写法
-      const textarea = document.createElement('textarea')
-      textarea.value = serverIp.value
-      textarea.style.position = 'fixed'
-      textarea.style.opacity = '0'
-      document.body.appendChild(textarea)
-      textarea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textarea)
+    if (!serverIp.value) return;
+    try {
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(serverIp.value);
+        } else {
+            // 非 HTTPS 环境下 navigator.clipboard 不可用，使用兼容写法
+            const textarea = document.createElement("textarea");
+            textarea.value = serverIp.value;
+            textarea.style.position = "fixed";
+            textarea.style.opacity = "0";
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand("copy");
+            document.body.removeChild(textarea);
+        }
+        Message.success("IP 已复制");
+    } catch (error) {
+        Message.error("复制失败，请手动复制");
     }
-    Message.success('IP 已复制')
-  } catch (error) {
-    Message.error('复制失败，请手动复制')
-  }
-}
+};
 
 // title
-let expectedTitle = ''
+let expectedTitle = "";
 const setPageTitle = (r) => {
-  const title = r.meta?.title || '三国面板'
-  const fullTitle = title ? `${title} - 三国面板` : '三国面板'
-  expectedTitle = fullTitle
-  document.title = fullTitle
-}
-watch(route, (r) => setPageTitle(r), { immediate: true })
+    const title = r.meta?.title || "三国面板";
+    const fullTitle = title ? `${title} - 三国面板` : "三国面板";
+    expectedTitle = fullTitle;
+    document.title = fullTitle;
+};
+watch(route, (r) => setPageTitle(r), { immediate: true });
 const restoreTitle = () => {
-  if (document.title !== expectedTitle && expectedTitle) document.title = expectedTitle
-}
-const titleInterval = setInterval(restoreTitle, 500)
-window.__titleInterval = titleInterval
+    if (document.title !== expectedTitle && expectedTitle)
+        document.title = expectedTitle;
+};
+const titleInterval = setInterval(restoreTitle, 500);
+window.__titleInterval = titleInterval;
 
 const onCollapse = (val) => {
-  collapsed.value = val
-  if (val) userPopupVisible.value = false
-}
+    collapsed.value = val;
+    if (val) userPopupVisible.value = false;
+};
 
 const onPopupVisibleChange = (visible) => {
-  userPopupVisible.value = visible
-  if (!visible) {
-    showLangOptions.value = false
-    showThemeOptions.value = false
-  }
-}
+    userPopupVisible.value = visible;
+    if (!visible) {
+        showLangOptions.value = false;
+        showThemeOptions.value = false;
+    }
+};
 
 const toggleLangOptions = () => {
-  showLangOptions.value = !showLangOptions.value
-  showThemeOptions.value = false
-}
+    showLangOptions.value = !showLangOptions.value;
+    showThemeOptions.value = false;
+};
 const toggleThemeOptions = () => {
-  showThemeOptions.value = !showThemeOptions.value
-  showLangOptions.value = false
-}
+    showThemeOptions.value = !showThemeOptions.value;
+    showLangOptions.value = false;
+};
 
 const applyTheme = (val) => {
-  if (val === 'dark') {
-    document.body.setAttribute('arco-theme', 'dark')
-    document.documentElement.setAttribute('arco-theme', 'dark')
-    document.body.style.backgroundColor = '#000000'
-  } else {
-    document.body.removeAttribute('arco-theme')
-    document.documentElement.removeAttribute('arco-theme')
-    document.body.style.backgroundColor = ''
-  }
-  localStorage.setItem('theme', val)
-}
+    if (val === "dark") {
+        document.body.setAttribute("arco-theme", "dark");
+        document.documentElement.setAttribute("arco-theme", "dark");
+        document.body.style.backgroundColor = "#000000";
+    } else {
+        document.body.removeAttribute("arco-theme");
+        document.documentElement.removeAttribute("arco-theme");
+        document.body.style.backgroundColor = "";
+    }
+    localStorage.setItem("theme", val);
+};
 const changeTheme = (newTheme) => {
-  theme.value = newTheme
-  applyTheme(newTheme)
-  userPopupVisible.value = false
-}
+    theme.value = newTheme;
+    applyTheme(newTheme);
+    userPopupVisible.value = false;
+};
 const changeLanguage = (lang) => {
-  currentLanguage.value = lang
-  localStorage.setItem('language', lang)
-  userPopupVisible.value = false
-}
+    currentLanguage.value = lang;
+    localStorage.setItem("language", lang);
+    userPopupVisible.value = false;
+};
 const handleLogout = () => {
-  localStorage.removeItem('token')
-  router.push('/login')
-}
+    localStorage.removeItem("token");
+    router.push("/login");
+};
 
 onMounted(() => {
-  applyTheme(theme.value)
-  fetchServerIp()
-})
+    applyTheme(theme.value);
+    fetchServerIp();
+});
 onUnmounted(() => {
-  const t = window.__titleInterval
-  if (t) clearInterval(t)
-})
+    const t = window.__titleInterval;
+    if (t) clearInterval(t);
+});
 
 const handleMenuClick = (key) => {
-  router.push({ name: key })
-}
+    router.push({ name: key });
+};
 </script>
 
 <style scoped lang="scss">
 .layout-container {
-  height: 100vh;
-  background-color: var(--color-bg-1);
+    height: 100vh;
+    background-color: var(--color-bg-1);
 }
 
 .arco-layout-sider {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  background: var(--color-bg-2);
-  border-right: 1px solid var(--color-border-2);
-  overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: var(--color-bg-2);
+    border-right: 1px solid var(--color-border-2);
+    overflow: hidden;
 }
 
 .arco-layout-sider :deep(.arco-layout-sider-children) {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
 }
 
 .arco-layout-sider :deep(.arco-layout-sider-trigger) {
-  display: none !important;
+    display: none !important;
 }
 
 .sider-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 12px 0 52px 0;
-  min-height: 0;
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 0 52px 0;
+    min-height: 0;
 }
 
 .logo-wrapper {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 64px;
-  padding: 0 16px;
-  background: var(--color-bg-2);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+    padding: 0 16px;
+    background: var(--color-bg-2);
 
-  /* 折叠时隐藏 logo，折叠按钮居中 */
-  &:has(.collapse-btn-collapsed) {
-    justify-content: center;
-  }
+    /* 折叠时隐藏 logo，折叠按钮居中 */
+    &:has(.collapse-btn-collapsed) {
+        justify-content: center;
+    }
 }
 
 .logo {
-  color: var(--color-text-1);
-  font-size: 18px;
-  font-weight: 600;
-  white-space: nowrap;
+    color: var(--color-text-1);
+    font-size: 18px;
+    font-weight: 600;
+    white-space: nowrap;
 }
 
 .ip-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 16px 10px;
-  font-size: 12px;
-  color: var(--color-text-3);
-  cursor: pointer;
-  user-select: none;
-  transition: background-color 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 16px 10px;
+    font-size: 12px;
+    color: var(--color-text-3);
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.15s;
 
-  &:hover {
-    background-color: var(--color-fill-2);
-    color: var(--color-text-1);
+    &:hover {
+        background-color: var(--color-fill-2);
+        color: var(--color-text-1);
 
-    .ip-copy {
-      color: var(--color-primary);
+        .ip-copy {
+            color: var(--color-primary);
+        }
     }
-  }
 }
 .ip-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .ip-copy {
-  flex-shrink: 0;
-  font-size: 14px;
+    flex-shrink: 0;
+    font-size: 14px;
 }
 
 .collapse-btn {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  color: var(--color-text-3);
-  flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    color: var(--color-text-3);
+    flex-shrink: 0;
 
-  &:hover {
-    background-color: var(--color-fill-2);
-    color: var(--color-text-1);
-  }
+    &:hover {
+        background-color: var(--color-fill-2);
+        color: var(--color-text-1);
+    }
 }
 
 .user-area-wrapper {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  border-top: 1px solid var(--color-border-2);
-  background: var(--color-bg-2);
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    border-top: 1px solid var(--color-border-2);
+    background: var(--color-bg-2);
 }
 
 .user-trigger {
-  display: flex;
-  align-items: center;
-  padding: 10px 16px;
-  cursor: pointer;
-  transition: background-color 0.2s;
+    display: flex;
+    align-items: center;
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: background-color 0.2s;
 
-  &:hover {
-    background-color: var(--color-fill-2);
-  }
+    &:hover {
+        background-color: var(--color-fill-2);
+    }
 
-  &.collapsed {
-    justify-content: center;
-    padding: 10px 0;
-  }
+    &.collapsed {
+        justify-content: center;
+        padding: 10px 0;
+    }
 }
 
 .user-info {
-  margin-left: 10px;
-  min-width: 0;
-  overflow: hidden;
+    margin-left: 10px;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .username {
-  display: block;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--color-text-1);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text-1);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .content {
-  padding: 16px 20px;
-  overflow-y: auto;
-  background-color: var(--color-bg-1);
-  flex: 1;
+    padding: 16px 20px;
+    overflow-y: auto;
+    background-color: var(--color-bg-1);
+    flex: 1;
 }
 
 .content :deep(.arco-typography) {
-  margin-top: 0;
+    margin-top: 0;
 }
 </style>
 
 <style lang="scss">
 /* Popover 菜单 — 非 scoped，因为 a-popover 内容渲染在 body */
 .user-popover-content {
-  padding: 0 !important;
-  min-width: 180px;
-  background: var(--color-bg-4) !important;
-  border: 1px solid var(--color-border-2) !important;
-  border-radius: 6px;
-  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.35) !important;
+    padding: 0 !important;
+    min-width: 180px;
+    background: var(--color-bg-4) !important;
+    border: 1px solid var(--color-border-2) !important;
+    border-radius: 6px;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.35) !important;
 }
 
 .popover-menu {
-  padding: 6px 0;
+    padding: 6px 0;
 }
 
 .menu-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 9px 14px;
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--color-text-1);
-  transition: background-color 0.15s;
-
-  &:hover {
-    background-color: var(--color-fill-2);
-  }
-
-  &.logout-row {
-    color: var(--arco-red-6);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 14px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--color-text-1);
+    transition: background-color 0.15s;
 
     &:hover {
-      background-color: var(--arco-red-1);
+        background-color: var(--color-fill-2);
     }
-  }
+
+    &.logout-row {
+        color: var(--arco-red-6);
+
+        &:hover {
+            background-color: var(--arco-red-1);
+        }
+    }
 }
 
 .menu-label {
-  font-weight: 500;
+    font-weight: 500;
 }
 
 .menu-value {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  color: var(--color-text-3);
-  font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    color: var(--color-text-3);
+    font-size: 12px;
 }
 
 .menu-arrow {
-  font-size: 11px;
-  color: var(--color-text-3);
+    font-size: 11px;
+    color: var(--color-text-3);
 }
 
 .menu-sub {
-  background: var(--color-fill-1);
+    background: var(--color-fill-1);
 }
 
 .menu-sub-item {
-  padding: 9px 14px 9px 28px;
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--color-text-1);
-  transition: background-color 0.15s;
+    padding: 9px 14px 9px 28px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--color-text-1);
+    transition: background-color 0.15s;
 
-  &:hover {
-    background-color: var(--color-fill-2);
-  }
+    &:hover {
+        background-color: var(--color-fill-2);
+    }
 
-  &.selected {
-    color: var(--arco-blue-6);
-    font-weight: 500;
-    background-color: var(--arco-blue-1);
-  }
+    &.selected {
+        color: var(--arco-blue-6);
+        font-weight: 500;
+        background-color: var(--arco-blue-1);
+    }
 }
 
 .menu-divider {
-  height: 1px;
-  margin: 4px 10px;
-  background-color: var(--color-border-1);
-}</style>
+    height: 1px;
+    margin: 4px 10px;
+    background-color: var(--color-border-1);
+}
+</style>
