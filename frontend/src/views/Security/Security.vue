@@ -3,7 +3,152 @@
     <a-typography-title :heading="2">安全防御</a-typography-title>
 
     <a-tabs v-model:active-key="activeTab">
-      
+      <a-tab-pane key="fail2ban-list" title="IP 封禁列表">
+        <a-grid :cols="24" :col-gap="16">
+          <a-grid-item :span="24">
+            <a-card title="IP 封禁列表">
+              <template #extra>
+                <a-space>
+                  <a-tag :color="!fail2ban.installed ? 'orange' : (fail2ban.active ? 'green' : 'red')">
+                    {{ !fail2ban.installed ? '未安装' : (fail2ban.active ? '运行中' : '已停止') }}
+                  </a-tag>
+                  <a-button
+                    v-if="!fail2ban.installed"
+                    size="small"
+                    type="primary"
+                    :loading="installing"
+                    @click="handleInstallFail2ban"
+                  >
+                    <template #icon><icon-download /></template>
+                    安装 Fail2ban
+                  </a-button>
+                  <a-button
+                    v-else
+                    size="small"
+                    :loading="restarting"
+                    @click="handleStartFail2ban"
+                  >
+                    <template #icon><icon-refresh /></template>
+                    重新启动Fail2ban
+                  </a-button>
+                  <a-button size="small" :loading="testingConfig" @click="handleTestConfig">
+                    <template #icon><icon-settings /></template>
+                    测试配置
+                  </a-button>
+                  <a-button size="small" :loading="logLoading" @click="handleViewLogs">
+                    <template #icon><icon-file /></template>
+                    查看日志
+                  </a-button>
+                </a-space>
+              </template>
+
+              <!-- 手动封禁 / 解禁 IP -->
+              <a-row :gutter="16" class="manual-ip-row">
+                <a-col :span="12">
+                  <a-card :bordered="false" class="manual-ban-card" title="手动封禁 IP">
+                    <a-space wrap>
+                      <a-input
+                        v-model="manualBanIp"
+                        placeholder="请输入要封禁的 IP 地址"
+                        allow-clear
+                        style="width: 260px;"
+                      />
+                      <a-select v-model="manualBanLevel" style="width: 150px;">
+                        <a-option value="permanent">永久封禁</a-option>
+                        <a-option value="temp_24h">临时 24h</a-option>
+                        <a-option value="temp_10m">临时 10 分钟</a-option>
+                        <a-option value="ratelimit">限速</a-option>
+                      </a-select>
+                      <a-button
+                        type="primary"
+                        status="danger"
+                        :loading="manualBanLoading"
+                        @click="handleBanIp"
+                      >
+                        封禁
+                      </a-button>
+                    </a-space>
+                  </a-card>
+                </a-col>
+                <a-col :span="12">
+                  <a-card :bordered="false" class="manual-ban-card" title="手动解禁 IP">
+                    <a-space wrap>
+                      <a-input
+                        v-model="manualUnbanIp"
+                        placeholder="请输入要解禁的 IP 地址"
+                        allow-clear
+                        style="width: 260px;"
+                      />
+                      <a-button
+                        type="primary"
+                        :loading="manualUnbanLoading"
+                        @click="handleManualUnbanIp"
+                      >
+                        解禁
+                      </a-button>
+                    </a-space>
+                  </a-card>
+                </a-col>
+              </a-row>
+
+              <!-- 当前封禁列表 -->
+              <a-table
+                :data="fail2ban.bans"
+                :loading="banLoading"
+                :pagination="false"
+                :scroll="{ y: 380 }"
+                style="margin-top: 16px;"
+              >
+                <template #columns>
+                  <a-table-column title="IP 地址" data-index="ip" :width="140" />
+                  <a-table-column title="等级" :width="100" >
+                    <template #cell="{ record }">
+                      <a-tag :color="levelMap[record.level] ? levelMap[record.level].color : 'gray'">
+                        {{ levelMap[record.level] ? levelMap[record.level].text : record.level }}
+                      </a-tag>
+                    </template>
+                  </a-table-column>
+                  <a-table-column title="原因" data-index="reason"  :width="170" />
+                  <a-table-column title="来源" :width="80" >
+                    <template #cell="{ record }">
+                      <a-tag :color="sourceMap[record.source] ? sourceMap[record.source].color : 'gray'">
+                        {{ sourceMap[record.source] ? sourceMap[record.source].text : record.source }}
+                      </a-tag>
+                    </template>
+                  </a-table-column>
+                  <a-table-column title="访问路径" :width="240" >
+                    <template #cell="{ record }">
+                      <span v-if="!(record.paths && record.paths.length)">-</span>
+                      <span v-else>
+                        {{ record.paths.slice(0, 3).join('、') }}<template v-if="record.paths.length > 3">…</template>
+                      </span>
+                    </template>
+                  </a-table-column>
+                  <a-table-column title="封禁时间" data-index="banned_at" :width="110" />
+                  <a-table-column title="过期时间" data-index="expire_at" :width="110" />
+                  <a-table-column title="累计次数" data-index="count" :width="70" />
+                  <a-table-column title="操作" fixed="right" :width="140" >
+                    <template #cell="{ record }">
+                      <a-space>
+                        <a-button type="text" size="small" @click="handleUnbanIp(record.ip)">解封</a-button>
+                        <a-button
+                          v-if="record.level !== 'permanent'"
+                          type="text"
+                          size="small"
+                          status="danger"
+                          @click="handlePermanent(record.ip)"
+                        >
+                          永久封禁
+                        </a-button>
+                      </a-space>
+                    </template>
+                  </a-table-column>
+                </template>
+              </a-table>
+            </a-card>
+          </a-grid-item>
+        </a-grid>
+      </a-tab-pane>
 
       <!-- WordPress 安全加固标签页 -->
       <a-tab-pane key="wordpress" title="WordPress 安全加固">
@@ -179,129 +324,6 @@
       </a-tab-pane>
 
       <!-- IP 封禁列表 -->
-      <a-tab-pane key="fail2ban-list" title="IP 封禁列表">
-        <a-grid :cols="24" :col-gap="16">
-          <a-grid-item :span="24">
-            <a-card title="IP 封禁列表">
-              <template #extra>
-                <a-space>
-                  <a-tag :color="!fail2ban.installed ? 'orange' : (fail2ban.active ? 'green' : 'red')">
-                    {{ !fail2ban.installed ? '未安装' : (fail2ban.active ? '运行中' : '已停止') }}
-                  </a-tag>
-                  <a-button
-                    v-if="!fail2ban.installed"
-                    size="small"
-                    type="primary"
-                    :loading="installing"
-                    @click="handleInstallFail2ban"
-                  >
-                    <template #icon><icon-download /></template>
-                    安装 Fail2ban
-                  </a-button>
-                  <a-button
-                    v-else
-                    size="small"
-                    :loading="restarting"
-                    @click="handleStartFail2ban"
-                  >
-                    <template #icon><icon-refresh /></template>
-                    重新启动Fail2ban
-                  </a-button>
-                  <a-button size="small" :loading="testingConfig" @click="handleTestConfig">
-                    <template #icon><icon-settings /></template>
-                    测试配置
-                  </a-button>
-                  <a-button size="small" :loading="logLoading" @click="handleViewLogs">
-                    <template #icon><icon-file /></template>
-                    查看日志
-                  </a-button>
-                </a-space>
-              </template>
-
-              <!-- 手动封禁 IP -->
-              <a-card :bordered="false" class="manual-ban-card" title="手动封禁 IP">
-                <a-space wrap>
-                  <a-input
-                    v-model="manualBanIp"
-                    placeholder="请输入要封禁的 IP 地址"
-                    allow-clear
-                    style="width: 260px;"
-                  />
-                  <a-select v-model="manualBanLevel" style="width: 150px;">
-                    <a-option value="permanent">永久封禁</a-option>
-                    <a-option value="temp_24h">临时 24h</a-option>
-                    <a-option value="temp_10m">临时 10 分钟</a-option>
-                    <a-option value="ratelimit">限速</a-option>
-                  </a-select>
-                  <a-button
-                    type="primary"
-                    status="danger"
-                    :loading="manualBanLoading"
-                    @click="handleBanIp"
-                  >
-                    封禁
-                  </a-button>
-                </a-space>
-              </a-card>
-
-              <!-- 当前封禁列表 -->
-              <a-table
-                :data="fail2ban.bans"
-                :loading="banLoading"
-                :pagination="false"
-                :scroll="{ y: 380 }"
-                style="margin-top: 16px;"
-              >
-                <template #columns>
-                  <a-table-column title="IP 地址" data-index="ip" :width="140" />
-                  <a-table-column title="等级" :width="100" >
-                    <template #cell="{ record }">
-                      <a-tag :color="levelMap[record.level] ? levelMap[record.level].color : 'gray'">
-                        {{ levelMap[record.level] ? levelMap[record.level].text : record.level }}
-                      </a-tag>
-                    </template>
-                  </a-table-column>
-                  <a-table-column title="原因" data-index="reason"  :width="170" />
-                  <a-table-column title="来源" :width="80" >
-                    <template #cell="{ record }">
-                      <a-tag :color="sourceMap[record.source] ? sourceMap[record.source].color : 'gray'">
-                        {{ sourceMap[record.source] ? sourceMap[record.source].text : record.source }}
-                      </a-tag>
-                    </template>
-                  </a-table-column>
-                  <a-table-column title="访问路径" :width="240" >
-                    <template #cell="{ record }">
-                      <span v-if="!(record.paths && record.paths.length)">-</span>
-                      <span v-else>
-                        {{ record.paths.slice(0, 3).join('、') }}<template v-if="record.paths.length > 3">…</template>
-                      </span>
-                    </template>
-                  </a-table-column>
-                  <a-table-column title="封禁时间" data-index="banned_at" :width="110" />
-                  <a-table-column title="过期时间" data-index="expire_at" :width="110" />
-                  <a-table-column title="累计次数" data-index="count" :width="70" />
-                  <a-table-column title="操作" fixed="right" :width="140" >
-                    <template #cell="{ record }">
-                      <a-space>
-                        <a-button type="text" size="small" @click="handleUnbanIp(record.ip)">解封</a-button>
-                        <a-button
-                          v-if="record.level !== 'permanent'"
-                          type="text"
-                          size="small"
-                          status="danger"
-                          @click="handlePermanent(record.ip)"
-                        >
-                          永久封禁
-                        </a-button>
-                      </a-space>
-                    </template>
-                  </a-table-column>
-                </template>
-              </a-table>
-            </a-card>
-          </a-grid-item>
-        </a-grid>
-      </a-tab-pane>
 
       <!-- 系统安全标签页 -->
       <a-tab-pane key="system" title="UFW 防火墙">
@@ -434,7 +456,7 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import request from '@/utils/request'
 import { Message } from '@arco-design/web-vue'
 
-const activeTab = ref('wordpress')
+const activeTab = ref('fail2ban-list')
 const loading = reactive({
   firewall: false,
   wp: false
@@ -461,6 +483,8 @@ const banLoading = ref(false)
 const manualBanIp = ref('')
 const manualBanLevel = ref('permanent')
 const manualBanLoading = ref(false)
+const manualUnbanIp = ref('')
+const manualUnbanLoading = ref(false)
 const restarting = ref(false)
 const installing = ref(false)
 const testingConfig = ref(false)
@@ -727,6 +751,25 @@ const handleUnbanIp = async (ip) => {
   }
 }
 
+const handleManualUnbanIp = async () => {
+  const ip = manualUnbanIp.value.trim()
+  if (!ip) {
+    Message.warning('请输入要解禁的 IP 地址')
+    return
+  }
+  manualUnbanLoading.value = true
+  try {
+    await request.post(`/security/fail2ban/unban?ip=${ip}`)
+    Message.success(`IP ${ip} 已解封`)
+    manualUnbanIp.value = ''
+    fetchData()
+  } catch (error) {
+    Message.error('操作失败')
+  } finally {
+    manualUnbanLoading.value = false
+  }
+}
+
 const handleBanIp = async () => {
   const ip = manualBanIp.value.trim()
   if (!ip) {
@@ -865,9 +908,12 @@ onMounted(fetchData)
       line-height: 1.6;
     }
   }
+  .manual-ip-row {
+    margin-bottom: 4px;
+  }
   .manual-ban-card {
     background-color: var(--color-fill-1);
-    margin-bottom: 4px;
+    height: 100%;
   }
   .setting-card {
     height: 100%;
