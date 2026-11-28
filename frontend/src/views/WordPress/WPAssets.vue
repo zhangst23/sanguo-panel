@@ -2,7 +2,7 @@
     <div class="wp-assets-page">
         <a-card class="library-card">
             <a-tabs v-model:active-key="activeTab">
-                <a-tab-pane key="speedTools" title="一键提速">
+                <a-tab-pane key="speedTools" title="WP一键提速">
                     <QuickSpeedTools />
                 </a-tab-pane>
 
@@ -394,7 +394,7 @@ const defaults = reactive({
     default_themes: [],
     default_plugins: [],
 });
-const activeTab = ref("core");
+const activeTab = ref("speedTools");
 
 const fetchVisible = ref(false);
 const fetchVersion = ref("");
