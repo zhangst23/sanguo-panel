@@ -27,7 +27,6 @@
       <!-- 服务器 IP（点击复制） -->
       <a-tooltip v-if="!collapsed && serverIp" content="点击复制 IP" position="bottom">
         <div class="ip-wrapper" @click="copyServerIp">
-          <span class="ip-label">IP</span>
           <span class="ip-text">{{ serverIp }}</span>
           <icon-copy class="ip-copy" />
         </div>
@@ -51,37 +50,39 @@
             <template #icon><icon-common /></template>
             网站管理
           </a-menu-item>
-          <a-menu-item key="MariaDB">
-            <template #icon><icon-storage /></template>
-            数据库管理
-          </a-menu-item>
           <a-menu-item key="FileManager">
             <template #icon><icon-folder /></template>
             文件管理
           </a-menu-item>
-          <a-menu-item key="OneClickTools">
-            <template #icon><icon-thunderbolt /></template>
-            AI工具
+          <a-menu-item key="MariaDB">
+            <template #icon><icon-storage /></template>
+            数据库管理
           </a-menu-item>
           <a-menu-item key="Security">
             <template #icon><icon-safe /></template>
             安全防御
           </a-menu-item>
+          <a-menu-item key="OneClickTools">
+            <template #icon><icon-thunderbolt /></template>
+            AI工具
+          </a-menu-item>
+          <a-menu-item key="WPAssets">
+            <template #icon><icon-apps /></template>
+            WP主题插件管理
+          </a-menu-item>
           <a-menu-item key="Backup">
             <template #icon><icon-cloud-download /></template>
             备份迁移
           </a-menu-item>
-          
+
           <a-sub-menu key="System">
             <template #icon><icon-settings /></template>
             <template #title>系统工具</template>
-            <a-menu-item key="WPAssets">WP主题插件管理</a-menu-item>
             <a-menu-item key="Linux">系统管理</a-menu-item>
             <a-menu-item key="Monitor">监控中心</a-menu-item>
             <a-menu-item key="SystemSettings">面板设置</a-menu-item>
             <a-menu-item key="TaskList">操作日志</a-menu-item>
             <a-menu-item key="About">关于</a-menu-item>
-            
           </a-sub-menu>
         </a-menu>
       </div>
@@ -183,7 +184,7 @@ import {
   IconSafe,
   IconCloudDownload,
   IconSettings,
-  IconList,
+  IconApps,
   IconLeft,
   IconRight,
   IconCopy,
@@ -357,7 +358,6 @@ const handleMenuClick = (key) => {
   height: 64px;
   padding: 0 16px;
   background: var(--color-bg-2);
-  border-bottom: 1px solid var(--color-border-2);
 
   /* 折叠时隐藏 logo，折叠按钮居中 */
   &:has(.collapse-btn-collapsed) {
@@ -375,7 +375,7 @@ const handleMenuClick = (key) => {
 .ip-wrapper {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   padding: 8px 16px 10px;
   font-size: 12px;
   color: var(--color-text-3);
@@ -392,17 +392,12 @@ const handleMenuClick = (key) => {
     }
   }
 }
-.ip-label {
-  flex-shrink: 0;
-  opacity: 0.8;
-}
 .ip-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .ip-copy {
-  margin-left: auto;
   flex-shrink: 0;
   font-size: 14px;
 }
