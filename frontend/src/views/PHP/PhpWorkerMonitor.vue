@@ -1,5 +1,5 @@
 <template>
-  <a-card title="Worker Monitor (实时监控)" :bordered="false">
+  <a-card title="实时监控" :bordered="false">
     <template #extra>
       <a-space>
         <a-button size="small" @click="fetchWorker"><icon-refresh /> 刷新</a-button>

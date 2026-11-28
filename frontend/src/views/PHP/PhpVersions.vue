@@ -1,5 +1,5 @@
 <template>
-  <a-card title="PHP 版本 (Versions)" :bordered="false">
+  <a-card title="PHP 版本" :bordered="false">
     <a-table :data="versions" :loading="loading" :pagination="false" size="medium">
       <template #columns>
         <a-table-column title="版本" data-index="version" />

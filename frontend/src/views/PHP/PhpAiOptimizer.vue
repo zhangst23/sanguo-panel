@@ -1,5 +1,5 @@
 <template>
-  <a-card title="AI Optimizer (AI 优化建议)" :bordered="false">
+  <a-card title="AI 优化建议" :bordered="false">
     <a-space direction="vertical" fill>
       <a-button size="small" @click="fetchTips"><icon-bulb /> 重新分析</a-button>
       <a-spin :loading="loading">

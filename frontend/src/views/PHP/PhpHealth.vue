@@ -1,5 +1,5 @@
 <template>
-  <a-card title="Health (健康检查)" :bordered="false">
+  <a-card title="健康检查" :bordered="false">
     <a-spin :loading="loading" style="width: 100%;">
       <a-space direction="vertical" fill>
         <a-progress

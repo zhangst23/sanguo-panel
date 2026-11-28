@@ -1,5 +1,5 @@
 <template>
-  <a-card title="OPcache (字节码缓存)" :bordered="false">
+  <a-card title="字节码缓存" :bordered="false">
     <a-spin :loading="loading" style="width: 100%;">
       <a-result v-if="!loading && !data.enabled" status="warning" title="OPcache 未启用">
         <template #subtitle>建议在 Runtime Config 或 php.ini 中开启 opcache.enable=1</template>

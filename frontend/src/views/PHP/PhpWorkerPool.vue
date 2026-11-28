@@ -1,5 +1,5 @@
 <template>
-  <a-card title="Worker Pool (Worker 配置)" :bordered="false">
+  <a-card title="进程池配置" :bordered="false">
     <a-form :model="form" layout="vertical" style="max-width: 520px;">
       <a-form-item label="最大连接数 (maxConns)">
         <a-input-number v-model="form.max_conns" :min="1" :max="1000" style="width: 100%;" />

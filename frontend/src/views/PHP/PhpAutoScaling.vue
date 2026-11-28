@@ -1,5 +1,5 @@
 <template>
-  <a-card title="Auto Scaling (自动伸缩)" :bordered="false">
+  <a-card title="自动伸缩" :bordered="false">
     <a-form :model="form" layout="vertical" style="max-width: 520px;">
       <a-form-item label="启用自动伸缩">
         <a-switch v-model="form.enabled" />

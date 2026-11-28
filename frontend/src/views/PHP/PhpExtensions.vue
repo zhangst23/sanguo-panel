@@ -1,5 +1,5 @@
 <template>
-  <a-card title="扩展管理 (Extensions)" :bordered="false">
+  <a-card title="扩展管理" :bordered="false">
     <a-space style="margin-bottom: 16px;">
       <a-select v-model="version" style="width: 200px;" @change="fetchExt">
         <a-option v-for="v in versions" :key="v.version" :value="v.version">{{ v.version }}</a-option>
