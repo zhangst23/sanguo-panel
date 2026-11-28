@@ -64,11 +64,13 @@
             </a-card>
           </a-col>
         </a-row>
+      </a-tab-pane>
 
-        <!-- AI 设置（从面板设置迁移至此，位于 AI诊断 卡片下方） -->
+      <!-- 模型配置 -->
+      <a-tab-pane key="model" title="模型">
         <a-row :gutter="16">
           <a-col :xs="24" :md="10">
-            <a-card title="AI 设置" :bordered="false" class="tool-card">
+            <a-card title="模型配置" :bordered="false" class="tool-card">
               <a-form :model="aiSettingsForm" layout="vertical" @submit="handleAISave">
                 <a-form-item label="模型" required>
                   <a-input v-model="aiSettingsForm.model" placeholder="请输入模型名称" />
