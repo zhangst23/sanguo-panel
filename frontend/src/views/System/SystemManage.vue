@@ -6,13 +6,13 @@
       <a-tab-pane key="status" title="系统状态">
         <SystemStatus />
       </a-tab-pane>    
-      <a-tab-pane key="php" title="PHP Runtime 管理">
+      <a-tab-pane key="php" title="PHP 管理">
         <PHPManager />
       </a-tab-pane>      
       <a-tab-pane key="ols" title="OLS 虚拟主机管理">
         <OLSManager />
       </a-tab-pane>
-      <a-tab-pane key="lscache" title="LSCache">
+      <a-tab-pane key="lscache" title="LS缓存管理">
         <LSCacheManager />
       </a-tab-pane>
       <a-tab-pane key="rewrite" title="Rewrite">

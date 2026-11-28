@@ -3,7 +3,7 @@ from backend.api.v1 import (
     auth, system, site, service, cache, ssl, 
     image, database, assets, cdn, ultimate, tasks,
     litespeed, php, linux, security, monitor, tools,
-    files, wp_assets
+    files, wp_assets, notifications
 )
 
 api_router = APIRouter()
@@ -27,3 +27,4 @@ api_router.include_router(ultimate.router, prefix="/ultimate", tags=["ultimate"]
 api_router.include_router(tasks.router, prefix="/tasks", tags=["tasks"])
 api_router.include_router(files.router, prefix="/files", tags=["files"])
 api_router.include_router(wp_assets.router, prefix="/wp-assets", tags=["wp-assets"])
+api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])

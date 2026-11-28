@@ -109,6 +109,11 @@
           </div>
         </a-card>
       </a-tab-pane>
+
+      <!-- 通知提醒 -->
+      <a-tab-pane key="notifications" title="通知提醒">
+        <NotificationSettings />
+      </a-tab-pane>
     </a-tabs>
   </div>
 </template>
@@ -120,6 +125,7 @@ import {
   IconRefresh, IconDownload, IconDelete, IconUpCircle
 } from '@arco-design/web-vue/es/icon'
 import request from '@/utils/request'
+import NotificationSettings from './NotificationSettings.vue'
 
 const loading = reactive({
   password: false,
