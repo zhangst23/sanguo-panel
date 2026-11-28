@@ -2,7 +2,6 @@
   <div class="about-container">
     <a-card :bordered="false" class="about-hero">
       <div class="about-brand">
-        <span class="about-logo">三</span>
         <div>
           <a-typography-title :heading="2" :style="{ margin: 0 }">三国面板</a-typography-title>
           <div class="about-subtitle">Sanguo Panel · 开源主机控制面板</div>
@@ -82,22 +81,7 @@ const openLink = (url) => {
   margin-bottom: 16px;
 }
 .about-brand {
-  display: flex;
-  align-items: center;
-  gap: 16px;
   margin-bottom: 16px;
-}
-.about-logo {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 56px;
-  height: 56px;
-  border-radius: 12px;
-  background: var(--color-primary-6);
-  color: #fff;
-  font-size: 28px;
-  font-weight: 700;
 }
 .about-subtitle {
   margin-top: 4px;

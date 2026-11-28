@@ -1459,6 +1459,12 @@ onMounted(() => {
   color: var(--color-text-2);
   margin-right: 4px;
 }
+/* 明亮主题下，批量操作行的默认按钮文字偏灰：加深普通/禁用态文字，
+   warning / danger / outline 按钮使用各自的状态色，不受影响。 */
+body:not([arco-theme='dark']) .action-row {
+  --color-text-2: var(--color-text-1);
+  --color-text-4: var(--color-text-3);
+}
 .list-card {
   border-radius: 8px;
   margin-top: 16px;
