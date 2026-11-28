@@ -68,7 +68,7 @@
           </a-menu-item>
           <a-menu-item key="WPAssets">
             <template #icon><icon-apps /></template>
-            WP主题插件管理
+            WP管理
           </a-menu-item>
           <a-menu-item key="Backup">
             <template #icon><icon-cloud-download /></template>

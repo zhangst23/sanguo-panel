@@ -80,7 +80,7 @@ const routes = [
         path: 'wp-assets',
         name: 'WPAssets',
         component: () => import('@/views/WordPress/WPAssets.vue'),
-        meta: { requiresAuth: true, title: 'WP主题插件管理' },
+        meta: { requiresAuth: true, title: 'WP管理' },
       },
       {
         path: 'linux',
