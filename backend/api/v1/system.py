@@ -60,12 +60,28 @@ class TaskStatusOut(BaseModel):
         from_attributes = True
 
 
+def _get_server_ip() -> str:
+    """获取本机在局域网/公网上的主 IP（不走实际流量）。"""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.connect(("8.8.8.8", 80))
+        return sock.getsockname()[0]
+    except Exception:
+        try:
+            return socket.gethostbyname(socket.gethostname())
+        except Exception:
+            return "127.0.0.1"
+    finally:
+        sock.close()
+
+
 @router.get("/status")
 async def get_status():
     return {
         "status": "online",
         "timestamp": datetime.now(),
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "ip": _get_server_ip(),
     }
 
 

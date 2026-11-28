@@ -37,7 +37,8 @@ class DeleteRequest(BaseModel):
 class ChmodRequest(BaseModel):
     site_id: int
     path: str
-    mode: int = 0o777
+    mode: int = 0o777          # 文件权限
+    dir_mode: Optional[int] = None  # 目录权限（不传则与文件相同）
     recursive: bool = True
 
 
@@ -183,7 +184,7 @@ def chmod_item(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_active_user)
 ):
-    """放开权限（chmod 777）"""
+    """修改权限；传 dir_mode 时可对目录与文件分别设置权限。"""
     site = db.query(Site).filter(Site.id == req.site_id).first()
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
@@ -192,29 +193,34 @@ def chmod_item(
         if not os.path.exists(target):
             raise HTTPException(status_code=404, detail="路径不存在")
 
+        file_mode = req.mode
+        dir_mode = req.dir_mode if req.dir_mode is not None else req.mode
+
         count = 0
         if os.path.isdir(target):
             if req.recursive:
                 for root, dirs, files in os.walk(target):
                     for d in dirs:
                         try:
-                            os.chmod(os.path.join(root, d), req.mode)
+                            os.chmod(os.path.join(root, d), dir_mode)
                             count += 1
                         except Exception:
                             pass
                     for f in files:
                         try:
-                            os.chmod(os.path.join(root, f), req.mode)
+                            os.chmod(os.path.join(root, f), file_mode)
                             count += 1
                         except Exception:
                             pass
-            else:
-                os.chmod(target, req.mode)
-                count = 1
+            try:
+                os.chmod(target, dir_mode)
+                count += 1
+            except Exception:
+                pass
         else:
-            os.chmod(target, req.mode)
+            os.chmod(target, file_mode)
             count = 1
-        return {"success": True, "changed": count, "mode": oct(req.mode)}
+        return {"success": True, "changed": count, "mode": oct(file_mode), "dir_mode": oct(dir_mode)}
     except HTTPException:
         raise
     except Exception as e:

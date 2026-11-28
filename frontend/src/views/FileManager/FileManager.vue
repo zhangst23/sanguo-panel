@@ -59,7 +59,6 @@
                   {{ seg }}
                 </a-breadcrumb-item>
               </a-breadcrumb>
-              <span v-if="currentPath" class="path-display">{{ currentPath }}</span>
               <a-tag v-if="currentPathSize" color="arcoblue" size="small">
                 ({{ currentPathSize }})
               </a-tag>
@@ -72,12 +71,14 @@
                 刷新
               </a-button>
               <a-popconfirm
-                content="确定要将当前目录及所有子文件权限放开为 777 (可读写) 吗？"
-                @ok="handleChmod777"
+                :content="isUnlocked
+                  ? '确定要把当前目录下所有文件改为只读吗？（文件 444 / 目录 555）'
+                  : '确定要将当前目录及所有子文件权限放开为 777（读+写+执行）吗？'"
+                @ok="handlePermissionConfirm"
               >
                 <a-button size="small" type="outline" :loading="chmodLoading">
-                  <template #icon><icon-unlock /></template>
-                  放开权限
+                  <template #icon><icon-lock v-if="isUnlocked" /><icon-unlock v-else /></template>
+                  {{ isUnlocked ? '一键只读' : '放开读写' }}
                 </a-button>
               </a-popconfirm>
               <a-button size="small" type="primary" @click="showUpload = true">
@@ -118,7 +119,11 @@
                   {{ record.is_dir ? '-' : formatSize(record.size) }}
                 </template>
               </a-table-column>
-              <a-table-column title="权限" :width="120" data-index="mode" />
+              <a-table-column title="权限（所有人）" :width="180">
+                <template #cell="{ record }">
+                  {{ formatPermission(record.mode) }}
+                </template>
+              </a-table-column>
               <a-table-column title="修改时间" :width="200" data-index="mtime" />
               <a-table-column title="操作" :width="200">
                 <template #cell="{ record }">
@@ -197,7 +202,8 @@ import {
   IconArrowUp,
   IconFolderAdd,
   IconStorage,
-  IconUnlock
+  IconUnlock,
+  IconLock
 } from '@arco-design/web-vue/es/icon'
 
 const route = useRoute()
@@ -223,6 +229,30 @@ const showUpload = ref(false)
 const uploadList = ref([])
 
 const canGoUp = computed(() => currentPath.value && currentPath.value !== '/')
+
+// 当前目录已放开读写（777）时，按钮切换为“一键只读”
+const isUnlocked = computed(() =>
+  files.value.length > 0 && files.value.every((f) => f.mode?.endsWith('rwxrwxrwx')))
+
+// 把 stat.filemode 字符串转成更易读的八进制权限说明
+const formatPermission = (mode) => {
+  if (!mode || typeof mode !== 'string') return '-'
+  const triad = (start) => {
+    let value = 0
+    if (mode[start] === 'r') value += 4
+    if (mode[start + 1] === 'w') value += 2
+    if (['x', 's', 't'].includes(mode[start + 2])) value += 1
+    return value
+  }
+  const numeric = `${triad(1)}${triad(4)}${triad(7)}`
+  const owner = triad(1)
+  const labels = { 4: '只读', 6: '读+写', 7: '读+写+执行', 5: '读+执行' }
+  const label = labels[owner] || (
+    `${owner & 4 ? '读' : ''}${owner & 2 ? '+写' : ''}${owner & 1 ? '+执行' : ''}`.replace(/^\+/, '') || '无权限'
+  )
+  return owner === 4 ? `${numeric} 只读` : `${numeric}（${label}）`
+}
+
 const pathSegments = computed(() => {
   if (!currentPath.value) return []
   return currentPath.value.split('/').filter(Boolean)
@@ -309,7 +339,7 @@ const calcCurrentPathSize = async () => {
   }
 }
 
-const handleChmod777 = async () => {
+const handleChmod = async (payload, successText) => {
   if (!currentSiteId.value || !currentPath.value) {
     Message.warning('请先选择目录')
     return
@@ -319,16 +349,28 @@ const handleChmod777 = async () => {
     const res = await request.post('/files/chmod', {
       site_id: currentSiteId.value,
       path: currentPath.value,
-      mode: 0o777,
-      recursive: true
+      recursive: true,
+      ...payload
     })
-    Message.success(`已放开权限，影响 ${res.changed} 个文件/文件夹`)
-    fetchFiles()
+    Message.success(`${successText}，影响 ${res.changed} 个文件/文件夹`)
+    await fetchFiles()
   } catch (e) {
     Message.error('操作失败: ' + (e.response?.data?.detail || e.message))
   } finally {
     chmodLoading.value = false
   }
+}
+
+const handleChmod777 = () => handleChmod({ mode: 0o777 }, '已放开读写')
+
+// 已放开读写时，按钮提供“一键只读”：文件 444，目录 555（可进入浏览）
+const handleReadOnly = () => handleChmod(
+  { mode: 0o444, dir_mode: 0o555 }, '已将文件改为只读'
+)
+
+const handlePermissionConfirm = () => {
+  if (isUnlocked.value) handleReadOnly()
+  else handleChmod777()
 }
 
 const openItem = (record) => {
@@ -530,14 +572,5 @@ onMounted(() => {
   justify-content: center;
   padding: 80px 0;
   color: var(--color-text-3);
-}
-.path-display {
-  font-size: 12px;
-  color: var(--color-text-3);
-  font-family: 'Consolas', 'Monaco', monospace;
-  max-width: 400px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 </style>

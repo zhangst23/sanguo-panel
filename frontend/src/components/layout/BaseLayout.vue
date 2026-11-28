@@ -24,6 +24,15 @@
         </a-button>
       </div>
 
+      <!-- 服务器 IP（点击复制） -->
+      <a-tooltip v-if="!collapsed && serverIp" content="点击复制 IP" position="bottom">
+        <div class="ip-wrapper" @click="copyServerIp">
+          <span class="ip-label">IP</span>
+          <span class="ip-text">{{ serverIp }}</span>
+          <icon-copy class="ip-copy" />
+        </div>
+      </a-tooltip>
+
       <!-- 菜单 -->
       <div class="sider-content">
         <a-menu
@@ -177,7 +186,10 @@ import {
   IconList,
   IconLeft,
   IconRight,
+  IconCopy,
 } from '@arco-design/web-vue/es/icon'
+import { Message } from '@arco-design/web-vue'
+import request from '@/utils/request'
 import { onMounted, onUnmounted } from 'vue'
 
 const router = useRouter()
@@ -194,6 +206,39 @@ const userInitial = ref('A')
 const selectedKey = computed(() => route.name)
 const languageLabel = computed(() => currentLanguage.value === 'zh' ? '中文' : 'English')
 const themeLabel = computed(() => theme.value === 'dark' ? '暗色' : '明亮')
+
+// 服务器 IP（进入面板时获取一次）
+const serverIp = ref('')
+const fetchServerIp = async () => {
+  try {
+    const res = await request.get('/system/status')
+    serverIp.value = res?.ip || ''
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+const copyServerIp = async () => {
+  if (!serverIp.value) return
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(serverIp.value)
+    } else {
+      // 非 HTTPS 环境下 navigator.clipboard 不可用，使用兼容写法
+      const textarea = document.createElement('textarea')
+      textarea.value = serverIp.value
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+    }
+    Message.success('IP 已复制')
+  } catch (error) {
+    Message.error('复制失败，请手动复制')
+  }
+}
 
 // title
 let expectedTitle = ''
@@ -259,7 +304,10 @@ const handleLogout = () => {
   router.push('/login')
 }
 
-onMounted(() => applyTheme(theme.value))
+onMounted(() => {
+  applyTheme(theme.value)
+  fetchServerIp()
+})
 onUnmounted(() => {
   const t = window.__titleInterval
   if (t) clearInterval(t)
@@ -322,6 +370,41 @@ const handleMenuClick = (key) => {
   font-size: 18px;
   font-weight: 600;
   white-space: nowrap;
+}
+
+.ip-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px 10px;
+  font-size: 12px;
+  color: var(--color-text-3);
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s;
+
+  &:hover {
+    background-color: var(--color-fill-2);
+    color: var(--color-text-1);
+
+    .ip-copy {
+      color: var(--color-primary);
+    }
+  }
+}
+.ip-label {
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+.ip-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ip-copy {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 14px;
 }
 
 .collapse-btn {
